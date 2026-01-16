@@ -36,6 +36,7 @@
 #include <Bitmap.h>
 #include <Button.h>
 #include <Catalog.h>
+#include <View.h>
 #include <CheckBox.h>
 #include <Clipboard.h>
 #include <ControlLook.h>
@@ -240,6 +241,7 @@ public:
 		:
 		fFocusedView(focusedView),
 		fPageIcon(NULL),
+		fPageIconLarge(NULL),
 		fURLInputSelectionStart(-1),
 		fURLInputSelectionEnd(-1),
 		fIsLoading(false)
@@ -249,6 +251,7 @@ public:
 	~PageUserData()
 	{
 		delete fPageIcon;
+		delete fPageIconLarge;
 	}
 
 	void SetFocusedView(BView* focusedView)
@@ -264,15 +267,46 @@ public:
 	void SetPageIcon(const BBitmap* icon)
 	{
 		delete fPageIcon;
-		if (icon)
+		fPageIcon = NULL;
+		delete fPageIconLarge;
+		fPageIconLarge = NULL;
+
+		if (icon == NULL)
+			return;
+
+		if (icon->Bounds().IntegerWidth() > 16) {
+			fPageIconLarge = new BBitmap(icon);
+			fPageIcon = new BBitmap(BRect(0, 0, 15, 15), B_RGBA32, true);
+			if (fPageIcon->IsValid()) {
+				BView* view = new BView(fPageIcon->Bounds(), "tmp",
+					B_FOLLOW_NONE, B_WILL_DRAW);
+				fPageIcon->AddChild(view);
+				fPageIcon->Lock();
+				view->SetHighColor(B_TRANSPARENT_32_BIT);
+				view->FillRect(view->Bounds());
+				view->SetDrawingMode(B_OP_ALPHA);
+				view->DrawBitmap(icon, fPageIcon->Bounds());
+				view->Sync();
+				fPageIcon->Unlock();
+				fPageIcon->RemoveChild(view);
+				delete view;
+			} else {
+				delete fPageIcon;
+				fPageIcon = new BBitmap(icon);
+			}
+		} else {
 			fPageIcon = new BBitmap(icon);
-		else
-			fPageIcon = NULL;
+		}
 	}
 
 	const BBitmap* PageIcon() const
 	{
 		return fPageIcon;
+	}
+
+	const BBitmap* PageIconLarge() const
+	{
+		return fPageIconLarge;
 	}
 
 	void SetURLInputContents(const char* text)
@@ -314,6 +348,7 @@ public:
 private:
 	BView*		fFocusedView;
 	BBitmap*	fPageIcon;
+	BBitmap*	fPageIconLarge;
 	BString		fURLInputContents;
 	int32		fURLInputSelectionStart;
 	int32		fURLInputSelectionEnd;
@@ -2676,12 +2711,12 @@ BrowserWindow::_CreateBookmark()
 	status_t status = _BookmarkPath(path);
 
 	BBitmap* miniIcon = NULL;
-	BBitmap* largeIcon = NULL;
+	const BBitmap* largeIcon = NULL;
 	PageUserData* userData = static_cast<PageUserData*>(CurrentWebView()->GetUserData());
 	if (userData != NULL && userData->PageIcon() != NULL) {
 		miniIcon = new BBitmap(BRect(0, 0, 15, 15), B_BITMAP_NO_SERVER_LINK, B_CMAP8);
 		miniIcon->ImportBits(userData->PageIcon());
-		// TODO:  retrieve the large icon too, once PageUserData can provide it.
+		largeIcon = userData->PageIconLarge();
 	}
 
 	if (status == B_OK)
@@ -2697,7 +2732,7 @@ BrowserWindow::_CreateBookmark()
 		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 		alert->Go();
 	}
-	return;
+	delete miniIcon;
 }
 
 
