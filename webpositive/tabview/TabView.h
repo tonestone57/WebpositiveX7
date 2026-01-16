@@ -47,6 +47,9 @@ public:
 			void				SetLabel(const char* label);
 			const BString&		Label() const;
 
+			void				SetPinned(bool pinned);
+			bool				IsPinned() const;
+
 			BRect				Frame() const;
 
 private:
@@ -57,6 +60,7 @@ private:
 			TabLayoutItem*		fLayoutItem;
 
 			BString				fLabel;
+			bool				fPinned;
 };
 
 

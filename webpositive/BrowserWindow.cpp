@@ -135,6 +135,9 @@ enum {
 	COPY_AS_MARKDOWN							= 'cpmd',
 	COPY_AS_HTML								= 'cpht',
 	COPY_AS_PLAIN_TEXT							= 'cppt',
+
+	PIN_TAB										= 'ptab',
+	UNPIN_TAB									= 'uptb',
 };
 
 
@@ -1198,6 +1201,22 @@ BrowserWindow::MessageReceived(BMessage* message)
 			_ReopenClosedTab();
 			break;
 
+		case PIN_TAB:
+		case UNPIN_TAB:
+		{
+			BWebView* currentWebView = CurrentWebView();
+			if (currentWebView) {
+				int32 tabIndex = fTabManager->TabForView(currentWebView);
+				if (tabIndex >= 0) {
+					TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
+					if (tab) {
+						tab->SetPinned(message->what == PIN_TAB);
+					}
+				}
+			}
+			break;
+		}
+
 		case COPY_AS_MARKDOWN:
 		case COPY_AS_HTML:
 		case COPY_AS_PLAIN_TEXT:
@@ -1214,7 +1233,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 			if (message->what == COPY_AS_MARKDOWN) {
 				text << "[" << EscapeMarkdown(title) << "](" << url << ")";
 			} else if (message->what == COPY_AS_HTML) {
-				text << "<a href=\"" << url << "\">" << EscapeHTML(title) << "</a>";
+				text << "<a href=\"" << EscapeHTML(url) << "\">" << EscapeHTML(title) << "</a>";
 			} else {
 				text << title << ": " << url;
 			}
@@ -1359,6 +1378,50 @@ BrowserWindow::MenusBeginning()
 {
 	_UpdateHistoryMenu();
 	_UpdateClipboardItems();
+
+	// Tab pinning menu items
+	// Check if the current view is a WebView (it should be)
+	BWebView* currentWebView = CurrentWebView();
+	if (currentWebView) {
+		int32 tabIndex = fTabManager->TabForView(currentWebView);
+		if (tabIndex >= 0) {
+			TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
+			if (tab) {
+				// We don't have a "Tab" menu in the main menu bar, but we can add
+				// these options to the "View" menu or context menu if accessible.
+				// Since we can't easily access context menu here without modifying WebView,
+				// let's add them to the "View" menu dynamically or just ensure they are handled.
+				// Actually, the prompt implies "Add tab pinning".
+				// Adding to the View menu is a safe bet for now.
+				// Find the "View" menu.
+				BMenu* viewMenu = NULL;
+				BMenuBar* keyMenuBar = KeyMenuBar();
+				if (keyMenuBar) {
+					// Index 2 is usually "View" (Window, Edit, View)
+					viewMenu = keyMenuBar->SubmenuAt(2);
+				}
+
+				if (viewMenu) {
+					// Remove existing Pin/Unpin items if any to avoid duplicates
+					// Simple check: Look for items with matching command
+					BMenuItem* item = viewMenu->FindItem(PIN_TAB);
+					if (item) viewMenu->RemoveItem(item);
+					item = viewMenu->FindItem(UNPIN_TAB);
+					if (item) viewMenu->RemoveItem(item);
+
+					// Add appropriate item
+					if (tab->IsPinned()) {
+						viewMenu->AddItem(new BMenuItem(B_TRANSLATE("Unpin tab"),
+							new BMessage(UNPIN_TAB)));
+					} else {
+						viewMenu->AddItem(new BMenuItem(B_TRANSLATE("Pin tab"),
+							new BMessage(PIN_TAB)));
+					}
+				}
+			}
+		}
+	}
+
 	fMenusRunning = true;
 }
 
