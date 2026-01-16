@@ -2328,7 +2328,12 @@ BrowserWindow::SetMenuBarVisible(bool flag, BWebView* view)
 void
 BrowserWindow::SetResizable(bool flag, BWebView* view)
 {
-	// TODO: Ignore request when there is more than one BWebView embedded!
+	if (view != CurrentWebView())
+		return;
+
+	// Ignore request when there is more than one BWebView embedded!
+	if (fTabManager->CountTabs() > 1)
+		return;
 
 	if (flag)
 		SetFlags(Flags() & ~B_NOT_RESIZABLE);
