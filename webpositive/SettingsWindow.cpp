@@ -188,6 +188,9 @@ SettingsWindow::MessageReceived(BMessage* message)
 			fStandardFontView->SetSize(size);
 			fSerifFontView->SetSize(size);
 			fSansSerifFontView->SetSize(size);
+			_UpdateFontSettings();
+			fSettings->Save();
+			BWebSettings::Default()->Apply();
 			_ValidateControlsEnabledStatus();
 			break;
 		}
@@ -195,6 +198,9 @@ SettingsWindow::MessageReceived(BMessage* message)
 		{
 			int32 size = fFixedSizesSpinner->Value();
 			fFixedFontView->SetSize(size);
+			_UpdateFontSettings();
+			fSettings->Save();
+			BWebSettings::Default()->Apply();
 			_ValidateControlsEnabledStatus();
 			break;
 		}
@@ -216,28 +222,87 @@ SettingsWindow::MessageReceived(BMessage* message)
 			break;
 		}
 
-		case MSG_START_PAGE_CHANGED:
-		case MSG_SEARCH_PAGE_CHANGED:
-		case MSG_DOWNLOAD_FOLDER_CHANGED:
 		case MSG_START_UP_BEHAVIOR_CHANGED:
+			fSettings->SetValue(kSettingsKeyStartUpPolicy, _StartUpPolicy());
+			fSettings->Save();
+			_ValidateControlsEnabledStatus();
+			break;
+
 		case MSG_NEW_WINDOWS_BEHAVIOR_CHANGED:
+			fSettings->SetValue(kSettingsKeyNewWindowPolicy,
+				_NewWindowPolicy());
+			fSettings->Save();
+			_ValidateControlsEnabledStatus();
+			break;
+
 		case MSG_NEW_TABS_BEHAVIOR_CHANGED:
+			fSettings->SetValue(kSettingsKeyNewTabPolicy, _NewTabPolicy());
+			fSettings->Save();
+			_ValidateControlsEnabledStatus();
+			break;
+
 		case MSG_HISTORY_MENU_DAYS_CHANGED:
+			BrowsingHistory::DefaultInstance()->SetMaxHistoryItemAge(
+				fDaysInHistory->Value());
+			_ValidateControlsEnabledStatus();
+			break;
+
 		case MSG_TAB_DISPLAY_BEHAVIOR_CHANGED:
+			fSettings->SetValue(kSettingsKeyShowTabsIfSinglePageOpen,
+				fShowTabsIfOnlyOnePage->Value() == B_CONTROL_ON);
+			fSettings->Save();
+			_ValidateControlsEnabledStatus();
+			break;
+
 		case MSG_AUTO_HIDE_INTERFACE_BEHAVIOR_CHANGED:
+			fSettings->SetValue(
+				kSettingsKeyAutoHideInterfaceInFullscreenMode,
+				fAutoHideInterfaceInFullscreenMode->Value() == B_CONTROL_ON);
+			fSettings->Save();
+			_ValidateControlsEnabledStatus();
+			break;
+
 		case MSG_AUTO_HIDE_POINTER_BEHAVIOR_CHANGED:
+			fSettings->SetValue(kSettingsKeyAutoHidePointer,
+				fAutoHidePointer->Value() == B_CONTROL_ON);
+			fSettings->Save();
+			_ValidateControlsEnabledStatus();
+			break;
+
 		case MSG_SHOW_HOME_BUTTON_CHANGED:
+			fSettings->SetValue(kSettingsKeyShowHomeButton,
+				fShowHomeButton->Value() == B_CONTROL_ON);
+			fSettings->Save();
+			_ValidateControlsEnabledStatus();
+			break;
+
 		case MSG_STANDARD_FONT_CHANGED:
 		case MSG_SERIF_FONT_CHANGED:
 		case MSG_SANS_SERIF_FONT_CHANGED:
 		case MSG_FIXED_FONT_CHANGED:
+			_UpdateFontSettings();
+			fSettings->Save();
+			BWebSettings::Default()->Apply();
+			_ValidateControlsEnabledStatus();
+			break;
+
 		case MSG_USE_PROXY_CHANGED:
+		case MSG_USE_PROXY_AUTH_CHANGED:
+			_UpdateProxySettings();
+			fSettings->Save();
+			BWebSettings::Default()->Apply();
+			_ValidateControlsEnabledStatus();
+			break;
+
+		case MSG_START_PAGE_CHANGED:
+		case MSG_SEARCH_PAGE_CHANGED:
+		case MSG_DOWNLOAD_FOLDER_CHANGED:
 		case MSG_PROXY_ADDRESS_CHANGED:
 		case MSG_PROXY_PORT_CHANGED:
-		case MSG_USE_PROXY_AUTH_CHANGED:
 		case MSG_PROXY_USERNAME_CHANGED:
 		case MSG_PROXY_PASSWORD_CHANGED:
-			// TODO: Some settings could change live, some others not?
+			// These settings cannot change live, as we don't want partial
+			// input to be applied.
 			_ValidateControlsEnabledStatus();
 			break;
 
@@ -695,52 +760,10 @@ SettingsWindow::_ApplySettings()
 	fSettings->SetValue(kSettingsKeyNewWindowPolicy, _NewWindowPolicy());
 	fSettings->SetValue(kSettingsKeyNewTabPolicy, _NewTabPolicy());
 
-	// Store font settings
-	fSettings->SetValue("standard font", fStandardFontView->Font());
-	fSettings->SetValue("serif font", fSerifFontView->Font());
-	fSettings->SetValue("sans serif font", fSansSerifFontView->Font());
-	fSettings->SetValue("fixed font", fFixedFontView->Font());
-	int32 standardFontSize = fStandardSizesSpinner->Value();
-	int32 fixedFontSize = fFixedSizesSpinner->Value();
-	fSettings->SetValue("standard font size", standardFontSize);
-	fSettings->SetValue("fixed font size", fixedFontSize);
-
-	// Store proxy settings
-
-	fSettings->SetValue(kSettingsKeyUseProxy,
-		fUseProxyCheckBox->Value() == B_CONTROL_ON);
-	fSettings->SetValue(kSettingsKeyProxyAddress,
-		fProxyAddressControl->Text());
-	uint32 proxyPort = _ProxyPort();
-	fSettings->SetValue(kSettingsKeyProxyPort, proxyPort);
-	fSettings->SetValue(kSettingsKeyUseProxyAuth,
-		fUseProxyAuthCheckBox->Value() == B_CONTROL_ON);
-	fSettings->SetValue(kSettingsKeyProxyUsername,
-		fProxyUsernameControl->Text());
-	fSettings->SetValue(kSettingsKeyProxyPassword,
-		fProxyPasswordControl->Text());
+	_UpdateFontSettings();
+	_UpdateProxySettings();
 
 	fSettings->Save();
-
-	// Apply settings to default web page settings.
-	BWebSettings::Default()->SetStandardFont(fStandardFontView->Font());
-	BWebSettings::Default()->SetSerifFont(fSerifFontView->Font());
-	BWebSettings::Default()->SetSansSerifFont(fSansSerifFontView->Font());
-	BWebSettings::Default()->SetFixedFont(fFixedFontView->Font());
-	BWebSettings::Default()->SetDefaultStandardFontSize(standardFontSize);
-	BWebSettings::Default()->SetDefaultFixedFontSize(fixedFontSize);
-
-	if (fUseProxyCheckBox->Value() == B_CONTROL_ON) {
-		if (fUseProxyAuthCheckBox->Value() == B_CONTROL_ON) {
-			BWebSettings::Default()->SetProxyInfo(fProxyAddressControl->Text(),
-				proxyPort, B_PROXY_TYPE_HTTP, fProxyUsernameControl->Text(),
-				fProxyPasswordControl->Text());
-		} else {
-			BWebSettings::Default()->SetProxyInfo(fProxyAddressControl->Text(),
-				proxyPort, B_PROXY_TYPE_HTTP, "", "");
-		}
-	} else
-		BWebSettings::Default()->SetProxyInfo();
 
 	// This will find all currently instantiated page settings and apply
 	// the default values, unless the page settings have local overrides.
@@ -922,6 +945,59 @@ SettingsWindow::_ValidateControlsEnabledStatus()
 	bool useProxyAuth = useProxy && fUseProxyAuthCheckBox->Value() == B_CONTROL_ON;
 	fProxyUsernameControl->SetEnabled(useProxyAuth);
 	fProxyPasswordControl->SetEnabled(useProxyAuth);
+}
+
+
+void
+SettingsWindow::_UpdateFontSettings()
+{
+	// Store font settings
+	fSettings->SetValue("standard font", fStandardFontView->Font());
+	fSettings->SetValue("serif font", fSerifFontView->Font());
+	fSettings->SetValue("sans serif font", fSansSerifFontView->Font());
+	fSettings->SetValue("fixed font", fFixedFontView->Font());
+	int32 standardFontSize = fStandardSizesSpinner->Value();
+	int32 fixedFontSize = fFixedSizesSpinner->Value();
+	fSettings->SetValue("standard font size", standardFontSize);
+	fSettings->SetValue("fixed font size", fixedFontSize);
+
+	BWebSettings::Default()->SetStandardFont(fStandardFontView->Font());
+	BWebSettings::Default()->SetSerifFont(fSerifFontView->Font());
+	BWebSettings::Default()->SetSansSerifFont(fSansSerifFontView->Font());
+	BWebSettings::Default()->SetFixedFont(fFixedFontView->Font());
+	BWebSettings::Default()->SetDefaultStandardFontSize(standardFontSize);
+	BWebSettings::Default()->SetDefaultFixedFontSize(fixedFontSize);
+}
+
+
+void
+SettingsWindow::_UpdateProxySettings()
+{
+	// Store proxy settings
+	fSettings->SetValue(kSettingsKeyUseProxy,
+		fUseProxyCheckBox->Value() == B_CONTROL_ON);
+	fSettings->SetValue(kSettingsKeyProxyAddress,
+		fProxyAddressControl->Text());
+	uint32 proxyPort = _ProxyPort();
+	fSettings->SetValue(kSettingsKeyProxyPort, proxyPort);
+	fSettings->SetValue(kSettingsKeyUseProxyAuth,
+		fUseProxyAuthCheckBox->Value() == B_CONTROL_ON);
+	fSettings->SetValue(kSettingsKeyProxyUsername,
+		fProxyUsernameControl->Text());
+	fSettings->SetValue(kSettingsKeyProxyPassword,
+		fProxyPasswordControl->Text());
+
+	if (fUseProxyCheckBox->Value() == B_CONTROL_ON) {
+		if (fUseProxyAuthCheckBox->Value() == B_CONTROL_ON) {
+			BWebSettings::Default()->SetProxyInfo(fProxyAddressControl->Text(),
+				proxyPort, B_PROXY_TYPE_HTTP, fProxyUsernameControl->Text(),
+				fProxyPasswordControl->Text());
+		} else {
+			BWebSettings::Default()->SetProxyInfo(fProxyAddressControl->Text(),
+				proxyPort, B_PROXY_TYPE_HTTP, "", "");
+		}
+	} else
+		BWebSettings::Default()->SetProxyInfo();
 }
 
 
