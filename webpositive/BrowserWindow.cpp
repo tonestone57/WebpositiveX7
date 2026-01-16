@@ -2177,24 +2177,62 @@ BrowserWindow::ResizeRequested(float width, float height, BWebView* view)
 void
 BrowserWindow::SetToolBarsVisible(bool flag, BWebView* view)
 {
-	// TODO
-	// TODO: Ignore request when there is more than one BWebView embedded!
+	if (view != CurrentWebView())
+		return;
+
+	// Ignore request when there is more than one BWebView embedded.
+	if (fTabManager->CountTabs() > 1)
+		return;
+
+	if (flag)
+		fVisibleInterfaceElements |= INTERFACE_ELEMENT_NAVIGATION;
+	else
+		fVisibleInterfaceElements &= ~INTERFACE_ELEMENT_NAVIGATION;
+
+	if (fInterfaceVisible)
+		fNavigationGroup->SetVisible(flag);
 }
 
 
 void
 BrowserWindow::SetStatusBarVisible(bool flag, BWebView* view)
 {
-	// TODO
-	// TODO: Ignore request when there is more than one BWebView embedded!
+	if (view != CurrentWebView())
+		return;
+
+	// Ignore request when there is more than one BWebView embedded.
+	if (fTabManager->CountTabs() > 1)
+		return;
+
+	if (flag)
+		fVisibleInterfaceElements |= INTERFACE_ELEMENT_STATUS;
+	else
+		fVisibleInterfaceElements &= ~INTERFACE_ELEMENT_STATUS;
+
+	if (fInterfaceVisible)
+		fStatusGroup->SetVisible(flag);
 }
 
 
 void
 BrowserWindow::SetMenuBarVisible(bool flag, BWebView* view)
 {
-	// TODO
-	// TODO: Ignore request when there is more than one BWebView embedded!
+	if (view != CurrentWebView())
+		return;
+
+	// Ignore request when there is more than one BWebView embedded.
+	if (fTabManager->CountTabs() > 1)
+		return;
+
+	if (flag)
+		fVisibleInterfaceElements |= INTERFACE_ELEMENT_MENU;
+	else
+		fVisibleInterfaceElements &= ~INTERFACE_ELEMENT_MENU;
+
+#if !INTEGRATE_MENU_INTO_TAB_BAR
+	if (fInterfaceVisible)
+		fMenuGroup->SetVisible(flag);
+#endif
 }
 
 
