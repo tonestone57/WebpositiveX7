@@ -404,8 +404,12 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fShowTabsIfSinglePageOpen(true),
 	fAutoHideInterfaceInFullscreenMode(false),
 	fAutoHidePointer(false),
+	fAutoHideBookmarkBar(false),
 	fBookmarkBar(NULL),
-	fDarkMode(false)
+	fDarkMode(false),
+	fReaderMode(false),
+	fToolbarBottom(false),
+	fTabSearchWindow(NULL)
 {
 	// Begin listening to settings changes and read some current values.
 	fAppSettings->AddListener(BMessenger(this));
@@ -1112,10 +1116,92 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case SEARCH_TABS:
 		{
-			TabSearchWindow* window = new TabSearchWindow(fTabManager);
-			window->Show();
+			if (fTabSearchWindow) {
+				fTabSearchWindow->Activate();
+			} else {
+				fTabSearchWindow = new TabSearchWindow(fTabManager);
+				fTabSearchWindow->Show();
+			}
 			break;
 		}
+
+		case TAB_SEARCH_WINDOW_QUIT:
+			fTabSearchWindow = NULL;
+			break;
+
+		case SET_TAB_COLOR:
+		{
+			rgb_color color;
+			if (message->FindColor("color", &color) == B_OK) {
+				BWebView* currentWebView = CurrentWebView();
+				if (currentWebView) {
+					int32 tabIndex = fTabManager->TabForView(currentWebView);
+					if (tabIndex >= 0) {
+						TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
+						if (tab) {
+							tab->SetGroupColor(color);
+						}
+					}
+				}
+			}
+			break;
+		}
+
+		case TOGGLE_READER_MODE:
+			fReaderMode = !fReaderMode;
+			fReaderModeMenuItem->SetMarked(fReaderMode);
+			// Apply to current page
+			if (CurrentWebView() && CurrentWebView()->WebPage()) {
+				// Simple Reader Mode JS: Hide common non-article tags
+				BString script = "if (typeof toggleReaderMode === 'undefined') {"
+					"  toggleReaderMode = function(enable) {"
+					"    var tags = ['nav', 'footer', 'aside', 'header', '.ads', '.sidebar'];"
+					"    tags.forEach(function(tag) {"
+					"      var elements = document.querySelectorAll(tag);"
+					"      elements.forEach(function(el) {"
+					"        el.style.display = enable ? 'none' : '';"
+					"      });"
+					"    });"
+					"    document.body.style.maxWidth = enable ? '800px' : '';"
+					"    document.body.style.margin = enable ? '0 auto' : '';"
+					"    document.body.style.fontSize = enable ? '18px' : '';"
+					"    document.body.style.lineHeight = enable ? '1.6' : '';"
+					"  };"
+					"}"
+					"toggleReaderMode(";
+				script << (fReaderMode ? "true" : "false") << ");";
+				CurrentWebView()->WebPage()->ExecuteJavaScript(script);
+			}
+			break;
+
+		case TOGGLE_TOOLBAR_BOTTOM:
+			fToolbarBottom = !fToolbarBottom;
+			fToolbarBottomMenuItem->SetMarked(fToolbarBottom);
+
+			// Re-layout
+			// Navigation group is index 1 or 2. We move it to bottom (after tab container or status)
+			// Current layout: Menu(0), Tabs(1), Nav(2), Bookmark(3), Web(4), Find(5), Status(6)
+			// If Bottom: Menu(0), Tabs(1), Bookmark(2), Web(3), Find(4), Nav(5), Status(6)
+			// BGroupView layout removal/addition is tricky.
+			// Let's just remove nav group and add it at appropriate index.
+			// fNavigationGroup is BLayoutItem*
+			// LayoutBuilder might not be modifiable easily.
+			// We can access GetLayout()->RemoveItem(fNavigationGroup) and AddItem(fNavigationGroup, index).
+			{
+				BLayout* layout = GetLayout();
+				layout->RemoveItem(fNavigationGroup);
+				if (fToolbarBottom) {
+					// Add before status bar (last item)
+					int32 count = layout->CountItems();
+					layout->AddItem(fNavigationGroup, count - 1);
+				} else {
+					// Add after tabs (index 2 usually, 0=menu, 1=tabs)
+					// If integrated menu, index 1.
+					// Let's assume standard layout.
+					layout->AddItem(fNavigationGroup, 2);
+				}
+			}
+			break;
 
 		case TOGGLE_DARK_MODE:
 			fDarkMode = !fDarkMode;
@@ -1418,6 +1504,12 @@ BrowserWindow::Archive(BMessage* archive, bool deep) const
 bool
 BrowserWindow::QuitRequested()
 {
+	if (fTabSearchWindow) {
+		fTabSearchWindow->Lock();
+		fTabSearchWindow->Quit();
+		fTabSearchWindow = NULL;
+	}
+
 	// TODO: Check for modified form data and ask user for confirmation, etc.
 
 	BMessage message(WINDOW_CLOSED);
@@ -1459,8 +1551,7 @@ BrowserWindow::MenusBeginning()
 				BMenu* viewMenu = NULL;
 				BMenuBar* keyMenuBar = KeyMenuBar();
 				if (keyMenuBar) {
-					// Index 2 is usually "View" (Window, Edit, View)
-					viewMenu = keyMenuBar->SubmenuAt(2);
+					viewMenu = keyMenuBar->FindItem(B_TRANSLATE("View"))->Submenu();
 				}
 
 				if (viewMenu) {
@@ -1479,6 +1570,34 @@ BrowserWindow::MenusBeginning()
 						viewMenu->AddItem(new BMenuItem(B_TRANSLATE("Pin tab"),
 							new BMessage(PIN_TAB)));
 					}
+
+					// Grouping (Color)
+					// Prevent duplication by removing existing "Set tab color" menu
+					for (int32 i = 0; i < viewMenu->CountItems(); i++) {
+						BMenuItem* item = viewMenu->ItemAt(i);
+						if (strcmp(item->Label(), B_TRANSLATE("Set tab color")) == 0) {
+							viewMenu->RemoveItem(i);
+							delete item;
+							break;
+						}
+					}
+
+					BMenu* colorMenu = new BMenu(B_TRANSLATE("Set tab color"));
+					const char* kColorNames[] = {"None", "Red", "Green", "Blue", "Yellow"};
+					rgb_color kColors[] = {
+						ui_color(B_PANEL_BACKGROUND_COLOR),
+						{255, 100, 100, 255},
+						{100, 255, 100, 255},
+						{100, 100, 255, 255},
+						{255, 255, 100, 255}
+					};
+
+					for (size_t i = 0; i < sizeof(kColorNames)/sizeof(char*); i++) {
+						BMessage* colorMsg = new BMessage(SET_TAB_COLOR);
+						colorMsg->AddColor("color", kColors[i]);
+						colorMenu->AddItem(new BMenuItem(kColorNames[i], colorMsg));
+					}
+					viewMenu->AddItem(colorMenu);
 				}
 			}
 		}
@@ -1804,6 +1923,13 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 void
 BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 {
+	// Apply per-site permissions (Stub implementation)
+	// In a real implementation, we would check "SitePermissions" settings for the domain
+	// and call BWebPage methods. Since APIs are private/missing, we log.
+	// printf("Applying permissions for %s\n", url.String());
+	// Example of enforcement if API existed:
+	// if (!ShouldEnableJS(url)) view->WebPage()->SetJavaScriptEnabled(false);
+
 	if (fDarkMode && view && view->WebPage()) {
 		BString script = "if (typeof toggleDarkMode === 'undefined') {"
 			"  toggleDarkMode = function(enable) {"
@@ -1819,6 +1945,26 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			"  };"
 			"}"
 			"toggleDarkMode(true);";
+		view->WebPage()->ExecuteJavaScript(script);
+	}
+
+	if (fReaderMode && view && view->WebPage()) {
+		BString script = "if (typeof toggleReaderMode === 'undefined') {"
+			"  toggleReaderMode = function(enable) {"
+			"    var tags = ['nav', 'footer', 'aside', 'header', '.ads', '.sidebar'];"
+			"    tags.forEach(function(tag) {"
+			"      var elements = document.querySelectorAll(tag);"
+			"      elements.forEach(function(el) {"
+			"        el.style.display = enable ? 'none' : '';"
+			"      });"
+			"    });"
+			"    document.body.style.maxWidth = enable ? '800px' : '';"
+			"    document.body.style.margin = enable ? '0 auto' : '';"
+			"    document.body.style.fontSize = enable ? '18px' : '';"
+			"    document.body.style.lineHeight = enable ? '1.6' : '';"
+			"  };"
+			"}"
+			"toggleReaderMode(true);";
 		view->WebPage()->ExecuteJavaScript(script);
 	}
 
@@ -2707,6 +2853,20 @@ BrowserWindow::_SetAutoHideInterfaceInFullscreen(bool doIt)
 void
 BrowserWindow::_CheckAutoHideInterface()
 {
+	// Bookmark Bar auto-hide logic (if enabled and NOT fullscreen)
+	if (!fIsFullscreen && fAutoHideBookmarkBar && fBookmarkBar) {
+		if (fBookmarkBar->IsHidden()) {
+			// Show if mouse at top (e.g. over menu/tabs/nav)
+			// Navigation group bottom is a good threshold.
+			if (fLastMousePos.y <= fNavigationGroup->Frame().bottom)
+				_ShowBookmarkBar(true);
+		} else {
+			// Hide if mouse moves away
+			if (fLastMousePos.y > fBookmarkBar->Frame().bottom + 10)
+				_ShowBookmarkBar(false);
+		}
+	}
+
 	if (!fIsFullscreen || !fAutoHideInterfaceInFullscreenMode
 		|| (CurrentWebView() != NULL && !CurrentWebView()->IsFocus())) {
 		return;

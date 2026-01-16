@@ -96,7 +96,12 @@ enum {
 
 	SEARCH_TABS						= 'stbs',
 	TOGGLE_DARK_MODE				= 'tgdm',
-	SHOW_PERMISSIONS_WINDOW			= 'spwn'
+	SHOW_PERMISSIONS_WINDOW			= 'spwn',
+	SET_TAB_COLOR					= 'stcl',
+	TOGGLE_READER_MODE				= 'trdm',
+	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb',
+	SHOW_HIDE_BOOKMARK_BAR			= 'shbb',
+	TAB_SEARCH_WINDOW_QUIT			= 'tswq'
 };
 
 
@@ -295,6 +300,7 @@ private:
 			uint32				fNewTabPolicy;
 			BString				fStartPageURL;
 			BString				fSearchPageURL;
+			bool				fAutoHideBookmarkBar;
 
 			BMenuItem*			fBookmarkBarMenuItem;
 			BookmarkBar*		fBookmarkBar;
@@ -302,6 +308,12 @@ private:
 
 			bool				fDarkMode;
 			BMenuItem*			fDarkModeMenuItem;
+			bool				fReaderMode;
+			BMenuItem*			fReaderModeMenuItem;
+			bool				fToolbarBottom;
+			BMenuItem*			fToolbarBottomMenuItem;
+
+			class TabSearchWindow* fTabSearchWindow;
 };
 
 

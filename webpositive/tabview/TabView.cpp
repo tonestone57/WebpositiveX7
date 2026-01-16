@@ -30,7 +30,8 @@ TabView::TabView()
 	fContainerView(NULL),
 	fLayoutItem(new TabLayoutItem(this)),
 	fLabel(),
-	fPinned(false)
+	fPinned(false),
+	fGroupColor(ui_color(B_PANEL_BACKGROUND_COLOR))
 {
 }
 
@@ -122,6 +123,13 @@ TabView::DrawBackground(BView* owner, BRect frame, const BRect& updateRect)
 	} else {
 		be_control_look->DrawInactiveTab(owner, frame, updateRect, base, flags,
 			borders, BControlLook::B_TOP_BORDER, index, selected, first, last);
+	}
+
+	if (fGroupColor != base) {
+		owner->SetHighColor(fGroupColor);
+		owner->SetPenSize(3.0f);
+		owner->StrokeLine(frame.LeftTop(), frame.RightTop());
+		owner->SetPenSize(1.0f);
 	}
 }
 
@@ -219,6 +227,24 @@ bool
 TabView::IsPinned() const
 {
 	return fPinned;
+}
+
+
+void
+TabView::SetGroupColor(rgb_color color)
+{
+	if (fGroupColor == color)
+		return;
+
+	fGroupColor = color;
+	fLayoutItem->InvalidateContainer();
+}
+
+
+rgb_color
+TabView::GroupColor() const
+{
+	return fGroupColor;
 }
 
 

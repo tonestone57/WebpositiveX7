@@ -61,8 +61,8 @@
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "WebPositive"
 
-const char* kApplicationSignature = "application/x-vnd.Haiku-WebPositive";
-const char* kApplicationName = B_TRANSLATE_SYSTEM_NAME("WebPositive");
+extern const char* kApplicationSignature = "application/x-vnd.Haiku-WebPositive";
+extern const char* kApplicationName = B_TRANSLATE_SYSTEM_NAME("WebPositive");
 static const uint32 PRELOAD_BROWSING_HISTORY = 'plbh';
 static const uint32 AUTO_SAVE_SESSION = 'assn';
 

@@ -98,6 +98,10 @@ TabSearchWindow::MessageReceived(BMessage* message)
 bool
 TabSearchWindow::QuitRequested()
 {
+	if (fTabManager) {
+		BMessage msg('tswq'); // TAB_SEARCH_WINDOW_QUIT
+		fTabManager->Target().SendMessage(&msg);
+	}
 	return true;
 }
 

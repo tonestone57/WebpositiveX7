@@ -50,6 +50,9 @@ public:
 			void				SetPinned(bool pinned);
 			bool				IsPinned() const;
 
+			void				SetGroupColor(rgb_color color);
+			rgb_color			GroupColor() const;
+
 			BRect				Frame() const;
 
 private:
@@ -61,6 +64,7 @@ private:
 
 			BString				fLabel;
 			bool				fPinned;
+			rgb_color			fGroupColor;
 };
 
 
