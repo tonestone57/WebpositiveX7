@@ -31,6 +31,7 @@
 
 #include "WebWindow.h"
 
+#include <deque>
 #include <Messenger.h>
 #include <String.h>
 #include <UrlContext.h>
@@ -223,7 +224,17 @@ private:
 
 			void				_ShowBookmarkBar(bool show);
 
+			void				_ReopenClosedTab();
+			void				_UpdateReopenClosedTabItem();
+
 private:
+			struct ClosedTabInfo {
+				BString url;
+				BString title;
+			};
+			std::deque<ClosedTabInfo> fClosedTabs;
+			BMenuItem*			fReopenClosedTabMenuItem;
+
 			BMenu*				fHistoryMenu;
 			int32				fHistoryMenuFixedItemCount;
 

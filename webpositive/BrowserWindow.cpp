@@ -130,7 +130,35 @@ enum {
 
 	SELECT_TAB									= 'sltb',
 	CYCLE_TABS									= 'ctab',
+
+	REOPEN_CLOSED_TAB							= 'roct',
+	COPY_AS_MARKDOWN							= 'cpmd',
+	COPY_AS_HTML								= 'cpht',
+	COPY_AS_PLAIN_TEXT							= 'cppt',
 };
+
+
+static BString
+EscapeHTML(const BString& text)
+{
+	BString result(text);
+	result.ReplaceAll("&", "&amp;");
+	result.ReplaceAll("<", "&lt;");
+	result.ReplaceAll(">", "&gt;");
+	result.ReplaceAll("\"", "&quot;");
+	return result;
+}
+
+
+static BString
+EscapeMarkdown(const BString& text)
+{
+	BString result(text);
+	// Escape characters that might break the link syntax [Title](URL)
+	result.ReplaceAll("[", "\\[");
+	result.ReplaceAll("]", "\\]");
+	return result;
+}
 
 
 static const int32 kModifiers = B_SHIFT_KEY | B_COMMAND_KEY
@@ -442,6 +470,16 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(B_COPY), 'C'));
 	menu->AddItem(fPasteMenuItem = new BMenuItem(B_TRANSLATE("Paste"),
 		new BMessage(B_PASTE), 'V'));
+
+	BMenu* copyAsMenu = new BMenu(B_TRANSLATE("Copy page as" B_UTF8_ELLIPSIS));
+	copyAsMenu->AddItem(new BMenuItem(B_TRANSLATE("Markdown"),
+		new BMessage(COPY_AS_MARKDOWN)));
+	copyAsMenu->AddItem(new BMenuItem(B_TRANSLATE("HTML"),
+		new BMessage(COPY_AS_HTML)));
+	copyAsMenu->AddItem(new BMenuItem(B_TRANSLATE("Plain text"),
+		new BMessage(COPY_AS_PLAIN_TEXT)));
+	menu->AddItem(copyAsMenu);
+
 	menu->AddSeparatorItem();
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Find"),
 		new BMessage(EDIT_SHOW_FIND_GROUP), 'F'));
@@ -487,6 +525,10 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fHistoryMenu->AddItem(fForwardMenuItem
 		= new BMenuItem(B_TRANSLATE("Forward"), new BMessage(GO_FORWARD),
 		B_RIGHT_ARROW));
+	fHistoryMenu->AddItem(fReopenClosedTabMenuItem = new BMenuItem(
+		B_TRANSLATE("Reopen closed tab"), new BMessage(REOPEN_CLOSED_TAB), 'T',
+		B_SHIFT_KEY));
+	fReopenClosedTabMenuItem->SetEnabled(false);
 	fHistoryMenu->AddSeparatorItem();
 	fHistoryMenuFixedItemCount = fHistoryMenu->CountItems();
 	mainMenu->AddItem(fHistoryMenu);
@@ -1149,6 +1191,42 @@ BrowserWindow::MessageReceived(BMessage* message)
 			if (index >= fTabManager->CountTabs())
 				index = 0;
 			fTabManager->SelectTab(index);
+			break;
+		}
+
+		case REOPEN_CLOSED_TAB:
+			_ReopenClosedTab();
+			break;
+
+		case COPY_AS_MARKDOWN:
+		case COPY_AS_HTML:
+		case COPY_AS_PLAIN_TEXT:
+		{
+			BWebView* view = CurrentWebView();
+			if (view == NULL)
+				break;
+			BString url = view->MainFrameURL();
+			BString title = view->MainFrameTitle();
+			if (title.Length() == 0)
+				title = url;
+
+			BString text;
+			if (message->what == COPY_AS_MARKDOWN) {
+				text << "[" << EscapeMarkdown(title) << "](" << url << ")";
+			} else if (message->what == COPY_AS_HTML) {
+				text << "<a href=\"" << url << "\">" << EscapeHTML(title) << "</a>";
+			} else {
+				text << title << ": " << url;
+			}
+
+			if (be_clipboard->Lock()) {
+				be_clipboard->Clear();
+				BMessage* clip = be_clipboard->Data();
+				clip->AddData("text/plain", B_MIME_TYPE, text.String(),
+					text.Length());
+				be_clipboard->Commit();
+				be_clipboard->Unlock();
+			}
 			break;
 		}
 
@@ -1901,8 +1979,24 @@ BrowserWindow::_TabGroupShouldBeVisible() const
 void
 BrowserWindow::_ShutdownTab(int32 index)
 {
-	BView* view = fTabManager->RemoveTab(index);
+	BView* view = fTabManager->ViewForTab(index);
 	BWebView* webView = dynamic_cast<BWebView*>(view);
+
+	if (webView != NULL) {
+		BString url = webView->MainFrameURL();
+		if (url.Length() > 0 && url != "about:blank") {
+			ClosedTabInfo info;
+			info.url = url;
+			info.title = webView->MainFrameTitle();
+			fClosedTabs.push_back(info);
+			if (fClosedTabs.size() > 10)
+				fClosedTabs.pop_front();
+			_UpdateReopenClosedTabItem();
+		}
+	}
+
+	view = fTabManager->RemoveTab(index);
+	// webView pointer is still valid here, as RemoveTab only removed it from layout
 	if (webView == CurrentWebView())
 		SetCurrentWebView(NULL);
 	if (webView != NULL)
@@ -2834,4 +2928,26 @@ BrowserWindow::_ShowBookmarkBar(bool show)
 		fBookmarkBar->Show();
 	else
 		fBookmarkBar->Hide();
+}
+
+
+void
+BrowserWindow::_ReopenClosedTab()
+{
+	if (fClosedTabs.empty())
+		return;
+
+	ClosedTabInfo info = fClosedTabs.back();
+	fClosedTabs.pop_back();
+	_UpdateReopenClosedTabItem();
+
+	CreateNewTab(info.url, true);
+}
+
+
+void
+BrowserWindow::_UpdateReopenClosedTabItem()
+{
+	if (fReopenClosedTabMenuItem != NULL)
+		fReopenClosedTabMenuItem->SetEnabled(!fClosedTabs.empty());
 }
