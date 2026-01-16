@@ -50,6 +50,9 @@ private:
 									const BMessage* message);
 			void				_ValidateControlsEnabledStatus();
 
+			void				_UpdateFontSettings();
+			void				_UpdateProxySettings();
+
 			uint32				_StartUpPolicy() const;
 			uint32				_NewWindowPolicy() const;
 			uint32				_NewTabPolicy() const;
