@@ -13,6 +13,7 @@
 class BButton;
 class BFile;
 class BGroupLayout;
+class BMessageRunner;
 class BScrollView;
 class BWebDownload;
 class SettingsMessage;
@@ -40,6 +41,8 @@ private:
 			void				_RemoveMissingDownloads();
 			void				_ValidateButtonStatus();
 			void				_SaveSettings();
+			void				_ScheduleSaveSettings();
+			void				_PerformSaveSettings();
 			void				_LoadSettings();
 			bool				_OpenSettingsFile(BFile& file, uint32 mode);
 
@@ -50,6 +53,8 @@ private:
 			BButton*			fRemoveMissingButton;
 			BString				fDownloadPath;
 			bool				fMinimizeOnClose;
+			bool				fSettingsDirty;
+			BMessageRunner*		fSaveSettingsRunner;
 };
 
 #endif // DOWNLOAD_WINDOW_H

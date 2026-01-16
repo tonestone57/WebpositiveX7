@@ -20,6 +20,7 @@
 #include <Locale.h>
 #include <MenuBar.h>
 #include <MenuItem.h>
+#include <MessageRunner.h>
 #include <Path.h>
 #include <Roster.h>
 #include <ScrollView.h>
@@ -121,7 +122,9 @@ DownloadWindow::DownloadWindow(BRect frame, bool visible,
 	: BWindow(frame, B_TRANSLATE("Downloads"),
 		B_TITLED_WINDOW_LOOK, B_NORMAL_WINDOW_FEEL,
 		B_AUTO_UPDATE_SIZE_LIMITS | B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE),
-	fMinimizeOnClose(false)
+	fMinimizeOnClose(false),
+	fSettingsDirty(false),
+	fSaveSettingsRunner(NULL)
 {
 	SetPulseRate(1000000);
 
@@ -188,8 +191,12 @@ DownloadWindow::DownloadWindow(BRect frame, bool visible,
 
 DownloadWindow::~DownloadWindow()
 {
+	delete fSaveSettingsRunner;
+	fSaveSettingsRunner = NULL;
+
 	// Only necessary to save the current progress of unfinished downloads:
-	_SaveSettings();
+	if (fSettingsDirty)
+		_PerformSaveSettings();
 }
 
 
@@ -286,7 +293,10 @@ DownloadWindow::MessageReceived(BMessage* message)
 			break;
 		case SAVE_SETTINGS:
 			_ValidateButtonStatus();
-			_SaveSettings();
+			if (message->HasBool("perform_save"))
+				_PerformSaveSettings();
+			else
+				_SaveSettings();
 			break;
 
 		case SETTINGS_VALUE_CHANGED:
@@ -513,6 +523,32 @@ DownloadWindow::_ValidateButtonStatus()
 void
 DownloadWindow::_SaveSettings()
 {
+	_ScheduleSaveSettings();
+}
+
+
+void
+DownloadWindow::_ScheduleSaveSettings()
+{
+	fSettingsDirty = true;
+
+	if (fSaveSettingsRunner != NULL)
+		return;
+
+	BMessage message(SAVE_SETTINGS);
+	message.AddBool("perform_save", true);
+	fSaveSettingsRunner = new(std::nothrow) BMessageRunner(BMessenger(this),
+		&message, 2000000, 1);
+}
+
+
+void
+DownloadWindow::_PerformSaveSettings()
+{
+	delete fSaveSettingsRunner;
+	fSaveSettingsRunner = NULL;
+	fSettingsDirty = false;
+
 	BFile file;
 	if (!_OpenSettingsFile(file, B_ERASE_FILE | B_CREATE_FILE | B_WRITE_ONLY))
 		return;
