@@ -82,9 +82,11 @@
 #include "CredentialsStorage.h"
 #include "IconButton.h"
 #include "NavMenu.h"
+#include "PermissionsWindow.h"
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
 #include "TabManager.h"
+#include "TabSearchWindow.h"
 #include "URLInputGroup.h"
 #include "WebPage.h"
 #include "WebView.h"
@@ -160,6 +162,15 @@ EscapeMarkdown(const BString& text)
 	// Escape characters that might break the link syntax [Title](URL)
 	result.ReplaceAll("[", "\\[");
 	result.ReplaceAll("]", "\\]");
+	return result;
+}
+
+static BString
+EscapeMarkdownURL(const BString& text)
+{
+	BString result(text);
+	// Escape closing parenthesis in URL to avoid breaking [Title](URL)
+	result.ReplaceAll(")", "%29");
 	return result;
 }
 
@@ -393,7 +404,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fShowTabsIfSinglePageOpen(true),
 	fAutoHideInterfaceInFullscreenMode(false),
 	fAutoHidePointer(false),
-	fBookmarkBar(NULL)
+	fBookmarkBar(NULL),
+	fDarkMode(false)
 {
 	// Begin listening to settings changes and read some current values.
 	fAppSettings->AddListener(BMessenger(this));
@@ -451,6 +463,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(SHOW_DOWNLOAD_WINDOW), 'D'));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Settings"),
 		new BMessage(SHOW_SETTINGS_WINDOW), ','));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Site permissions"),
+		new BMessage(SHOW_PERMISSIONS_WINDOW)));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Cookie manager"),
 		new BMessage(SHOW_COOKIE_WINDOW)));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Script console"),
@@ -459,6 +473,10 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(B_ABOUT_REQUESTED));
 	menu->AddItem(aboutItem);
 	aboutItem->SetTarget(be_app);
+
+	menu->AddSeparatorItem();
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Search tabs"),
+		new BMessage(SEARCH_TABS), 'F', B_OPTION_KEY));
 	menu->AddSeparatorItem();
 	BMenuItem* quitItem = new BMenuItem(B_TRANSLATE("Quit"),
 		new BMessage(B_QUIT_REQUESTED), 'Q');
@@ -513,6 +531,11 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(ZOOM_TEXT_ONLY));
 	fZoomTextOnlyMenuItem->SetMarked(fZoomTextOnly);
 	menu->AddItem(fZoomTextOnlyMenuItem);
+
+	fDarkModeMenuItem = new BMenuItem(B_TRANSLATE("Dark mode"),
+		new BMessage(TOGGLE_DARK_MODE));
+	fDarkModeMenuItem->SetMarked(fDarkMode);
+	menu->AddItem(fDarkModeMenuItem);
 
 	menu->AddSeparatorItem();
 	fFullscreenItem = new BMenuItem(B_TRANSLATE("Full screen"),
@@ -1087,6 +1110,37 @@ BrowserWindow::MessageReceived(BMessage* message)
 			_CheckAutoHideInterface();
 			break;
 
+		case SEARCH_TABS:
+		{
+			TabSearchWindow* window = new TabSearchWindow(fTabManager);
+			window->Show();
+			break;
+		}
+
+		case TOGGLE_DARK_MODE:
+			fDarkMode = !fDarkMode;
+			fDarkModeMenuItem->SetMarked(fDarkMode);
+			// Apply to current page
+			if (CurrentWebView() && CurrentWebView()->WebPage()) {
+				BString script = "if (typeof toggleDarkMode === 'undefined') {"
+					"  toggleDarkMode = function(enable) {"
+					"    if (enable) {"
+					"      var style = document.createElement('style');"
+					"      style.id = 'webpositive-dark-mode';"
+					"      style.innerHTML = 'html { filter: invert(100%); } img, video { filter: invert(100%); }';"
+					"      document.head.appendChild(style);"
+					"    } else {"
+					"      var style = document.getElementById('webpositive-dark-mode');"
+					"      if (style) style.remove();"
+					"    }"
+					"  };"
+					"}"
+					"toggleDarkMode(";
+				script << (fDarkMode ? "true" : "false") << ");";
+				CurrentWebView()->WebPage()->ExecuteJavaScript(script);
+			}
+			break;
+
 		case SHOW_PAGE_SOURCE:
 			CurrentWebView()->WebPage()->SendPageSource();
 			break;
@@ -1165,6 +1219,14 @@ BrowserWindow::MessageReceived(BMessage* message)
 			be_app->PostMessage(message);
 			break;
 
+		case SHOW_PERMISSIONS_WINDOW:
+		{
+			// Open non-modal window. In a real app we'd track the instance to avoid duplicates.
+			PermissionsWindow* window = new PermissionsWindow(BRect(100, 100, 400, 400));
+			window->Show();
+			break;
+		}
+
 		case CLOSE_TAB:
 			if (fTabManager->CountTabs() > 1) {
 				int32 index;
@@ -1231,7 +1293,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 			BString text;
 			if (message->what == COPY_AS_MARKDOWN) {
-				text << "[" << EscapeMarkdown(title) << "](" << url << ")";
+				text << "[" << EscapeMarkdown(title) << "](" << EscapeMarkdownURL(url) << ")";
 			} else if (message->what == COPY_AS_HTML) {
 				text << "<a href=\"" << EscapeHTML(url) << "\">" << EscapeHTML(title) << "</a>";
 			} else {
@@ -1742,6 +1804,24 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 void
 BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 {
+	if (fDarkMode && view && view->WebPage()) {
+		BString script = "if (typeof toggleDarkMode === 'undefined') {"
+			"  toggleDarkMode = function(enable) {"
+			"    if (enable) {"
+			"      var style = document.createElement('style');"
+			"      style.id = 'webpositive-dark-mode';"
+			"      style.innerHTML = 'html { filter: invert(100%); } img, video { filter: invert(100%); }';"
+			"      document.head.appendChild(style);"
+			"    } else {"
+			"      var style = document.getElementById('webpositive-dark-mode');"
+			"      if (style) style.remove();"
+			"    }"
+			"  };"
+			"}"
+			"toggleDarkMode(true);";
+		view->WebPage()->ExecuteJavaScript(script);
+	}
+
 	if (view != CurrentWebView())
 		return;
 
