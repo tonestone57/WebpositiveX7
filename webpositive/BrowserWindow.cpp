@@ -3197,11 +3197,14 @@ BrowserWindow::_VisitSearchEngine(const BString& search)
 inline bool
 BrowserWindow::_IsValidDomainChar(char ch)
 {
-	// TODO: Currenlty, only a whitespace character breaks a domain name. It
-	// might be a good idea (or a bad one) to make character filtering based on
-	// the IDNA 2008 standard.
+	if ((unsigned char)ch > 0x7f)
+		return true;
 
-	return ch != ' ';
+	if (isalnum(ch))
+		return true;
+
+	return ch == '-' || ch == '.' || ch == ':' || ch == '%'
+		|| ch == '[' || ch == ']' || ch == '@' || ch == '_';
 }
 
 
@@ -3272,10 +3275,10 @@ BrowserWindow::_SmartURLHandler(const BString& url)
 			// URL.
 			bool isURL = false;
 
-			for (int32 i = 0; i < url.CountChars(); i++) {
+			for (int32 i = 0; i < url.Length(); i++) {
 				if (url[i] == '.')
 					isURL = true;
-				else if (url[i] == '/')
+				else if (url[i] == '/' || url[i] == '?' || url[i] == '#')
 					break;
 				else if (!_IsValidDomainChar(url[i])) {
 					isURL = false;
