@@ -7,10 +7,12 @@
 #define BROWSING_HISTORY_H
 
 #include "DateTime.h"
+#include <Handler.h>
 #include <List.h>
 #include <Locker.h>
 
 class BFile;
+class BMessageRunner;
 class BString;
 
 
@@ -52,9 +54,11 @@ private:
 };
 
 
-class BrowsingHistory : public BLocker {
+class BrowsingHistory : public BHandler, public BLocker {
 public:
 	static	BrowsingHistory*	DefaultInstance();
+
+	virtual	void				MessageReceived(BMessage* message);
 
 			bool				AddItem(const BrowsingHistoryItem& item);
 			bool				RemoveUrl(const BString& url);
@@ -78,6 +82,7 @@ private:
 
 			void				_LoadSettings();
 			void				_SaveSettings();
+			void				_ScheduleSave();
 			bool				_OpenSettingsFile(BFile& file, uint32 mode);
 
 private:
@@ -86,6 +91,7 @@ private:
 
 	static	BrowsingHistory		sDefaultInstance;
 			bool				fSettingsLoaded;
+			BMessageRunner*		fSaveRunner;
 };
 
 
