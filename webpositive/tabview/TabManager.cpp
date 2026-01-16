@@ -482,6 +482,13 @@ static const int kIconInset = 3;
 BSize
 WebTabView::MaxSize()
 {
+	if (IsPinned()) {
+		// Pinned tabs are basically just the icon.
+		BSize size(TabView::MaxSize());
+		size.height = max_c(size.height, kIconSize + kIconInset * 2);
+		return size;
+	}
+
 	// Account for icon.
 	BSize size(TabView::MaxSize());
 	size.height = max_c(size.height, kIconSize + kIconInset * 2);
@@ -496,6 +503,25 @@ WebTabView::MaxSize()
 void
 WebTabView::DrawContents(BView* owner, BRect frame, const BRect& updateRect)
 {
+	if (IsPinned()) {
+		if (fIcon != NULL) {
+			BRect iconBounds(0, 0, kIconSize - 1, kIconSize - 1);
+			// Center icon in frame
+			BPoint iconPos(
+				frame.left + floorf((frame.Width() - iconBounds.Width()) / 2),
+				frame.top + floorf((frame.Height() - iconBounds.Height()) / 2)
+			);
+			iconBounds.OffsetTo(iconPos);
+			owner->SetDrawingMode(B_OP_ALPHA);
+			owner->SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
+			owner->DrawBitmap(fIcon, fIcon->Bounds(), iconBounds,
+				B_FILTER_BITMAP_BILINEAR);
+			owner->SetDrawingMode(B_OP_COPY);
+		}
+		// Skip drawing label and close button for pinned tabs
+		return;
+	}
+
 	if (fController->CloseButtonsAvailable())
 		_DrawCloseButton(owner, frame, updateRect);
 
@@ -951,4 +977,30 @@ TabManager::SetCloseButtonsAvailable(bool available)
 		return;
 	fController->SetCloseButtonsAvailable(available);
 	fTabContainerView->Invalidate();
+}
+
+
+void
+TabManager::MoveTab(int32 fromIndex, int32 toIndex)
+{
+	if (fromIndex == toIndex) return;
+
+	// Move in Container View
+	fTabContainerView->MoveTab(fromIndex, toIndex);
+
+	// Move in Card Layout
+	// BCardLayout doesn't support MoveItem?
+	// We might need to remove and add.
+	// BUT removing item might delete the view if we are not careful.
+	// BCardLayout::RemoveItem returns BLayoutItem*. Item owns the view?
+	// Usually BLayoutItem doesn't own view unless specified.
+	// BCardLayout manages views.
+	// Let's check RemoveItem signature in BCardLayout... wait, I can't check headers easily.
+	// Assuming standard BLayout behavior: RemoveItem(int32) returns item.
+	// We can then AddItem(item, toIndex).
+
+	BLayoutItem* item = fCardLayout->RemoveItem(fromIndex);
+	if (item) {
+		fCardLayout->AddItem(toIndex, item);
+	}
 }

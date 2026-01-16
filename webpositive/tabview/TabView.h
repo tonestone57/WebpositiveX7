@@ -47,6 +47,12 @@ public:
 			void				SetLabel(const char* label);
 			const BString&		Label() const;
 
+			void				SetPinned(bool pinned);
+			bool				IsPinned() const;
+
+			void				SetGroupColor(rgb_color color);
+			rgb_color			GroupColor() const;
+
 			BRect				Frame() const;
 
 private:
@@ -57,6 +63,8 @@ private:
 			TabLayoutItem*		fLayoutItem;
 
 			BString				fLabel;
+			bool				fPinned;
+			rgb_color			fGroupColor;
 };
 
 

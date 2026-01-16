@@ -82,9 +82,11 @@
 #include "CredentialsStorage.h"
 #include "IconButton.h"
 #include "NavMenu.h"
+#include "PermissionsWindow.h"
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
 #include "TabManager.h"
+#include "TabSearchWindow.h"
 #include "URLInputGroup.h"
 #include "WebPage.h"
 #include "WebView.h"
@@ -130,7 +132,47 @@ enum {
 
 	SELECT_TAB									= 'sltb',
 	CYCLE_TABS									= 'ctab',
+
+	REOPEN_CLOSED_TAB							= 'roct',
+	COPY_AS_MARKDOWN							= 'cpmd',
+	COPY_AS_HTML								= 'cpht',
+	COPY_AS_PLAIN_TEXT							= 'cppt',
+
+	PIN_TAB										= 'ptab',
+	UNPIN_TAB									= 'uptb',
 };
+
+
+static BString
+EscapeHTML(const BString& text)
+{
+	BString result(text);
+	result.ReplaceAll("&", "&amp;");
+	result.ReplaceAll("<", "&lt;");
+	result.ReplaceAll(">", "&gt;");
+	result.ReplaceAll("\"", "&quot;");
+	return result;
+}
+
+
+static BString
+EscapeMarkdown(const BString& text)
+{
+	BString result(text);
+	// Escape characters that might break the link syntax [Title](URL)
+	result.ReplaceAll("[", "\\[");
+	result.ReplaceAll("]", "\\]");
+	return result;
+}
+
+static BString
+EscapeMarkdownURL(const BString& text)
+{
+	BString result(text);
+	// Escape closing parenthesis in URL to avoid breaking [Title](URL)
+	result.ReplaceAll(")", "%29");
+	return result;
+}
 
 
 static const int32 kModifiers = B_SHIFT_KEY | B_COMMAND_KEY
@@ -362,7 +404,12 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fShowTabsIfSinglePageOpen(true),
 	fAutoHideInterfaceInFullscreenMode(false),
 	fAutoHidePointer(false),
-	fBookmarkBar(NULL)
+	fAutoHideBookmarkBar(false),
+	fBookmarkBar(NULL),
+	fDarkMode(false),
+	fReaderMode(false),
+	fToolbarBottom(false),
+	fTabSearchWindow(NULL)
 {
 	// Begin listening to settings changes and read some current values.
 	fAppSettings->AddListener(BMessenger(this));
@@ -420,6 +467,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(SHOW_DOWNLOAD_WINDOW), 'D'));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Settings"),
 		new BMessage(SHOW_SETTINGS_WINDOW), ','));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Site permissions"),
+		new BMessage(SHOW_PERMISSIONS_WINDOW)));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Cookie manager"),
 		new BMessage(SHOW_COOKIE_WINDOW)));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Script console"),
@@ -428,6 +477,10 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(B_ABOUT_REQUESTED));
 	menu->AddItem(aboutItem);
 	aboutItem->SetTarget(be_app);
+
+	menu->AddSeparatorItem();
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Search tabs"),
+		new BMessage(SEARCH_TABS), 'F', B_OPTION_KEY));
 	menu->AddSeparatorItem();
 	BMenuItem* quitItem = new BMenuItem(B_TRANSLATE("Quit"),
 		new BMessage(B_QUIT_REQUESTED), 'Q');
@@ -442,6 +495,16 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(B_COPY), 'C'));
 	menu->AddItem(fPasteMenuItem = new BMenuItem(B_TRANSLATE("Paste"),
 		new BMessage(B_PASTE), 'V'));
+
+	BMenu* copyAsMenu = new BMenu(B_TRANSLATE("Copy page as" B_UTF8_ELLIPSIS));
+	copyAsMenu->AddItem(new BMenuItem(B_TRANSLATE("Markdown"),
+		new BMessage(COPY_AS_MARKDOWN)));
+	copyAsMenu->AddItem(new BMenuItem(B_TRANSLATE("HTML"),
+		new BMessage(COPY_AS_HTML)));
+	copyAsMenu->AddItem(new BMenuItem(B_TRANSLATE("Plain text"),
+		new BMessage(COPY_AS_PLAIN_TEXT)));
+	menu->AddItem(copyAsMenu);
+
 	menu->AddSeparatorItem();
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Find"),
 		new BMessage(EDIT_SHOW_FIND_GROUP), 'F'));
@@ -473,6 +536,11 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fZoomTextOnlyMenuItem->SetMarked(fZoomTextOnly);
 	menu->AddItem(fZoomTextOnlyMenuItem);
 
+	fDarkModeMenuItem = new BMenuItem(B_TRANSLATE("Dark mode"),
+		new BMessage(TOGGLE_DARK_MODE));
+	fDarkModeMenuItem->SetMarked(fDarkMode);
+	menu->AddItem(fDarkModeMenuItem);
+
 	menu->AddSeparatorItem();
 	fFullscreenItem = new BMenuItem(B_TRANSLATE("Full screen"),
 		new BMessage(TOGGLE_FULLSCREEN), B_RETURN);
@@ -487,6 +555,10 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fHistoryMenu->AddItem(fForwardMenuItem
 		= new BMenuItem(B_TRANSLATE("Forward"), new BMessage(GO_FORWARD),
 		B_RIGHT_ARROW));
+	fHistoryMenu->AddItem(fReopenClosedTabMenuItem = new BMenuItem(
+		B_TRANSLATE("Reopen closed tab"), new BMessage(REOPEN_CLOSED_TAB), 'T',
+		B_SHIFT_KEY));
+	fReopenClosedTabMenuItem->SetEnabled(false);
 	fHistoryMenu->AddSeparatorItem();
 	fHistoryMenuFixedItemCount = fHistoryMenu->CountItems();
 	mainMenu->AddItem(fHistoryMenu);
@@ -1042,6 +1114,119 @@ BrowserWindow::MessageReceived(BMessage* message)
 			_CheckAutoHideInterface();
 			break;
 
+		case SEARCH_TABS:
+		{
+			if (fTabSearchWindow) {
+				fTabSearchWindow->Activate();
+			} else {
+				fTabSearchWindow = new TabSearchWindow(fTabManager);
+				fTabSearchWindow->Show();
+			}
+			break;
+		}
+
+		case TAB_SEARCH_WINDOW_QUIT:
+			fTabSearchWindow = NULL;
+			break;
+
+		case SET_TAB_COLOR:
+		{
+			rgb_color color;
+			if (message->FindColor("color", &color) == B_OK) {
+				BWebView* currentWebView = CurrentWebView();
+				if (currentWebView) {
+					int32 tabIndex = fTabManager->TabForView(currentWebView);
+					if (tabIndex >= 0) {
+						TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
+						if (tab) {
+							tab->SetGroupColor(color);
+						}
+					}
+				}
+			}
+			break;
+		}
+
+		case TOGGLE_READER_MODE:
+			fReaderMode = !fReaderMode;
+			fReaderModeMenuItem->SetMarked(fReaderMode);
+			// Apply to current page
+			if (CurrentWebView() && CurrentWebView()->WebPage()) {
+				// Simple Reader Mode JS: Hide common non-article tags
+				BString script = "if (typeof toggleReaderMode === 'undefined') {"
+					"  toggleReaderMode = function(enable) {"
+					"    var tags = ['nav', 'footer', 'aside', 'header', '.ads', '.sidebar'];"
+					"    tags.forEach(function(tag) {"
+					"      var elements = document.querySelectorAll(tag);"
+					"      elements.forEach(function(el) {"
+					"        el.style.display = enable ? 'none' : '';"
+					"      });"
+					"    });"
+					"    document.body.style.maxWidth = enable ? '800px' : '';"
+					"    document.body.style.margin = enable ? '0 auto' : '';"
+					"    document.body.style.fontSize = enable ? '18px' : '';"
+					"    document.body.style.lineHeight = enable ? '1.6' : '';"
+					"  };"
+					"}"
+					"toggleReaderMode(";
+				script << (fReaderMode ? "true" : "false") << ");";
+				CurrentWebView()->WebPage()->ExecuteJavaScript(script);
+			}
+			break;
+
+		case TOGGLE_TOOLBAR_BOTTOM:
+			fToolbarBottom = !fToolbarBottom;
+			fToolbarBottomMenuItem->SetMarked(fToolbarBottom);
+
+			// Re-layout
+			// Navigation group is index 1 or 2. We move it to bottom (after tab container or status)
+			// Current layout: Menu(0), Tabs(1), Nav(2), Bookmark(3), Web(4), Find(5), Status(6)
+			// If Bottom: Menu(0), Tabs(1), Bookmark(2), Web(3), Find(4), Nav(5), Status(6)
+			// BGroupView layout removal/addition is tricky.
+			// Let's just remove nav group and add it at appropriate index.
+			// fNavigationGroup is BLayoutItem*
+			// LayoutBuilder might not be modifiable easily.
+			// We can access GetLayout()->RemoveItem(fNavigationGroup) and AddItem(fNavigationGroup, index).
+			{
+				BLayout* layout = GetLayout();
+				layout->RemoveItem(fNavigationGroup);
+				if (fToolbarBottom) {
+					// Add before status bar (last item)
+					int32 count = layout->CountItems();
+					layout->AddItem(fNavigationGroup, count - 1);
+				} else {
+					// Add after tabs (index 2 usually, 0=menu, 1=tabs)
+					// If integrated menu, index 1.
+					// Let's assume standard layout.
+					layout->AddItem(fNavigationGroup, 2);
+				}
+			}
+			break;
+
+		case TOGGLE_DARK_MODE:
+			fDarkMode = !fDarkMode;
+			fDarkModeMenuItem->SetMarked(fDarkMode);
+			// Apply to current page
+			if (CurrentWebView() && CurrentWebView()->WebPage()) {
+				BString script = "if (typeof toggleDarkMode === 'undefined') {"
+					"  toggleDarkMode = function(enable) {"
+					"    if (enable) {"
+					"      var style = document.createElement('style');"
+					"      style.id = 'webpositive-dark-mode';"
+					"      style.innerHTML = 'html { filter: invert(100%); } img, video { filter: invert(100%); }';"
+					"      document.head.appendChild(style);"
+					"    } else {"
+					"      var style = document.getElementById('webpositive-dark-mode');"
+					"      if (style) style.remove();"
+					"    }"
+					"  };"
+					"}"
+					"toggleDarkMode(";
+				script << (fDarkMode ? "true" : "false") << ");";
+				CurrentWebView()->WebPage()->ExecuteJavaScript(script);
+			}
+			break;
+
 		case SHOW_PAGE_SOURCE:
 			CurrentWebView()->WebPage()->SendPageSource();
 			break;
@@ -1120,6 +1305,14 @@ BrowserWindow::MessageReceived(BMessage* message)
 			be_app->PostMessage(message);
 			break;
 
+		case SHOW_PERMISSIONS_WINDOW:
+		{
+			// Open non-modal window. In a real app we'd track the instance to avoid duplicates.
+			PermissionsWindow* window = new PermissionsWindow(BRect(100, 100, 400, 400));
+			window->Show();
+			break;
+		}
+
 		case CLOSE_TAB:
 			if (fTabManager->CountTabs() > 1) {
 				int32 index;
@@ -1149,6 +1342,97 @@ BrowserWindow::MessageReceived(BMessage* message)
 			if (index >= fTabManager->CountTabs())
 				index = 0;
 			fTabManager->SelectTab(index);
+			break;
+		}
+
+		case REOPEN_CLOSED_TAB:
+			_ReopenClosedTab();
+			break;
+
+		case PIN_TAB:
+		case UNPIN_TAB:
+		{
+			BWebView* currentWebView = CurrentWebView();
+			if (currentWebView) {
+				int32 tabIndex = fTabManager->TabForView(currentWebView);
+				if (tabIndex >= 0) {
+					TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
+					if (tab) {
+						bool pinned = (message->what == PIN_TAB);
+						tab->SetPinned(pinned);
+
+						if (pinned) {
+							// Move to start (0)
+							// But careful about other pinned tabs.
+							// We should move it after the last pinned tab.
+							// For simplicity, let's just move to 0 for now, making it the "first" pinned tab.
+							// Or iterate to find first unpinned index.
+							int32 targetIndex = 0;
+							for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
+								TabView* t = fTabManager->GetTabContainerView()->TabAt(i);
+								if (t && !t->IsPinned()) {
+									targetIndex = i;
+									break;
+								}
+								// If all before are pinned, target is i+1, but loop continues.
+								// Wait, if i is pinned, we want to insert after it?
+								// No, we want to find the first unpinned slot.
+								// If index 0 is pinned, target 1.
+								if (t && t->IsPinned()) targetIndex = i + 1;
+							}
+
+							// If we are pinning, we move to targetIndex.
+							// But we must check if we are moving left.
+							if (tabIndex > targetIndex) {
+								// Correcting targetIndex is tricky if we don't account for self.
+								// Actually, just moving to 0 is a good start for "Pin".
+								// But users expect pinned tabs on left.
+								// Let's iterate.
+								int32 insertPos = 0;
+								for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
+									TabView* t = fTabManager->GetTabContainerView()->TabAt(i);
+									if (t == tab) continue;
+									if (t && t->IsPinned()) insertPos++;
+									else break;
+								}
+								fTabManager->MoveTab(tabIndex, insertPos);
+							}
+						}
+					}
+				}
+			}
+			break;
+		}
+
+		case COPY_AS_MARKDOWN:
+		case COPY_AS_HTML:
+		case COPY_AS_PLAIN_TEXT:
+		{
+			BWebView* view = CurrentWebView();
+			if (view == NULL)
+				break;
+			BString url = view->MainFrameURL();
+			BString title = view->MainFrameTitle();
+			if (title.Length() == 0)
+				title = url;
+
+			BString text;
+			if (message->what == COPY_AS_MARKDOWN) {
+				text << "[" << EscapeMarkdown(title) << "](" << EscapeMarkdownURL(url) << ")";
+			} else if (message->what == COPY_AS_HTML) {
+				text << "<a href=\"" << EscapeHTML(url) << "\">" << EscapeHTML(title) << "</a>";
+			} else {
+				text << title << ": " << url;
+			}
+
+			if (be_clipboard->Lock()) {
+				be_clipboard->Clear();
+				BMessage* clip = be_clipboard->Data();
+				clip->AddData("text/plain", B_MIME_TYPE, text.String(),
+					text.Length());
+				be_clipboard->Commit();
+				be_clipboard->Unlock();
+			}
 			break;
 		}
 
@@ -1259,6 +1543,12 @@ BrowserWindow::Archive(BMessage* archive, bool deep) const
 bool
 BrowserWindow::QuitRequested()
 {
+	if (fTabSearchWindow) {
+		fTabSearchWindow->Lock();
+		fTabSearchWindow->Quit();
+		fTabSearchWindow = NULL;
+	}
+
 	// TODO: Check for modified form data and ask user for confirmation, etc.
 
 	BMessage message(WINDOW_CLOSED);
@@ -1281,6 +1571,77 @@ BrowserWindow::MenusBeginning()
 {
 	_UpdateHistoryMenu();
 	_UpdateClipboardItems();
+
+	// Tab pinning menu items
+	// Check if the current view is a WebView (it should be)
+	BWebView* currentWebView = CurrentWebView();
+	if (currentWebView) {
+		int32 tabIndex = fTabManager->TabForView(currentWebView);
+		if (tabIndex >= 0) {
+			TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
+			if (tab) {
+				// We don't have a "Tab" menu in the main menu bar, but we can add
+				// these options to the "View" menu or context menu if accessible.
+				// Since we can't easily access context menu here without modifying WebView,
+				// let's add them to the "View" menu dynamically or just ensure they are handled.
+				// Actually, the prompt implies "Add tab pinning".
+				// Adding to the View menu is a safe bet for now.
+				// Find the "View" menu.
+				BMenu* viewMenu = NULL;
+				BMenuBar* keyMenuBar = KeyMenuBar();
+				if (keyMenuBar) {
+					viewMenu = keyMenuBar->FindItem(B_TRANSLATE("View"))->Submenu();
+				}
+
+				if (viewMenu) {
+					// Remove existing Pin/Unpin items if any to avoid duplicates
+					// Simple check: Look for items with matching command
+					BMenuItem* item = viewMenu->FindItem(PIN_TAB);
+					if (item) viewMenu->RemoveItem(item);
+					item = viewMenu->FindItem(UNPIN_TAB);
+					if (item) viewMenu->RemoveItem(item);
+
+					// Add appropriate item
+					if (tab->IsPinned()) {
+						viewMenu->AddItem(new BMenuItem(B_TRANSLATE("Unpin tab"),
+							new BMessage(UNPIN_TAB)));
+					} else {
+						viewMenu->AddItem(new BMenuItem(B_TRANSLATE("Pin tab"),
+							new BMessage(PIN_TAB)));
+					}
+
+					// Grouping (Color)
+					// Prevent duplication by removing existing "Set tab color" menu
+					for (int32 i = 0; i < viewMenu->CountItems(); i++) {
+						BMenuItem* item = viewMenu->ItemAt(i);
+						if (strcmp(item->Label(), B_TRANSLATE("Set tab color")) == 0) {
+							viewMenu->RemoveItem(i);
+							delete item;
+							break;
+						}
+					}
+
+					BMenu* colorMenu = new BMenu(B_TRANSLATE("Set tab color"));
+					const char* kColorNames[] = {"None", "Red", "Green", "Blue", "Yellow"};
+					rgb_color kColors[] = {
+						ui_color(B_PANEL_BACKGROUND_COLOR),
+						{255, 100, 100, 255},
+						{100, 255, 100, 255},
+						{100, 100, 255, 255},
+						{255, 255, 100, 255}
+					};
+
+					for (size_t i = 0; i < sizeof(kColorNames)/sizeof(char*); i++) {
+						BMessage* colorMsg = new BMessage(SET_TAB_COLOR);
+						colorMsg->AddColor("color", kColors[i]);
+						colorMenu->AddItem(new BMenuItem(kColorNames[i], colorMsg));
+					}
+					viewMenu->AddItem(colorMenu);
+				}
+			}
+		}
+	}
+
 	fMenusRunning = true;
 }
 
@@ -1601,6 +1962,88 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 void
 BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 {
+	// Apply per-site permissions
+	BPath path;
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
+		path.Append(kApplicationName);
+		path.Append("SitePermissions");
+		SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.Path());
+
+		int32 i = 0;
+		BMessage domainMsg;
+		bool found = false;
+		bool allowPopups = true; // Default to true? Or false? Browsers usually default true but block intrusive.
+		                         // But our checkbox says "Allow Popups", defaulting to False in UI?
+		                         // Let's assume default is false for popups, true for JS/Cookies.
+
+		// Simple domain matching (substring/host check needed in real app)
+		// For now, exact string match or simple substring.
+		BUrl bUrl(url);
+		BString host = bUrl.Host();
+
+		while (settings.FindMessage("domain", i++, &domainMsg) == B_OK) {
+			BString name;
+			if (domainMsg.FindString("name", &name) == B_OK) {
+				if (host.IFindFirst(name) >= 0) { // e.g. google.com matches www.google.com
+					found = true;
+					// bool js; domainMsg.FindBool("js", &js);
+					// bool cookies; domainMsg.FindBool("cookies", &cookies);
+					bool popups;
+					if (domainMsg.FindBool("popups", &popups) == B_OK) {
+						allowPopups = popups;
+					} else allowPopups = false;
+					break;
+				}
+			}
+		}
+
+		if (found && !allowPopups) {
+			// Enforce No Popups via JS
+			if (view && view->WebPage()) {
+				view->WebPage()->ExecuteJavaScript(
+					"window.open = function() { console.log('Popups blocked by WebPositive permissions'); return null; };");
+			}
+		}
+	}
+
+	if (fDarkMode && view && view->WebPage()) {
+		BString script = "if (typeof toggleDarkMode === 'undefined') {"
+			"  toggleDarkMode = function(enable) {"
+			"    if (enable) {"
+			"      var style = document.createElement('style');"
+			"      style.id = 'webpositive-dark-mode';"
+			"      style.innerHTML = 'html { filter: invert(100%); } img, video { filter: invert(100%); }';"
+			"      document.head.appendChild(style);"
+			"    } else {"
+			"      var style = document.getElementById('webpositive-dark-mode');"
+			"      if (style) style.remove();"
+			"    }"
+			"  };"
+			"}"
+			"toggleDarkMode(true);";
+		view->WebPage()->ExecuteJavaScript(script);
+	}
+
+	if (fReaderMode && view && view->WebPage()) {
+		BString script = "if (typeof toggleReaderMode === 'undefined') {"
+			"  toggleReaderMode = function(enable) {"
+			"    var tags = ['nav', 'footer', 'aside', 'header', '.ads', '.sidebar'];"
+			"    tags.forEach(function(tag) {"
+			"      var elements = document.querySelectorAll(tag);"
+			"      elements.forEach(function(el) {"
+			"        el.style.display = enable ? 'none' : '';"
+			"      });"
+			"    });"
+			"    document.body.style.maxWidth = enable ? '800px' : '';"
+			"    document.body.style.margin = enable ? '0 auto' : '';"
+			"    document.body.style.fontSize = enable ? '18px' : '';"
+			"    document.body.style.lineHeight = enable ? '1.6' : '';"
+			"  };"
+			"}"
+			"toggleReaderMode(true);";
+		view->WebPage()->ExecuteJavaScript(script);
+	}
+
 	if (view != CurrentWebView())
 		return;
 
@@ -1901,8 +2344,24 @@ BrowserWindow::_TabGroupShouldBeVisible() const
 void
 BrowserWindow::_ShutdownTab(int32 index)
 {
-	BView* view = fTabManager->RemoveTab(index);
+	BView* view = fTabManager->ViewForTab(index);
 	BWebView* webView = dynamic_cast<BWebView*>(view);
+
+	if (webView != NULL) {
+		BString url = webView->MainFrameURL();
+		if (url.Length() > 0 && url != "about:blank") {
+			ClosedTabInfo info;
+			info.url = url;
+			info.title = webView->MainFrameTitle();
+			fClosedTabs.push_back(info);
+			if (fClosedTabs.size() > 10)
+				fClosedTabs.pop_front();
+			_UpdateReopenClosedTabItem();
+		}
+	}
+
+	view = fTabManager->RemoveTab(index);
+	// webView pointer is still valid here, as RemoveTab only removed it from layout
 	if (webView == CurrentWebView())
 		SetCurrentWebView(NULL);
 	if (webView != NULL)
@@ -2470,6 +2929,20 @@ BrowserWindow::_SetAutoHideInterfaceInFullscreen(bool doIt)
 void
 BrowserWindow::_CheckAutoHideInterface()
 {
+	// Bookmark Bar auto-hide logic (if enabled and NOT fullscreen)
+	if (!fIsFullscreen && fAutoHideBookmarkBar && fBookmarkBar) {
+		if (fBookmarkBar->IsHidden()) {
+			// Show if mouse at top (e.g. over menu/tabs/nav)
+			// Navigation group bottom is a good threshold.
+			if (fLastMousePos.y <= fNavigationGroup->Frame().bottom)
+				_ShowBookmarkBar(true);
+		} else {
+			// Hide if mouse moves away
+			if (fLastMousePos.y > fBookmarkBar->Frame().bottom + 10)
+				_ShowBookmarkBar(false);
+		}
+	}
+
 	if (!fIsFullscreen || !fAutoHideInterfaceInFullscreenMode
 		|| (CurrentWebView() != NULL && !CurrentWebView()->IsFocus())) {
 		return;
@@ -2870,4 +3343,26 @@ BrowserWindow::_ShowBookmarkBar(bool show)
 		fBookmarkBar->Show();
 	else
 		fBookmarkBar->Hide();
+}
+
+
+void
+BrowserWindow::_ReopenClosedTab()
+{
+	if (fClosedTabs.empty())
+		return;
+
+	ClosedTabInfo info = fClosedTabs.back();
+	fClosedTabs.pop_back();
+	_UpdateReopenClosedTabItem();
+
+	CreateNewTab(info.url, true);
+}
+
+
+void
+BrowserWindow::_UpdateReopenClosedTabItem()
+{
+	if (fReopenClosedTabMenuItem != NULL)
+		fReopenClosedTabMenuItem->SetEnabled(!fClosedTabs.empty());
 }

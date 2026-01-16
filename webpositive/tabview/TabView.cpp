@@ -29,7 +29,9 @@ TabView::TabView()
 	:
 	fContainerView(NULL),
 	fLayoutItem(new TabLayoutItem(this)),
-	fLabel()
+	fLabel(),
+	fPinned(false),
+	fGroupColor(ui_color(B_PANEL_BACKGROUND_COLOR))
 {
 }
 
@@ -45,6 +47,9 @@ TabView::~TabView()
 BSize
 TabView::MinSize()
 {
+	if (fPinned)
+		return MaxSize();
+
 	BSize size(MaxSize());
 	size.width = 60.0f;
 	return size;
@@ -63,6 +68,10 @@ TabView::MaxSize()
 {
 	float extra = be_control_look->DefaultLabelSpacing();
 	float labelWidth = 300.0f;
+	if (fPinned) {
+		// Pinned tabs are square-ish, based on height
+		labelWidth = _LabelHeight() + extra;
+	}
 	return BSize(labelWidth, _LabelHeight() + extra);
 }
 
@@ -115,12 +124,22 @@ TabView::DrawBackground(BView* owner, BRect frame, const BRect& updateRect)
 		be_control_look->DrawInactiveTab(owner, frame, updateRect, base, flags,
 			borders, BControlLook::B_TOP_BORDER, index, selected, first, last);
 	}
+
+	if (fGroupColor != base) {
+		owner->SetHighColor(fGroupColor);
+		owner->SetPenSize(3.0f);
+		owner->StrokeLine(frame.LeftTop(), frame.RightTop());
+		owner->SetPenSize(1.0f);
+	}
 }
 
 
 void
 TabView::DrawContents(BView* owner, BRect frame, const BRect& updateRect)
 {
+	if (fPinned)
+		return;
+
 	rgb_color base = ui_color(B_PANEL_BACKGROUND_COLOR);
 	rgb_color text = ui_color(B_PANEL_TEXT_COLOR);
 	be_control_look->DrawLabel(owner, fLabel.String(), frame, updateRect,
@@ -190,6 +209,42 @@ const BString&
 TabView::Label() const
 {
 	return fLabel;
+}
+
+
+void
+TabView::SetPinned(bool pinned)
+{
+	if (fPinned == pinned)
+		return;
+
+	fPinned = pinned;
+	fLayoutItem->InvalidateLayout();
+}
+
+
+bool
+TabView::IsPinned() const
+{
+	return fPinned;
+}
+
+
+void
+TabView::SetGroupColor(rgb_color color)
+{
+	if (fGroupColor == color)
+		return;
+
+	fGroupColor = color;
+	fLayoutItem->InvalidateContainer();
+}
+
+
+rgb_color
+TabView::GroupColor() const
+{
+	return fGroupColor;
 }
 
 

@@ -64,6 +64,8 @@ public:
 
 			void				SetTabLabel(int32 tabIndex, const char* label);
 
+			void				MoveTab(int32 fromIndex, int32 toIndex);
+
 			void				SetFirstVisibleTabIndex(int32 index);
 			int32				FirstVisibleTabIndex() const;
 			int32				MaxFirstVisibleTabIndex() const;

@@ -334,6 +334,20 @@ TabContainerView::SetTabLabel(int32 index, const char* label)
 
 
 void
+TabContainerView::MoveTab(int32 fromIndex, int32 toIndex)
+{
+	BGroupLayout* layout = GroupLayout();
+	BLayoutItem* item = layout->RemoveItem(fromIndex);
+	if (item) {
+		layout->AddItem(toIndex, item);
+		// Update selection logic or invalidation if needed
+		Invalidate();
+		_ValidateTabVisibility();
+	}
+}
+
+
+void
 TabContainerView::SetFirstVisibleTabIndex(int32 index)
 {
 	if (index < 0)

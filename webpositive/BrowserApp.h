@@ -90,6 +90,9 @@ private:
 			SettingsWindow*		fSettingsWindow;
 			ConsoleWindow*		fConsoleWindow;
 			CookieWindow*		fCookieWindow;
+
+			BMessageRunner*		fAutoSaver;
+			void				_SaveSession();
 };
 
 

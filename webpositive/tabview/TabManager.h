@@ -63,6 +63,8 @@ public:
 									const BBitmap* icon);
 			void				SetCloseButtonsAvailable(bool available);
 
+			void				MoveTab(int32 fromIndex, int32 toIndex);
+
 private:
 #if INTEGRATE_MENU_INTO_TAB_BAR
 			BGroupView*			fMenuContainer;

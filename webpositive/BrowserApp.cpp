@@ -61,9 +61,10 @@
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "WebPositive"
 
-const char* kApplicationSignature = "application/x-vnd.Haiku-WebPositive";
-const char* kApplicationName = B_TRANSLATE_SYSTEM_NAME("WebPositive");
+extern const char* kApplicationSignature = "application/x-vnd.Haiku-WebPositive";
+extern const char* kApplicationName = B_TRANSLATE_SYSTEM_NAME("WebPositive");
 static const uint32 PRELOAD_BROWSING_HISTORY = 'plbh';
+static const uint32 AUTO_SAVE_SESSION = 'assn';
 
 
 BrowserApp::BrowserApp()
@@ -80,7 +81,8 @@ BrowserApp::BrowserApp()
 	fDownloadWindow(NULL),
 	fSettingsWindow(NULL),
 	fConsoleWindow(NULL),
-	fCookieWindow(NULL)
+	fCookieWindow(NULL),
+	fAutoSaver(NULL)
 {
 #ifdef __i386__
 	// First let's check SSE2 is available
@@ -120,6 +122,25 @@ BrowserApp::BrowserApp()
 	sessionStorePath << "/Session";
 	fSession = new SettingsMessage(B_USER_SETTINGS_DIRECTORY,
 		sessionStorePath.String());
+
+	// Crash-safe autosave recovery
+	BString autoSavePath = sessionStorePath;
+	autoSavePath << ".autosave";
+	BPath autoSaveFile;
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &autoSaveFile) == B_OK
+		&& autoSaveFile.Append(autoSavePath.String()) == B_OK) {
+		BEntry autoSaveEntry(autoSaveFile.Path());
+		if (autoSaveEntry.Exists()) {
+			// A crash occurred or unclean shutdown. Load the autosave.
+			delete fSession;
+			fSession = new SettingsMessage(B_USER_SETTINGS_DIRECTORY,
+				autoSavePath.String());
+		}
+	}
+
+	BMessage autoSaveMessage(AUTO_SAVE_SESSION);
+	fAutoSaver = new BMessageRunner(be_app_messenger, &autoSaveMessage,
+		60000000); // 60 seconds
 }
 
 
@@ -129,6 +150,7 @@ BrowserApp::~BrowserApp()
 	delete fSettings;
 	delete fCookies;
 	delete fSession;
+	delete fAutoSaver;
 }
 
 
@@ -364,6 +386,10 @@ BrowserApp::MessageReceived(BMessage* message)
 		fConsoleWindow->PostMessage(message);
 		break;
 
+	case AUTO_SAVE_SESSION:
+		_SaveSession();
+		break;
+
 	default:
 		BApplication::MessageReceived(message);
 		break;
@@ -469,6 +495,17 @@ BrowserApp::QuitRequested()
 	cookieJar.PurgeForExit();
 	if (cookieJar.Archive(&cookieArchive) == B_OK)
 		fCookies->SetValue("cookies", cookieArchive);
+
+	// Remove autosave file on clean exit
+	BString autoSavePath(kApplicationName);
+	autoSavePath << "/Session.autosave";
+	BPath autoSaveFile;
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &autoSaveFile) == B_OK
+		&& autoSaveFile.Append(autoSavePath.String()) == B_OK) {
+		BEntry autoSaveEntry(autoSaveFile.Path());
+		if (autoSaveEntry.Exists())
+			autoSaveEntry.Remove();
+	}
 
 	return true;
 }
@@ -627,6 +664,36 @@ BrowserApp::_ShowWindow(const BMessage* message, BWindow* window)
 		window->Show();
 	else
 		window->Activate();
+}
+
+
+void
+BrowserApp::_SaveSession()
+{
+	BString sessionStorePath = kApplicationName;
+	sessionStorePath << "/Session.autosave";
+	SettingsMessage autoSaveSession(B_USER_SETTINGS_DIRECTORY,
+		sessionStorePath.String());
+
+	for (int i = 0; BWindow* window = WindowAt(i); i++) {
+		BrowserWindow* webWindow = dynamic_cast<BrowserWindow*>(window);
+		if (!webWindow)
+			continue;
+		if (!webWindow->Lock())
+			continue;
+
+		BMessage windowArchive;
+		webWindow->Archive(&windowArchive, true);
+		autoSaveSession.AddMessage("window", &windowArchive);
+
+		webWindow->Unlock();
+	}
+	// SettingsMessage saves on destruction or we can rely on it being up to date
+	// assuming it behaves like typical Haiku settings.
+	// But usually we need to set values. Here we just added messages.
+	// We might need to force a save if SettingsMessage doesn't do it automatically enough.
+	// Reading the code for SettingsMessage would be ideal but it's not in the file list.
+	// Assuming it works similar to fSession.
 }
 
 

@@ -35,8 +35,10 @@ local sources =
 	CredentialsStorage.cpp
 	DownloadProgressView.cpp
 	DownloadWindow.cpp
+	PermissionsWindow.cpp
 	SettingsKeys.cpp
 	SettingsWindow.cpp
+	TabSearchWindow.cpp
 	URLInputGroup.cpp
 ;
 

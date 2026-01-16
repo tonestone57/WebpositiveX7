@@ -31,6 +31,7 @@
 
 #include "WebWindow.h"
 
+#include <deque>
 #include <Messenger.h>
 #include <String.h>
 #include <UrlContext.h>
@@ -91,7 +92,16 @@ enum {
 	SHOW_DOWNLOAD_WINDOW			= 'sdwd',
 	SHOW_SETTINGS_WINDOW			= 'sswd',
 	SHOW_CONSOLE_WINDOW				= 'scwd',
-	SHOW_COOKIE_WINDOW				= 'skwd'
+	SHOW_COOKIE_WINDOW				= 'skwd',
+
+	SEARCH_TABS						= 'stbs',
+	TOGGLE_DARK_MODE				= 'tgdm',
+	SHOW_PERMISSIONS_WINDOW			= 'spwn',
+	SET_TAB_COLOR					= 'stcl',
+	TOGGLE_READER_MODE				= 'trdm',
+	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb',
+	SHOW_HIDE_BOOKMARK_BAR			= 'shbb',
+	TAB_SEARCH_WINDOW_QUIT			= 'tswq'
 };
 
 
@@ -223,7 +233,17 @@ private:
 
 			void				_ShowBookmarkBar(bool show);
 
+			void				_ReopenClosedTab();
+			void				_UpdateReopenClosedTabItem();
+
 private:
+			struct ClosedTabInfo {
+				BString url;
+				BString title;
+			};
+			std::deque<ClosedTabInfo> fClosedTabs;
+			BMenuItem*			fReopenClosedTabMenuItem;
+
 			BMenu*				fHistoryMenu;
 			int32				fHistoryMenuFixedItemCount;
 
@@ -280,10 +300,20 @@ private:
 			uint32				fNewTabPolicy;
 			BString				fStartPageURL;
 			BString				fSearchPageURL;
+			bool				fAutoHideBookmarkBar;
 
 			BMenuItem*			fBookmarkBarMenuItem;
 			BookmarkBar*		fBookmarkBar;
 			BFilePanel*			fSavePanel;
+
+			bool				fDarkMode;
+			BMenuItem*			fDarkModeMenuItem;
+			bool				fReaderMode;
+			BMenuItem*			fReaderModeMenuItem;
+			bool				fToolbarBottom;
+			BMenuItem*			fToolbarBottomMenuItem;
+
+			class TabSearchWindow* fTabSearchWindow;
 };
 
 
