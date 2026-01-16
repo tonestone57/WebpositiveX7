@@ -11,6 +11,9 @@
 
 #include <Window.h>
 
+#include <map>
+#include <vector>
+
 #include <NetworkCookieJar.h>
 
 
@@ -41,6 +44,8 @@ private:
 	BStringView*				fHeaderView;
 
 	BPrivate::Network::BNetworkCookieJar&	fCookieJar;
+
+	std::map<BString, std::vector<BPrivate::Network::BNetworkCookie> > fCookieMap;
 };
 
 

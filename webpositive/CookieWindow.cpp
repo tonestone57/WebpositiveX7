@@ -222,11 +222,16 @@ CookieWindow::_BuildDomainList()
 	fDomains->AddItem(rootItem);
 
 	// Populate the domain list
+	fCookieMap.clear();
 	BPrivate::Network::BNetworkCookieJar::Iterator it = fCookieJar.GetIterator();
 
 	const BPrivate::Network::BNetworkCookie* cookie;
-	while ((cookie = it.NextDomain()) != NULL) {
-		_AddDomain(cookie->Domain(), false);
+	while ((cookie = it.Next()) != NULL) {
+		BString domain = cookie->Domain();
+		if (fCookieMap.find(domain) == fCookieMap.end())
+			_AddDomain(domain, false);
+
+		fCookieMap[domain].push_back(*cookie);
 	}
 
 	int i = 1;
@@ -352,24 +357,14 @@ CookieWindow::_ShowCookiesForDomain(BString domain)
 	// Empty the cookie list
 	fCookies->Clear();
 
-	// Populate the domain list
-	BPrivate::Network::BNetworkCookieJar::Iterator it
-		= fCookieJar.GetIterator();
-
-	const BPrivate::Network::BNetworkCookie* cookie;
-	/* FIXME A direct access to a domain would be needed in BNetworkCookieJar. */
-	while ((cookie = it.Next()) != NULL) {
-		if (cookie->Domain() == domain)
-			break;
-	}
-
-	if (cookie == NULL)
+	if (fCookieMap.find(domain) == fCookieMap.end())
 		return;
 
-	do {
-		new CookieRow(fCookies, *cookie); // Attaches itself to the list
-		cookie = it.Next();
-	} while (cookie != NULL && cookie->Domain() == domain);
+	const std::vector<BPrivate::Network::BNetworkCookie>& cookies
+		= fCookieMap[domain];
+	std::vector<BPrivate::Network::BNetworkCookie>::const_iterator it;
+	for (it = cookies.begin(); it != cookies.end(); ++it)
+		new CookieRow(fCookies, *it);
 }
 
 
@@ -412,4 +407,6 @@ CookieWindow::_DeleteCookies()
 			delete row;
 		}
 	}
+
+	PostMessage(COOKIE_REFRESH);
 }
