@@ -3112,13 +3112,10 @@ BrowserWindow::_ShowInterface(bool show)
 		fStatusGroup->SetVisible(false);
 	}
 
-	if (fIsLoading) {
-		if (fLoadingProgressBar->IsHidden())
-			fLoadingProgressBar->Show();
-	} else {
-		if (!fLoadingProgressBar->IsHidden())
-			fLoadingProgressBar->Hide();
-	}
+	// TODO: Setting the group visible seems to unhide the status bar.
+	// Fix in Haiku?
+	while (!fLoadingProgressBar->IsHidden())
+		fLoadingProgressBar->Hide();
 }
 
 
