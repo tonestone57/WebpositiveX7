@@ -2755,15 +2755,52 @@ BrowserWindow::_HandlePageSourceResult(const BMessage* message)
 		pathToPageSource.SetTo(url.String());
 	} else {
 		// Something else, store it.
-		// TODO: What if it isn't HTML, but for example SVG?
 		BString source;
 		ret = message->FindString("source", &source);
 
 		if (ret == B_OK)
 			ret = find_directory(B_SYSTEM_TEMP_DIRECTORY, &pathToPageSource);
 
+		BString extension = ".html";
+		const char* mimeType = "text/html";
+
+		BString urlForExtension(url);
+		int32 queryPos = urlForExtension.FindFirst('?');
+		if (queryPos != -1)
+			urlForExtension.Truncate(queryPos);
+		int32 fragmentPos = urlForExtension.FindFirst('#');
+		if (fragmentPos != -1)
+			urlForExtension.Truncate(fragmentPos);
+
+		int32 dotPos = urlForExtension.FindLast('.');
+		int32 slashPos = urlForExtension.FindLast('/');
+		if (dotPos > slashPos) {
+			BString ext;
+			urlForExtension.CopyInto(ext, dotPos + 1, urlForExtension.Length() - dotPos - 1);
+			if (ext.Length() > 0 && ext.Length() <= 5) {
+				bool valid = true;
+				for (int32 i = 0; i < ext.Length(); i++) {
+					if (!isalnum(ext[i])) {
+						valid = false;
+						break;
+					}
+				}
+
+				if (valid) {
+					extension = "";
+					extension << "." << ext;
+					if (ext.ICompare("svg") == 0)
+						mimeType = "image/svg+xml";
+					else if (ext.ICompare("xml") == 0)
+						mimeType = "text/xml";
+					else if (ext.ICompare("txt") == 0)
+						mimeType = "text/plain";
+				}
+			}
+		}
+
 		BString tmpFileName("PageSource_");
-		tmpFileName << system_time() << ".html";
+		tmpFileName << system_time() << extension;
 		if (ret == B_OK)
 			ret = pathToPageSource.Append(tmpFileName.String());
 
@@ -2780,9 +2817,8 @@ BrowserWindow::_HandlePageSourceResult(const BMessage* message)
 		}
 
 		if (ret == B_OK) {
-			const char* type = "text/html";
-			size_t size = strlen(type);
-			pageSourceFile.WriteAttr("BEOS:TYPE", B_STRING_TYPE, 0, type, size);
+			size_t size = strlen(mimeType);
+			pageSourceFile.WriteAttr("BEOS:TYPE", B_STRING_TYPE, 0, mimeType, size);
 				// If it fails we don't care.
 		}
 	}
