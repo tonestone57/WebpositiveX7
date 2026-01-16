@@ -2274,10 +2274,11 @@ BrowserWindow::SetMenuBarVisible(bool flag, BWebView* view)
 	if (fTabManager->CountTabs() > 1)
 		return;
 
-	if (flag)
+	if (flag) {
 		fVisibleInterfaceElements |= INTERFACE_ELEMENT_MENU;
-	else
+	} else {
 		fVisibleInterfaceElements &= ~INTERFACE_ELEMENT_MENU;
+	}
 
 #if !INTEGRATE_MENU_INTO_TAB_BAR
 	if (fInterfaceVisible)
