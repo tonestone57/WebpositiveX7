@@ -22,6 +22,7 @@
 #include <GroupLayoutBuilder.h>
 #include <Locale.h>
 #include <MenuItem.h>
+#include <Node.h>
 #include <NodeInfo.h>
 #include <NodeMonitor.h>
 #include <Notification.h>
@@ -29,6 +30,7 @@
 #include <Roster.h>
 #include <SpaceLayoutItem.h>
 #include <StatusBar.h>
+#include <StorageDefs.h>
 #include <StringView.h>
 #include <TimeFormat.h>
 
@@ -409,11 +411,45 @@ DownloadProgressView::MessageReceived(BMessage* message)
 			break;
 		case OPEN_DOWNLOAD:
 		{
-			// TODO: In case of executable files, ask the user first!
 			entry_ref ref;
 			status_t status = get_ref_for_path(fPath.Path(), &ref);
-			if (status == B_OK)
+			if (status == B_OK) {
+				bool isExecutable = false;
+				BNode node(&ref);
+
+				mode_t permissions;
+				if (node.GetPermissions(&permissions) == B_OK) {
+					if ((permissions & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0)
+						isExecutable = true;
+				}
+
+				if (!isExecutable) {
+					BNodeInfo nodeInfo(&node);
+					char mimeType[B_MIME_TYPE_LENGTH];
+					if (nodeInfo.GetType(mimeType) == B_OK) {
+						if (strcmp(mimeType, B_APP_MIME_TYPE) == 0)
+							isExecutable = true;
+					}
+				}
+
+				if (isExecutable) {
+					BString message(B_TRANSLATE("The file '%name%' is an executable. "
+						"Are you sure you want to open it?"));
+					message.ReplaceFirst("%name%", fPath.Leaf());
+
+					BAlert* alert = new BAlert(B_TRANSLATE("Open executable?"),
+						message.String(), B_TRANSLATE("Cancel"),
+						B_TRANSLATE("Open"), NULL, B_WIDTH_AS_USUAL,
+						B_WARNING_ALERT);
+					alert->SetShortcut(0, B_ESCAPE);
+
+					if (alert->Go() != 1)
+						break;
+				}
+
 				status = be_roster->Launch(&ref);
+			}
+
 			if (status != B_OK && status != B_ALREADY_RUNNING) {
 				BAlert* alert = new BAlert(B_TRANSLATE("Open download error"),
 					B_TRANSLATE("The download could not be opened."),
