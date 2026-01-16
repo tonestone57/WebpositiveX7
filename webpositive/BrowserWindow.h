@@ -312,6 +312,7 @@ private:
 			BMenuItem*			fReaderModeMenuItem;
 			bool				fToolbarBottom;
 			BMenuItem*			fToolbarBottomMenuItem;
+			bool				fIsLoading;
 
 			class TabSearchWindow* fTabSearchWindow;
 };

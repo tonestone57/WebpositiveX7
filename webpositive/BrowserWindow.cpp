@@ -241,7 +241,8 @@ public:
 		fFocusedView(focusedView),
 		fPageIcon(NULL),
 		fURLInputSelectionStart(-1),
-		fURLInputSelectionEnd(-1)
+		fURLInputSelectionEnd(-1),
+		fIsLoading(false)
 	{
 	}
 
@@ -300,12 +301,23 @@ public:
 		return fURLInputSelectionEnd;
 	}
 
+	void SetIsLoading(bool loading)
+	{
+		fIsLoading = loading;
+	}
+
+	bool IsLoading() const
+	{
+		return fIsLoading;
+	}
+
 private:
 	BView*		fFocusedView;
 	BBitmap*	fPageIcon;
 	BString		fURLInputContents;
 	int32		fURLInputSelectionStart;
 	int32		fURLInputSelectionEnd;
+	bool		fIsLoading;
 };
 
 
@@ -409,6 +421,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fDarkMode(false),
 	fReaderMode(false),
 	fToolbarBottom(false),
+	fIsLoading(false),
 	fTabSearchWindow(NULL)
 {
 	// Begin listening to settings changes and read some current values.
@@ -1731,8 +1744,12 @@ BrowserWindow::SetCurrentWebView(BWebView* webView)
 		PageUserData* userData = static_cast<PageUserData*>(
 			webView->GetUserData());
 		BView* focusedView = NULL;
-		if (userData != NULL)
+		if (userData != NULL) {
 			focusedView = userData->FocusedView();
+			fIsLoading = userData->IsLoading();
+		} else {
+			fIsLoading = false;
+		}
 
 		if (focusedView != NULL
 			&& viewIsChild(GetLayout()->View(), focusedView)) {
@@ -1907,11 +1924,16 @@ BrowserWindow::CloseWindowRequested(BWebView* view)
 void
 BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 {
+	if (view == CurrentWebView())
+		fIsLoading = true;
+
+	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+	if (userData != NULL)
+		userData->SetIsLoading(true);
+
 	if (view != CurrentWebView()) {
 		// Update the userData contents instead so the user sees
 		// the correct URL when they switch back to that tab.
-		PageUserData* userData = static_cast<PageUserData*>(
-			view->GetUserData());
 		if (userData != NULL && userData->URLInputContents().Length() == 0) {
 			userData->SetURLInputContents(url);
 		}
@@ -1928,8 +1950,14 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 void
 BrowserWindow::LoadCommitted(const BString& url, BWebView* view)
 {
+	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+	if (userData != NULL)
+		userData->SetIsLoading(true);
+
 	if (view != CurrentWebView())
 		return;
+
+	fIsLoading = true;
 
 	// This hook is invoked when the load is committed.
 	fURLInputGroup->SetText(url.String());
@@ -1957,8 +1985,14 @@ BrowserWindow::LoadProgress(float progress, BWebView* view)
 void
 BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 {
+	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+	if (userData != NULL)
+		userData->SetIsLoading(false);
+
 	if (view != CurrentWebView())
 		return;
+
+	fIsLoading = false;
 
 	BString status(B_TRANSLATE_COMMENT("%url failed", "Loading URL failed. "
 		"Don't translate variable %url."));
@@ -2054,8 +2088,14 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 		view->WebPage()->ExecuteJavaScript(script);
 	}
 
+	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+	if (userData != NULL)
+		userData->SetIsLoading(false);
+
 	if (view != CurrentWebView())
 		return;
+
+	fIsLoading = false;
 
 	fURLInputGroup->SetText(url.String());
 
@@ -3032,10 +3072,14 @@ BrowserWindow::_ShowInterface(bool show)
 		fNavigationGroup->SetVisible(false);
 		fStatusGroup->SetVisible(false);
 	}
-	// TODO: Setting the group visible seems to unhide the status bar.
-	// Fix in Haiku?
-	while (!fLoadingProgressBar->IsHidden())
-		fLoadingProgressBar->Hide();
+
+	if (fIsLoading) {
+		if (fLoadingProgressBar->IsHidden())
+			fLoadingProgressBar->Show();
+	} else {
+		if (!fLoadingProgressBar->IsHidden())
+			fLoadingProgressBar->Hide();
+	}
 }
 
 
@@ -3050,9 +3094,8 @@ BrowserWindow::_ShowProgressBar(bool show)
 	} else {
 		if (!fInterfaceVisible)
 			fStatusGroup->SetVisible(false);
-		// TODO: This is also used in _ShowInterface. Without it the status bar
-		// doesn't always hide again. It may be an Interface Kit bug.
-		while (!fLoadingProgressBar->IsHidden())
+
+		if (!fLoadingProgressBar->IsHidden())
 			fLoadingProgressBar->Hide();
 	}
 }
