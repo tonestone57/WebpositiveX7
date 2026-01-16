@@ -8,7 +8,7 @@
 #include <String.h>
 
 
-BString baseURL(const BString string);
+BString baseURL(const BString& string);
 
 
 #endif // BASE_URL_H
