@@ -28,6 +28,7 @@
 
 
 static const float kLeftTabInset = 4;
+static const float kRightTabInset = 10;
 
 
 TabContainerView::TabContainerView(Controller* controller)
@@ -42,7 +43,7 @@ TabContainerView::TabContainerView(Controller* controller)
 {
 	SetFlags(Flags() | B_WILL_DRAW | B_FULL_UPDATE_ON_RESIZE);
 	SetViewColor(B_TRANSPARENT_COLOR);
-	GroupLayout()->SetInsets(kLeftTabInset, 0, 0, 1);
+	GroupLayout()->SetInsets(kLeftTabInset, 0, kRightTabInset, 1);
 	GroupLayout()->AddItem(BSpaceLayoutItem::CreateGlue(), 0.0f);
 }
 
@@ -516,8 +517,7 @@ TabContainerView::_UpdateTabVisibility()
 float
 TabContainerView::_AvailableWidthForTabs() const
 {
-	float width = Bounds().Width() - 10;
-		// TODO: Don't really know why -10 is needed above.
+	float width = Bounds().Width();
 
 	float left;
 	float right;
