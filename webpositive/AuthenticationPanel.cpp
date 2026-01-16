@@ -217,7 +217,7 @@ bool AuthenticationPanel::getAuthentication(const BString& text,
 		for (;;) {
 			do {
 				err = acquire_sem_etc(m_exitSemaphore, 1, B_RELATIVE_TIMEOUT,
-					10000);
+					50000);
 				// We've (probably) had our time slice taken away from us
 			} while (err == B_INTERRUPTED);
 
