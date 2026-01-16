@@ -14,9 +14,13 @@
 #include <File.h>
 #include <FindDirectory.h>
 #include <Message.h>
+#include <MessageRunner.h>
 #include <Path.h>
 
 #include "BrowserApp.h"
+
+
+static const uint32 SAVE_HISTORY = 'svhs';
 
 
 BrowsingHistoryItem::BrowsingHistoryItem(const BString& url)
@@ -154,10 +158,12 @@ BrowsingHistory::sDefaultInstance;
 
 BrowsingHistory::BrowsingHistory()
 	:
+	BHandler("browsing history"),
 	BLocker("browsing history"),
 	fHistoryItems(64),
 	fMaxHistoryItemAge(7),
-	fSettingsLoaded(false)
+	fSettingsLoaded(false),
+	fSaveRunner(NULL)
 {
 }
 
@@ -166,6 +172,7 @@ BrowsingHistory::~BrowsingHistory()
 {
 	_SaveSettings();
 	_Clear();
+	delete fSaveRunner;
 }
 
 
@@ -217,12 +224,30 @@ BrowsingHistory::Clear()
 
 
 void
+BrowsingHistory::MessageReceived(BMessage* message)
+{
+	switch (message->what) {
+		case SAVE_HISTORY:
+		{
+			BAutolock _(this);
+			_SaveSettings();
+			delete fSaveRunner;
+			fSaveRunner = NULL;
+			break;
+		}
+		default:
+			BHandler::MessageReceived(message);
+	}
+}
+
+
+void
 BrowsingHistory::SetMaxHistoryItemAge(int32 days)
 {
 	BAutolock _(this);
 	if (fMaxHistoryItemAge != days) {
 		fMaxHistoryItemAge = days;
-		_SaveSettings();
+		_ScheduleSave();
 	}
 }	
 
@@ -262,7 +287,7 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 		if (item.URL() == existingItem->URL()) {
 			if (!internal) {
 				existingItem->Invoked();
-				_SaveSettings();
+				_ScheduleSave();
 			}
 			return true;
 		}
@@ -277,7 +302,7 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 
 	if (!internal) {
 		newItem->Invoked();
-		_SaveSettings();
+		_ScheduleSave();
 	}
 
 	return true;
@@ -338,6 +363,21 @@ BrowsingHistory::_SaveSettings()
 		}
 		settingsArchive.Flatten(&settingsFile);
 	}
+}
+
+
+void
+BrowsingHistory::_ScheduleSave()
+{
+	if (fSaveRunner)
+		return;
+
+	if (Looper() == NULL)
+		return;
+
+	BMessage message(SAVE_HISTORY);
+	fSaveRunner = new(std::nothrow) BMessageRunner(BMessenger(this),
+		&message, 2000000, 1);
 }
 
 
