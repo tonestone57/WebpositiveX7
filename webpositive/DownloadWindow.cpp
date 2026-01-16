@@ -258,6 +258,46 @@ DownloadWindow::MessageReceived(BMessage* message)
 			}
 			break;
 		}
+		case B_DOWNLOAD_STARTED:
+		{
+			BWebDownload* download;
+			if (message->FindPointer("download", reinterpret_cast<void**>(
+					&download)) != B_OK)
+				break;
+
+			for (int32 i = fDownloadViewsLayout->CountItems() - 1;
+					BLayoutItem* item = fDownloadViewsLayout->ItemAt(i); i--) {
+				DownloadProgressView* view = dynamic_cast<DownloadProgressView*>(
+					item->View());
+				if (!view)
+					continue;
+				if (view->Download() == download) {
+					view->DownloadStarted(message);
+					break;
+				}
+			}
+			break;
+		}
+		case B_DOWNLOAD_PROGRESS:
+		{
+			BWebDownload* download;
+			if (message->FindPointer("download", reinterpret_cast<void**>(
+					&download)) != B_OK)
+				break;
+
+			for (int32 i = fDownloadViewsLayout->CountItems() - 1;
+					BLayoutItem* item = fDownloadViewsLayout->ItemAt(i); i--) {
+				DownloadProgressView* view = dynamic_cast<DownloadProgressView*>(
+					item->View());
+				if (!view)
+					continue;
+				if (view->Download() == download) {
+					view->DownloadProgress(message);
+					break;
+				}
+			}
+			break;
+		}
 		case B_DOWNLOAD_REMOVED:
 		{
 			BWebDownload* download;
