@@ -2386,7 +2386,13 @@ BrowserWindow::AuthenticationChallenge(BString message, BString& inOutUser,
 		= CredentialsStorage::SessionInstance();
 
 	// TODO: Using the message as key here is not so smart.
-	HashString key(message);
+	BString keyString(message);
+	if (view != NULL) {
+		BUrl url(view->MainFrameURL());
+		if (url.IsValid())
+			keyString.Prepend(BString().SetToFormat("%s:", url.Host().String()));
+	}
+	HashString key(keyString);
 
 	if (failureCount == 0) {
 		if (persistentStorage->Contains(key)) {
