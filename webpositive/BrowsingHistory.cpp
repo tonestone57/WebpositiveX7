@@ -189,6 +189,14 @@ BrowsingHistory::AddItem(const BrowsingHistoryItem& item)
 }
 
 
+bool
+BrowsingHistory::RemoveUrl(const BString& url)
+{
+	BAutolock _(this);
+	return _RemoveUrl(url);
+}
+
+
 int32
 BrowsingHistory::BrowsingHistory::CountItems() const
 {
@@ -281,6 +289,24 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 	}
 
 	return true;
+}
+
+
+bool
+BrowsingHistory::_RemoveUrl(const BString& url)
+{
+	int32 count = CountItems();
+	for (int32 i = 0; i < count; i++) {
+		BrowsingHistoryItem* item = reinterpret_cast<BrowsingHistoryItem*>(
+			fHistoryItems.ItemAtFast(i));
+		if (item->URL() == url) {
+			fHistoryItems.RemoveItem(i);
+			delete item;
+			_SaveSettings();
+			return true;
+		}
+	}
+	return false;
 }
 
 

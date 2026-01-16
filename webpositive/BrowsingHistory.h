@@ -57,6 +57,7 @@ public:
 	static	BrowsingHistory*	DefaultInstance();
 
 			bool				AddItem(const BrowsingHistoryItem& item);
+			bool				RemoveUrl(const BString& url);
 
 	// Should Lock() the object when using these in some loop or so:
 			int32				CountItems() const;
@@ -73,6 +74,7 @@ private:
 			void				_Clear();
 			bool				_AddItem(const BrowsingHistoryItem& item,
 									bool invoke);
+			bool				_RemoveUrl(const BString& url);
 
 			void				_LoadSettings();
 			void				_SaveSettings();

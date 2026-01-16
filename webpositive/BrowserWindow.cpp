@@ -2107,7 +2107,7 @@ BrowserWindow::MainDocumentError(const BString& failingURL,
 
 	BWebWindow::MainDocumentError(failingURL, localizedDescription, view);
 
-	// TODO: Remove the failing URL from the BrowsingHistory!
+	BrowsingHistory::DefaultInstance()->RemoveUrl(failingURL);
 }
 
 
