@@ -7,6 +7,7 @@
 #include "BookmarkBar.h"
 
 #include <Alert.h>
+#include <OS.h>
 #include <Catalog.h>
 #include <Directory.h>
 #include <Entry.h>
@@ -35,6 +36,39 @@ const uint32 kAskBookmarkNameMsg = 'askn';
 const uint32 kShowInTrackerMsg = 'otrk';
 const uint32 kRenameBookmarkMsg = 'rena';
 const uint32 kFolderMsg = 'fold';
+
+const uint32 kMsgInitialBookmarksLoaded = 'ibld';
+
+struct LoaderParams {
+	node_ref dirRef;
+	BMessenger target;
+};
+
+
+static status_t
+LoadBookmarksThread(void* data)
+{
+	LoaderParams* params = (LoaderParams*)data;
+	BDirectory dir(&params->dirRef);
+	BEntry bookmark;
+
+	BMessage message(kMsgInitialBookmarksLoaded);
+
+	while (dir.GetNextEntry(&bookmark, false) == B_OK) {
+		node_ref ref;
+		if (bookmark.GetNodeRef(&ref) == B_OK) {
+			entry_ref entryRef;
+			if (bookmark.GetRef(&entryRef) == B_OK) {
+				message.AddRef("refs", &entryRef);
+				message.AddInt64("inodes", (int64)ref.node);
+			}
+		}
+	}
+
+	params->target.SendMessage(&message);
+	delete params;
+	return B_OK;
+}
 
 
 BookmarkBar::BookmarkBar(const char* title, BHandler* target,
@@ -116,15 +150,27 @@ BookmarkBar::AttachedToWindow()
 	watch_node(&fNodeRef, B_WATCH_DIRECTORY, BMessenger(this));
 
 	// Enumerate initial directory content
-	BDirectory dir(&fNodeRef);
-	BEntry bookmark;
-	while (dir.GetNextEntry(&bookmark, false) == B_OK) {
-		node_ref ref;
-		if (bookmark.GetNodeRef(&ref) == B_OK)
-			_AddItem(ref.node, &bookmark, false);
+	LoaderParams* params = new LoaderParams;
+	params->dirRef = fNodeRef;
+	params->target = BMessenger(this);
+
+	thread_id loader = spawn_thread(LoadBookmarksThread, "BookmarkLoader",
+		B_NORMAL_PRIORITY, params);
+	if (loader >= 0) {
+		resume_thread(loader);
+	} else {
+		delete params;
+		// Fallback to synchronous loading
+		BDirectory dir(&fNodeRef);
+		BEntry bookmark;
+		while (dir.GetNextEntry(&bookmark, false) == B_OK) {
+			node_ref ref;
+			if (bookmark.GetNodeRef(&ref) == B_OK)
+				_AddItem(ref.node, &bookmark, false);
+		}
+		BRect rect = Bounds();
+		FrameResized(rect.Width(), rect.Height());
 	}
-	BRect rect = Bounds();
-	FrameResized(rect.Width(), rect.Height());
 }
 
 
@@ -132,6 +178,29 @@ void
 BookmarkBar::MessageReceived(BMessage* message)
 {
 	switch (message->what) {
+		case kMsgInitialBookmarksLoaded:
+		{
+			entry_ref ref;
+			int32 i = 0;
+			bool addedAny = false;
+			while (message->FindRef("refs", i, &ref) == B_OK) {
+				int64 inodeVal;
+				if (message->FindInt64("inodes", i, &inodeVal) == B_OK) {
+					BEntry entry(&ref);
+					if (entry.InitCheck() == B_OK) {
+						_AddItem((ino_t)inodeVal, &entry, false);
+						addedAny = true;
+					}
+				}
+				i++;
+			}
+			if (addedAny) {
+				BRect rect = Bounds();
+				FrameResized(rect.Width(), rect.Height());
+			}
+			break;
+		}
+
 		case B_NODE_MONITOR:
 		{
 			int32 opcode = message->FindInt32("opcode");
