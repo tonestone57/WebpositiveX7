@@ -20,8 +20,11 @@
 #include <TextControl.h>
 #include <stdio.h>
 
+#include <MessageRunner.h>
+
 static const uint32 kMsgPanelOK = 'pnok';
 static const uint32 kMsgJitter = 'jitr';
+static const uint32 kMsgJitterStep = 'jist';
 static const uint32 kHidePassword = 'hdpw';
 
 
@@ -48,13 +51,16 @@ AuthenticationPanel::AuthenticationPanel(BRect parentFrame)
 	m_cancelButton(new BButton("cancel", B_TRANSLATE("Cancel"),
 		new BMessage(B_QUIT_REQUESTED))),
 	m_cancelled(false),
-	m_exitSemaphore(create_sem(0, "Authentication Panel"))
+	m_exitSemaphore(create_sem(0, "Authentication Panel")),
+	m_jitterRunner(NULL),
+	m_jitterCount(0)
 {
 }
 
 
 AuthenticationPanel::~AuthenticationPanel()
 {
+	delete m_jitterRunner;
 	delete_sem(m_exitSemaphore);
 }
 
@@ -92,15 +98,39 @@ AuthenticationPanel::MessageReceived(BMessage* message)
 	}
 	case kMsgJitter: {
 		UpdateIfNeeded();
-		BPoint leftTop = Frame().LeftTop();
+
+		if (m_lastJitterOffset != 0)
+			MoveBy(-m_lastJitterOffset, 0);
+
+		m_lastJitterOffset = 0;
+		m_jitterCount = 0;
+
+		delete m_jitterRunner;
+		BMessage message(kMsgJitterStep);
+		m_jitterRunner = new BMessageRunner(BMessenger(this), &message, 15000);
+		break;
+	}
+
+	case kMsgJitterStep: {
+		if (m_jitterCount >= 20) {
+			if (m_lastJitterOffset != 0)
+				MoveBy(-m_lastJitterOffset, 0);
+
+			delete m_jitterRunner;
+			m_jitterRunner = NULL;
+			break;
+		}
+
 		const float jitterOffsets[] = { -10, 0, 10, 0 };
 		const int32 jitterOffsetCount = sizeof(jitterOffsets) / sizeof(float);
-		for (int32 i = 0; i < 20; i++) {
-			float offset = jitterOffsets[i % jitterOffsetCount];
-			MoveTo(leftTop.x + offset, leftTop.y);
-			snooze(15000);
-		}
-		MoveTo(leftTop);
+		float offset = jitterOffsets[m_jitterCount % jitterOffsetCount];
+		float delta = offset - m_lastJitterOffset;
+
+		if (delta != 0)
+			MoveBy(delta, 0);
+
+		m_lastJitterOffset = offset;
+		m_jitterCount++;
 		break;
 	}
 	default:
