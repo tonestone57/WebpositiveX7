@@ -9,9 +9,10 @@
 #include "DateTime.h"
 #include <List.h>
 #include <Locker.h>
+#include <String.h>
+#include <map>
 
 class BFile;
-class BString;
 
 
 class BrowsingHistoryItem {
@@ -80,6 +81,7 @@ private:
 
 private:
 			BList				fHistoryItems;
+			std::map<BString, BrowsingHistoryItem*> fHistoryMap;
 			int32				fMaxHistoryItemAge;
 
 	static	BrowsingHistory		sDefaultInstance;

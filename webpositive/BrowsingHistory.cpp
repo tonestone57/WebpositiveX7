@@ -247,30 +247,49 @@ BrowsingHistory::_Clear()
 		delete item;
 	}
 	fHistoryItems.MakeEmpty();
+	fHistoryMap.clear();
 }
 
 
 bool
 BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 {
+	// Optimistic check using map
+	std::map<BString, BrowsingHistoryItem*>::iterator it
+		= fHistoryMap.find(item.URL());
+	if (it != fHistoryMap.end()) {
+		BrowsingHistoryItem* existingItem = it->second;
+		if (!internal) {
+			existingItem->Invoked();
+			_SaveSettings();
+		}
+		return true;
+	}
+
 	int32 count = CountItems();
 	int32 insertionIndex = count;
 	for (int32 i = 0; i < count; i++) {
 		BrowsingHistoryItem* existingItem
 			= reinterpret_cast<BrowsingHistoryItem*>(
 			fHistoryItems.ItemAtFast(i));
-		if (item.URL() == existingItem->URL()) {
-			if (!internal) {
-				existingItem->Invoked();
-				_SaveSettings();
-			}
-			return true;
-		}
 		if (item < *existingItem)
 			insertionIndex = i;
 	}
 	BrowsingHistoryItem* newItem = new(std::nothrow) BrowsingHistoryItem(item);
 	if (!newItem || !fHistoryItems.AddItem(newItem, insertionIndex)) {
+		delete newItem;
+		return false;
+	}
+
+	// Add to map
+	try {
+		fHistoryMap.insert(
+			std::pair<BString, BrowsingHistoryItem*>(item.URL(), newItem));
+	} catch (...) {
+		// If map insertion fails, we remove the item from the list to avoid
+		// duplicate entries in the list that are not in the map (which would
+		// cause the map check to fail next time, leading to another duplicate).
+		fHistoryItems.RemoveItem(insertionIndex);
 		delete newItem;
 		return false;
 	}
