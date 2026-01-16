@@ -60,7 +60,7 @@ public:
 
 	// Should Lock() the object when using these in some loop or so:
 			int32				CountItems() const;
-			BrowsingHistoryItem	HistoryItemAt(int32 index) const;
+			const BrowsingHistoryItem*	HistoryItemAt(int32 index) const;
 			void				Clear();
 
 			void				SetMaxHistoryItemAge(int32 days);

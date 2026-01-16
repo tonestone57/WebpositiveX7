@@ -198,17 +198,12 @@ BrowsingHistory::BrowsingHistory::CountItems() const
 }
 
 
-BrowsingHistoryItem
+const BrowsingHistoryItem*
 BrowsingHistory::HistoryItemAt(int32 index) const
 {
 	BAutolock _(const_cast<BrowsingHistory*>(this));
 
-	BrowsingHistoryItem* existingItem = reinterpret_cast<BrowsingHistoryItem*>(
-		fHistoryItems.ItemAt(index));
-	if (!existingItem)
-		return BrowsingHistoryItem(BString());
-
-	return BrowsingHistoryItem(*existingItem);
+	return reinterpret_cast<BrowsingHistoryItem*>(fHistoryItems.ItemAt(index));
 }
 
 
@@ -332,8 +327,8 @@ BrowsingHistory::_SaveSettings()
 		BMessage historyItemArchive;
 		int32 count = CountItems();
 		for (int32 i = 0; i < count; i++) {
-			BrowsingHistoryItem item = HistoryItemAt(i);
-			if (item.Archive(&historyItemArchive) != B_OK)
+			const BrowsingHistoryItem* item = HistoryItemAt(i);
+			if (!item || item->Archive(&historyItemArchive) != B_OK)
 				break;
 			if (settingsArchive.AddMessage("history item",
 					&historyItemArchive) != B_OK) {
