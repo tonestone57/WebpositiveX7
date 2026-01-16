@@ -574,9 +574,19 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		BDirectory barDir(&bookmarkRef);
 		BEntry bookmarkBar(&barDir, kBookmarkBarSubdir);
 		entry_ref bookmarkBarRef;
-		// TODO we could also check if the folder is empty here.
+
+		bool bookmarkBarNotEmpty = false;
 		if (bookmarkBar.Exists() && bookmarkBar.GetRef(&bookmarkBarRef)
 				== B_OK) {
+			BDirectory bookmarkBarDir(&bookmarkBarRef);
+			if (bookmarkBarDir.InitCheck() == B_OK) {
+				BEntry entry;
+				if (bookmarkBarDir.GetNextEntry(&entry) == B_OK)
+					bookmarkBarNotEmpty = true;
+			}
+		}
+
+		if (bookmarkBarNotEmpty) {
 			fBookmarkBar = new BookmarkBar("Bookmarks", this, &bookmarkBarRef);
 			fBookmarkBarMenuItem->SetEnabled(true);
 		} else
