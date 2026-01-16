@@ -121,8 +121,10 @@ BookmarkBar::AttachedToWindow()
 	while (dir.GetNextEntry(&bookmark, false) == B_OK) {
 		node_ref ref;
 		if (bookmark.GetNodeRef(&ref) == B_OK)
-			_AddItem(ref.node, &bookmark);
+			_AddItem(ref.node, &bookmark, false);
 	}
+	BRect rect = Bounds();
+	FrameResized(rect.Width(), rect.Height());
 }
 
 
@@ -429,7 +431,7 @@ BookmarkBar::MinSize()
 
 
 void
-BookmarkBar::_AddItem(ino_t inode, BEntry* entry)
+BookmarkBar::_AddItem(ino_t inode, BEntry* entry, bool layout)
 {
 	char name[B_FILE_NAME_LENGTH];
 	entry->GetName(name);
@@ -470,6 +472,8 @@ BookmarkBar::_AddItem(ino_t inode, BEntry* entry)
 	fItemsMap[inode] = item;
 
 	// Move the item to the "more" menu if it overflows.
-	BRect rect = Bounds();
-	FrameResized(rect.Width(), rect.Height());
+	if (layout) {
+		BRect rect = Bounds();
+		FrameResized(rect.Width(), rect.Height());
+	}
 }

@@ -37,7 +37,8 @@ public:
 
 	void 							MouseDown(BPoint where);
 private:
-	void							_AddItem(ino_t inode, BEntry* entry);
+	void							_AddItem(ino_t inode, BEntry* entry,
+										bool layout = true);
 
 private:
 	node_ref						fNodeRef;
