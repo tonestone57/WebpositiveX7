@@ -280,30 +280,42 @@ BrowsingHistory::_Clear()
 		delete item;
 	}
 	fHistoryItems.MakeEmpty();
+	fHistoryMap.clear();
 }
 
 
 bool
 BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 {
+	std::map<BString, BrowsingHistoryItem*>::iterator it
+		= fHistoryMap.find(item.URL());
+	if (it != fHistoryMap.end()) {
+		if (!internal) {
+			it->second->Invoked();
+			_ScheduleSave();
+		}
+		return true;
+	}
+
 	int32 count = CountItems();
 	int32 insertionIndex = count;
 	for (int32 i = 0; i < count; i++) {
 		BrowsingHistoryItem* existingItem
 			= reinterpret_cast<BrowsingHistoryItem*>(
 			fHistoryItems.ItemAtFast(i));
-		if (item.URL() == existingItem->URL()) {
-			if (!internal) {
-				existingItem->Invoked();
-				_ScheduleSave();
-			}
-			return true;
-		}
 		if (item < *existingItem)
 			insertionIndex = i;
 	}
 	BrowsingHistoryItem* newItem = new(std::nothrow) BrowsingHistoryItem(item);
 	if (!newItem || !fHistoryItems.AddItem(newItem, insertionIndex)) {
+		delete newItem;
+		return false;
+	}
+
+	try {
+		fHistoryMap[newItem->URL()] = newItem;
+	} catch (...) {
+		fHistoryItems.RemoveItem(newItem);
 		delete newItem;
 		return false;
 	}
@@ -320,18 +332,18 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 bool
 BrowsingHistory::_RemoveUrl(const BString& url)
 {
-	int32 count = CountItems();
-	for (int32 i = 0; i < count; i++) {
-		BrowsingHistoryItem* item = reinterpret_cast<BrowsingHistoryItem*>(
-			fHistoryItems.ItemAtFast(i));
-		if (item->URL() == url) {
-			fHistoryItems.RemoveItem(i);
-			delete item;
-			_SaveSettings();
-			return true;
-		}
-	}
-	return false;
+	std::map<BString, BrowsingHistoryItem*>::iterator it
+		= fHistoryMap.find(url);
+	if (it == fHistoryMap.end())
+		return false;
+
+	BrowsingHistoryItem* item = it->second;
+	fHistoryItems.RemoveItem(item);
+	fHistoryMap.erase(it);
+	delete item;
+
+	_SaveSettings();
+	return true;
 }
 
 
