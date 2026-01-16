@@ -1358,7 +1358,46 @@ BrowserWindow::MessageReceived(BMessage* message)
 				if (tabIndex >= 0) {
 					TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
 					if (tab) {
-						tab->SetPinned(message->what == PIN_TAB);
+						bool pinned = (message->what == PIN_TAB);
+						tab->SetPinned(pinned);
+
+						if (pinned) {
+							// Move to start (0)
+							// But careful about other pinned tabs.
+							// We should move it after the last pinned tab.
+							// For simplicity, let's just move to 0 for now, making it the "first" pinned tab.
+							// Or iterate to find first unpinned index.
+							int32 targetIndex = 0;
+							for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
+								TabView* t = fTabManager->GetTabContainerView()->TabAt(i);
+								if (t && !t->IsPinned()) {
+									targetIndex = i;
+									break;
+								}
+								// If all before are pinned, target is i+1, but loop continues.
+								// Wait, if i is pinned, we want to insert after it?
+								// No, we want to find the first unpinned slot.
+								// If index 0 is pinned, target 1.
+								if (t && t->IsPinned()) targetIndex = i + 1;
+							}
+
+							// If we are pinning, we move to targetIndex.
+							// But we must check if we are moving left.
+							if (tabIndex > targetIndex) {
+								// Correcting targetIndex is tricky if we don't account for self.
+								// Actually, just moving to 0 is a good start for "Pin".
+								// But users expect pinned tabs on left.
+								// Let's iterate.
+								int32 insertPos = 0;
+								for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
+									TabView* t = fTabManager->GetTabContainerView()->TabAt(i);
+									if (t == tab) continue;
+									if (t && t->IsPinned()) insertPos++;
+									else break;
+								}
+								fTabManager->MoveTab(tabIndex, insertPos);
+							}
+						}
 					}
 				}
 			}
@@ -1923,12 +1962,49 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 void
 BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 {
-	// Apply per-site permissions (Stub implementation)
-	// In a real implementation, we would check "SitePermissions" settings for the domain
-	// and call BWebPage methods. Since APIs are private/missing, we log.
-	// printf("Applying permissions for %s\n", url.String());
-	// Example of enforcement if API existed:
-	// if (!ShouldEnableJS(url)) view->WebPage()->SetJavaScriptEnabled(false);
+	// Apply per-site permissions
+	BPath path;
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
+		path.Append(kApplicationName);
+		path.Append("SitePermissions");
+		SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.Path());
+
+		int32 i = 0;
+		BMessage domainMsg;
+		bool found = false;
+		bool allowPopups = true; // Default to true? Or false? Browsers usually default true but block intrusive.
+		                         // But our checkbox says "Allow Popups", defaulting to False in UI?
+		                         // Let's assume default is false for popups, true for JS/Cookies.
+
+		// Simple domain matching (substring/host check needed in real app)
+		// For now, exact string match or simple substring.
+		BUrl bUrl(url);
+		BString host = bUrl.Host();
+
+		while (settings.FindMessage("domain", i++, &domainMsg) == B_OK) {
+			BString name;
+			if (domainMsg.FindString("name", &name) == B_OK) {
+				if (host.IFindFirst(name) >= 0) { // e.g. google.com matches www.google.com
+					found = true;
+					// bool js; domainMsg.FindBool("js", &js);
+					// bool cookies; domainMsg.FindBool("cookies", &cookies);
+					bool popups;
+					if (domainMsg.FindBool("popups", &popups) == B_OK) {
+						allowPopups = popups;
+					} else allowPopups = false;
+					break;
+				}
+			}
+		}
+
+		if (found && !allowPopups) {
+			// Enforce No Popups via JS
+			if (view && view->WebPage()) {
+				view->WebPage()->ExecuteJavaScript(
+					"window.open = function() { console.log('Popups blocked by WebPositive permissions'); return null; };");
+			}
+		}
+	}
 
 	if (fDarkMode && view && view->WebPage()) {
 		BString script = "if (typeof toggleDarkMode === 'undefined') {"

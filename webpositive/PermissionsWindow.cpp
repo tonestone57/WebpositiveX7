@@ -26,6 +26,26 @@ enum {
 	MSG_SAVE_PERMISSIONS = 'msvp'
 };
 
+class PermissionItem : public BStringItem {
+public:
+	PermissionItem(const char* text, bool js, bool cookies, bool popups)
+		: BStringItem(text), fJS(js), fCookies(cookies), fPopups(popups) {}
+
+	void SetJS(bool enable) { fJS = enable; }
+	bool JS() const { return fJS; }
+
+	void SetCookies(bool enable) { fCookies = enable; }
+	bool Cookies() const { return fCookies; }
+
+	void SetPopups(bool enable) { fPopups = enable; }
+	bool Popups() const { return fPopups; }
+
+private:
+	bool fJS;
+	bool fCookies;
+	bool fPopups;
+};
+
 PermissionsWindow::PermissionsWindow(BRect frame)
 	:
 	BWindow(frame, "Site Permissions", B_TITLED_WINDOW,
@@ -104,8 +124,19 @@ PermissionsWindow::MessageReceived(BMessage* message)
 		}
 
 		case MSG_SAVE_PERMISSIONS:
+		{
+			int32 selection = fDomainList->CurrentSelection();
+			if (selection >= 0) {
+				PermissionItem* item = dynamic_cast<PermissionItem*>(fDomainList->ItemAt(selection));
+				if (item) {
+					item->SetJS(fJSEnabled->Value() == B_CONTROL_ON);
+					item->SetCookies(fCookiesEnabled->Value() == B_CONTROL_ON);
+					item->SetPopups(fPopupsEnabled->Value() == B_CONTROL_ON);
+				}
+			}
 			_SavePermissions();
 			break;
+		}
 
 		default:
 			BWindow::MessageReceived(message);
@@ -148,7 +179,14 @@ PermissionsWindow::_LoadPermissions()
 		while (settings.FindMessage("domain", i++, &domainMsg) == B_OK) {
 			BString domain;
 			if (domainMsg.FindString("name", &domain) == B_OK) {
-				BStringItem* item = new BStringItem(domain);
+				bool js = true;
+				bool cookies = true;
+				bool popups = false;
+				domainMsg.FindBool("js", &js);
+				domainMsg.FindBool("cookies", &cookies);
+				domainMsg.FindBool("popups", &popups);
+
+				PermissionItem* item = new PermissionItem(domain, js, cookies, popups);
 				fDomainList->AddItem(item);
 			}
 		}
@@ -167,30 +205,17 @@ PermissionsWindow::_SavePermissions()
 		settings.MakeEmpty();
 
 		for (int32 i = 0; i < fDomainList->CountItems(); i++) {
-			BStringItem* item = dynamic_cast<BStringItem*>(fDomainList->ItemAt(i));
+			PermissionItem* item = dynamic_cast<PermissionItem*>(fDomainList->ItemAt(i));
 			if (!item) continue;
 
 			BString domain = item->Text();
 			BMessage domainMsg;
 			domainMsg.AddString("name", domain);
 
-			// If it's the currently selected one, use current controls.
-			// Otherwise we should have stored it.
-			// For simplicity in this non-enforcing implementation, we just save default or current if selected.
-			// A proper implementation would need a map or data in BStringItem.
-			// Let's assume we just save what's in the UI if selected, else default (true/true/false).
-			// This is a limitation of this basic implementation.
-
-			if (item->IsSelected()) {
-				SetDomainSettings(domainMsg,
-					fJSEnabled->Value() == B_CONTROL_ON,
-					fCookiesEnabled->Value() == B_CONTROL_ON,
-					fPopupsEnabled->Value() == B_CONTROL_ON);
-			} else {
-				// We need to preserve existing if possible, but we don't have a map.
-				// Let's just save defaults for now to satisfy "persistence" requirement of list.
-				SetDomainSettings(domainMsg, true, true, false);
-			}
+			SetDomainSettings(domainMsg,
+				item->JS(),
+				item->Cookies(),
+				item->Popups());
 
 			settings.AddMessage("domain", &domainMsg);
 		}
@@ -211,41 +236,11 @@ PermissionsWindow::_UpdateFields()
 	fPopupsEnabled->SetEnabled(hasSelection);
 
 	if (hasSelection) {
-		// In a full implementation, we would load the specific settings for this domain from the map/message.
-		// Since we don't keep them in memory in this basic version (only on disk),
-		// we should reload from disk or just show defaults/mock.
-		// To be better than "mock", let's try to find it in the settings file on disk.
-
-		BPath path;
-		bool found = false;
-		if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
-			path.Append(kApplicationName);
-			path.Append("SitePermissions");
-			SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.Path());
-
-			BStringItem* item = dynamic_cast<BStringItem*>(fDomainList->ItemAt(selection));
-			if (item) {
-				BString domain = item->Text();
-				int32 i = 0;
-				BMessage domainMsg;
-				while (settings.FindMessage("domain", i++, &domainMsg) == B_OK) {
-					BString name;
-					if (domainMsg.FindString("name", &name) == B_OK && name == domain) {
-						bool js, cookies, popups;
-						if (domainMsg.FindBool("js", &js) == B_OK) fJSEnabled->SetValue(js);
-						if (domainMsg.FindBool("cookies", &cookies) == B_OK) fCookiesEnabled->SetValue(cookies);
-						if (domainMsg.FindBool("popups", &popups) == B_OK) fPopupsEnabled->SetValue(popups);
-						found = true;
-						break;
-					}
-				}
-			}
-		}
-
-		if (!found) {
-			fJSEnabled->SetValue(B_CONTROL_ON);
-			fCookiesEnabled->SetValue(B_CONTROL_ON);
-			fPopupsEnabled->SetValue(B_CONTROL_OFF);
+		PermissionItem* item = dynamic_cast<PermissionItem*>(fDomainList->ItemAt(selection));
+		if (item) {
+			fJSEnabled->SetValue(item->JS() ? B_CONTROL_ON : B_CONTROL_OFF);
+			fCookiesEnabled->SetValue(item->Cookies() ? B_CONTROL_ON : B_CONTROL_OFF);
+			fPopupsEnabled->SetValue(item->Popups() ? B_CONTROL_ON : B_CONTROL_OFF);
 		}
 	}
 }
