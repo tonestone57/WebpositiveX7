@@ -457,7 +457,12 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fReaderMode(false),
 	fToolbarBottom(false),
 	fIsLoading(false),
-	fTabSearchWindow(NULL)
+	fTabSearchWindow(NULL),
+	fForceClose(false),
+	fFormCheckPending(false),
+	fTabsToCheck(0),
+	fDirtyTabs(0),
+	fFormCheckTimeoutRunner(NULL)
 {
 	// Begin listening to settings changes and read some current values.
 	fAppSettings->AddListener(BMessenger(this));
@@ -840,6 +845,7 @@ BrowserWindow::~BrowserWindow()
 	delete fTabManager;
 	delete fPulseRunner;
 	delete fSavePanel;
+	delete fFormCheckTimeoutRunner;
 }
 
 
@@ -1558,6 +1564,14 @@ BrowserWindow::MessageReceived(BMessage* message)
 			BWebWindow::MessageReceived(message);
 			break;
 
+		case CHECK_FORM_DIRTY_TIMEOUT:
+			if (fFormCheckPending) {
+				// Abort checking and assume we can close (or show alert if we found some dirty ones already)
+				// The helper handles finalization.
+				_CheckFormDirtyFinished();
+			}
+			break;
+
 		case B_COPY_TARGET:
 		{
 			const char* filetype = message->GetString("be:filetypes");
@@ -1603,26 +1617,88 @@ BrowserWindow::Archive(BMessage* archive, bool deep) const
 bool
 BrowserWindow::QuitRequested()
 {
-	if (fTabSearchWindow) {
-		fTabSearchWindow->Lock();
-		fTabSearchWindow->Quit();
-		fTabSearchWindow = NULL;
+	if (fForceClose) {
+		if (fTabSearchWindow) {
+			fTabSearchWindow->Lock();
+			fTabSearchWindow->Quit();
+			fTabSearchWindow = NULL;
+		}
+
+		BMessage message(WINDOW_CLOSED);
+		Archive(&message);
+
+		// Iterate over all tabs to delete all BWebViews.
+		// Do this here, so WebKit tear down happens earlier.
+		SetCurrentWebView(NULL);
+		while (fTabManager->CountTabs() > 0)
+			_ShutdownTab(0);
+
+		message.AddRect("window frame", WindowFrame());
+		be_app->PostMessage(&message);
+		return true;
 	}
 
-	// TODO: Check for modified form data and ask user for confirmation, etc.
+	if (fFormCheckPending)
+		return false;
 
-	BMessage message(WINDOW_CLOSED);
-	Archive(&message);
+	fFormCheckPending = true;
+	fTabsToCheck = 0;
+	fDirtyTabs = 0;
 
-	// Iterate over all tabs to delete all BWebViews.
-	// Do this here, so WebKit tear down happens earlier.
-	SetCurrentWebView(NULL);
-	while (fTabManager->CountTabs() > 0)
-		_ShutdownTab(0);
+	BString checkScript(
+		"(function(){"
+		"    var dirty = false;"
+		"    try {"
+		"        var forms = document.forms;"
+		"        for (var i = 0; i < forms.length; i++) {"
+		"            var form = forms[i];"
+		"            for (var j = 0; j < form.elements.length; j++) {"
+		"                var el = form.elements[j];"
+		"                if (el.disabled || el.readOnly) continue;"
+		"                var type = el.type;"
+		"                if (type == 'checkbox' || type == 'radio') {"
+		"                    if (el.checked != el.defaultChecked) { dirty = true; break; }"
+		"                } else if (type == 'select-one' || type == 'select-multiple') {"
+		"                     for (var k = 0; k < el.options.length; k++) {"
+		"                         if (el.options[k].selected != el.options[k].defaultSelected) { dirty = true; break; }"
+		"                     }"
+		"                } else if (type == 'text' || type == 'textarea' || type == 'password' || type == 'search' || type == 'email' || type == 'url' || type == 'tel' || type == 'number') {"
+		"                    if (el.value != el.defaultValue) { dirty = true; break; }"
+		"                }"
+		"            }"
+		"            if (dirty) break;"
+		"        }"
+		"    } catch(e) {}"
+		"    window.status = 'WebPositive:FormDirty:' + (dirty ? 'true' : 'false');"
+		"})();"
+	);
 
-	message.AddRect("window frame", WindowFrame());
-	be_app->PostMessage(&message);
-	return true;
+	for (int i = 0; i < fTabManager->CountTabs(); i++) {
+		BWebView* view = dynamic_cast<BWebView*>(fTabManager->ViewForTab(i));
+		if (view == NULL)
+			continue;
+
+		BString url = view->MainFrameURL();
+		if (url.Length() == 0 || url == "about:blank")
+			continue;
+
+		fTabsToCheck++;
+		view->WebPage()->ExecuteJavaScript(checkScript);
+	}
+
+	if (fTabsToCheck == 0) {
+		fFormCheckPending = false;
+		fForceClose = true;
+		PostMessage(B_QUIT_REQUESTED);
+		return false;
+	}
+
+	// Wait up to 1 second for results
+	BMessage msg(CHECK_FORM_DIRTY_TIMEOUT);
+	delete fFormCheckTimeoutRunner;
+	fFormCheckTimeoutRunner = new BMessageRunner(BMessenger(this), &msg, 1000000, 1);
+
+	return false;
 }
 
 
@@ -2340,6 +2416,20 @@ BrowserWindow::SetResizable(bool flag, BWebView* view)
 void
 BrowserWindow::StatusChanged(const BString& statusText, BWebView* view)
 {
+	if (statusText.Compare("WebPositive:FormDirty:", 22) == 0) {
+		if (fFormCheckPending) {
+			if (strncmp(statusText.String() + 22, "true", 4) == 0)
+				fDirtyTabs++;
+
+			fTabsToCheck--;
+			if (fTabsToCheck <= 0) {
+				_CheckFormDirtyFinished();
+			}
+		}
+		// Do not show this status message in the UI
+		return;
+	}
+
 	if (view != CurrentWebView())
 		return;
 
@@ -3498,4 +3588,30 @@ BrowserWindow::_UpdateReopenClosedTabItem()
 {
 	if (fReopenClosedTabMenuItem != NULL)
 		fReopenClosedTabMenuItem->SetEnabled(!fClosedTabs.empty());
+}
+
+
+void
+BrowserWindow::_CheckFormDirtyFinished()
+{
+	delete fFormCheckTimeoutRunner;
+	fFormCheckTimeoutRunner = NULL;
+	fFormCheckPending = false;
+
+	if (fDirtyTabs > 0) {
+		BAlert* alert = new BAlert(B_TRANSLATE("Unsaved data"),
+			B_TRANSLATE("One or more tabs have unsaved form data. Do you want to close the window anyway?"),
+			B_TRANSLATE("Cancel"), B_TRANSLATE("Close"));
+		alert->SetShortcut(0, B_ESCAPE);
+		int32 result = alert->Go();
+		if (result == 1) { // Close
+			fForceClose = true;
+			PostMessage(B_QUIT_REQUESTED);
+		}
+		// If Cancel, do nothing, window stays open
+	} else {
+		// No dirty tabs, proceed to close
+		fForceClose = true;
+		PostMessage(B_QUIT_REQUESTED);
+	}
 }
