@@ -11,6 +11,7 @@
 
 class BCheckBox;
 class BTextControl;
+class BMessageRunner;
 
 class AuthenticationPanel : public BWindow {
 public:
@@ -38,6 +39,10 @@ private:
 	bool m_cancelled;
 
 	sem_id m_exitSemaphore;
+
+	BMessageRunner* m_jitterRunner;
+	float m_lastJitterOffset;
+	int32 m_jitterCount;
 };
 
 #endif // AuthenticationPanel_h
