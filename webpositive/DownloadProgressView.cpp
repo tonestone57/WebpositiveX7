@@ -322,7 +322,7 @@ void
 DownloadProgressView::AttachedToWindow()
 {
 	if (fDownload) {
-		fDownload->SetProgressListener(BMessenger(this));
+		fDownload->SetProgressListener(BMessenger(Window()));
 		// Will start node monitor upon receiving the B_DOWNLOAD_STARTED
 		// message.
 	} else {
@@ -374,41 +374,6 @@ void
 DownloadProgressView::MessageReceived(BMessage* message)
 {
 	switch (message->what) {
-		case B_DOWNLOAD_STARTED:
-		{
-			BString path;
-			if (message->FindString("path", &path) != B_OK)
-				break;
-			fPath.SetTo(path);
-			BEntry entry(fPath.Path());
-			fIconView->SetTo(entry);
-			fStatusBar->Reset(fPath.Leaf());
-			_StartNodeMonitor(entry);
-
-			// Immediately switch to speed display whenever a new download
-			// starts.
-			sShowSpeed = true;
-			sLastEstimatedFinishSpeedToggleTime
-				= fProcessStartTime = fLastSpeedReferenceTime
-				= fEstimatedFinishReferenceTime = system_time();
-			break;
-		}
-		case B_DOWNLOAD_PROGRESS:
-		{
-			int64 currentSize;
-			int64 expectedSize;
-			if (message->FindInt64("current size", &currentSize) == B_OK
-				&& message->FindInt64("expected size", &expectedSize) == B_OK) {
-				_UpdateStatus(currentSize, expectedSize);
-			}
-			break;
-		}
-		case B_DOWNLOAD_REMOVED:
-			// TODO: This is a bit asymetric. The removed notification
-			// arrives here, but it would be nicer if it arrived
-			// at the window...
-			Window()->PostMessage(message);
-			break;
 		case OPEN_DOWNLOAD:
 		{
 			entry_ref ref;
@@ -711,6 +676,39 @@ DownloadProgressView::CancelDownload()
 	fInfoView->SetText("");
 
 	fPath.Unset();
+}
+
+
+void
+DownloadProgressView::DownloadStarted(BMessage* message)
+{
+	BString path;
+	if (message->FindString("path", &path) != B_OK)
+		return;
+	fPath.SetTo(path);
+	BEntry entry(fPath.Path());
+	fIconView->SetTo(entry);
+	fStatusBar->Reset(fPath.Leaf());
+	_StartNodeMonitor(entry);
+
+	// Immediately switch to speed display whenever a new download
+	// starts.
+	sShowSpeed = true;
+	sLastEstimatedFinishSpeedToggleTime
+		= fProcessStartTime = fLastSpeedReferenceTime
+		= fEstimatedFinishReferenceTime = system_time();
+}
+
+
+void
+DownloadProgressView::DownloadProgress(BMessage* message)
+{
+	int64 currentSize;
+	int64 expectedSize;
+	if (message->FindInt64("current size", &currentSize) == B_OK
+		&& message->FindInt64("expected size", &expectedSize) == B_OK) {
+		_UpdateStatus(currentSize, expectedSize);
+	}
 }
 
 

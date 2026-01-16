@@ -50,6 +50,9 @@ public:
 			void				DownloadFinished();
 			void				CancelDownload();
 
+			void				DownloadStarted(BMessage* message);
+			void				DownloadProgress(BMessage* message);
+
 	static	void				SpeedVersusEstimatedFinishTogglePulse();
 
 private:
