@@ -360,13 +360,29 @@ BDefaultChoiceView::ShowChoices(BAutoCompleter::CompletionStyle* completer)
 	if (!completer)
 		return;
 
-	HideChoices();
-
 	BAutoCompleter::ChoiceModel* choiceModel = completer->GetChoiceModel();
 	BAutoCompleter::EditView* editView = completer->GetEditView();
 
-	if (!editView || !choiceModel || choiceModel->CountChoices() == 0)
+	if (!editView || !choiceModel || choiceModel->CountChoices() == 0) {
+		HideChoices();
 		return;
+	}
+
+	bool reuseWindow = false;
+	if (fWindow != NULL) {
+		if (fWindow->Lock()) {
+			reuseWindow = true;
+			while (fWindow->CountChildren() > 0) {
+				BView* child = fWindow->ChildAt(0);
+				child->RemoveSelf();
+				delete child;
+			}
+			fListView = NULL;
+		} else {
+			fWindow = NULL;
+			fListView = NULL;
+		}
+	}
 
 	fListView = new ListView(completer);
 	int32 count = choiceModel->CountChoices();
@@ -381,9 +397,12 @@ BDefaultChoiceView::ShowChoices(BAutoCompleter::CompletionStyle* completer)
 		scrollView = new BScrollView("", fListView, B_FOLLOW_NONE, 0, false, true, B_NO_BORDER);
 	}
 
-	fWindow = new BWindow(BRect(0, 0, 100, 100), "", B_BORDERED_WINDOW_LOOK, 
-		B_NORMAL_WINDOW_FEEL, B_NOT_MOVABLE | B_WILL_ACCEPT_FIRST_CLICK 
-			| B_AVOID_FOCUS | B_ASYNCHRONOUS_CONTROLS);
+	if (fWindow == NULL) {
+		fWindow = new BWindow(BRect(0, 0, 100, 100), "", B_BORDERED_WINDOW_LOOK,
+			B_NORMAL_WINDOW_FEEL, B_NOT_MOVABLE | B_WILL_ACCEPT_FIRST_CLICK
+				| B_AVOID_FOCUS | B_ASYNCHRONOUS_CONTROLS);
+	}
+
 	if (scrollView != NULL)
 		fWindow->AddChild(scrollView);
 	else
@@ -415,7 +434,11 @@ BDefaultChoiceView::ShowChoices(BAutoCompleter::CompletionStyle* completer)
 	}
 	fWindow->MoveTo(listRect.left, listRect.top);
 	fWindow->ResizeTo(listRect.Width(), listRect.Height());
-	fWindow->Show();
+
+	if (reuseWindow)
+		fWindow->Unlock();
+	else
+		fWindow->Show();
 }
 
 
