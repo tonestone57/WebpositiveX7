@@ -42,6 +42,7 @@
 #include <debugger.h>
 
 #include <stdio.h>
+#include <signal.h>
 
 #include "BrowserWindow.h"
 #include "BrowsingHistory.h"
@@ -65,6 +66,12 @@ extern const char* kApplicationSignature = "application/x-vnd.Haiku-WebPositive"
 extern const char* kApplicationName = B_TRANSLATE_SYSTEM_NAME("WebPositive");
 static const uint32 PRELOAD_BROWSING_HISTORY = 'plbh';
 static const uint32 AUTO_SAVE_SESSION = 'assn';
+
+
+void crash_handler(int sig)
+{
+	debugger("WebPositive Internal Crash: Signal Caught");
+}
 
 
 BrowserApp::BrowserApp()
@@ -141,6 +148,11 @@ BrowserApp::BrowserApp()
 	BMessage autoSaveMessage(AUTO_SAVE_SESSION);
 	fAutoSaver = new BMessageRunner(be_app_messenger, &autoSaveMessage,
 		60000000); // 60 seconds
+
+	signal(SIGSEGV, crash_handler);
+	signal(SIGABRT, crash_handler);
+	signal(SIGILL, crash_handler);
+	signal(SIGFPE, crash_handler);
 }
 
 
@@ -302,7 +314,7 @@ BrowserApp::ReadyToRun()
 					for (int j = 1; archivedWindow.FindString("tab", j, &url)
 						== B_OK; j++) {
 						printf("Create %d:%d\n", i, j);
-						_CreateNewTab(window, url, false);
+						_CreateNewTab(window, url, false, true);
 						pagesCreated++;
 					}
 				}
@@ -697,11 +709,11 @@ BrowserApp::_CreateNewWindow(const BString& url, bool fullscreen, bool privateWi
 
 void
 BrowserApp::_CreateNewTab(BrowserWindow* window, const BString& url,
-	bool select)
+	bool select, bool lazy)
 {
 	if (!window->Lock())
 		return;
-	window->CreateNewTab(url, select);
+	window->CreateNewTab(url, select, NULL, lazy);
 	window->Unlock();
 }
 
