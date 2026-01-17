@@ -39,6 +39,8 @@
 
 #include "bookmarks/BookmarkManager.h"
 #include "support/URLHandler.h"
+#include "support/FormSafetyHelper.h"
+#include "support/PageSourceSaver.h"
 
 class BButton;
 class BCheckBox;
@@ -146,6 +148,8 @@ public:
 
 			void				ToggleFullscreen();
 
+			TabManager*			GetTabManager() const { return fTabManager; }
+
 private:
 	// WebPage notification API implementations
 	virtual	void				NavigationRequested(const BString& url,
@@ -215,15 +219,10 @@ private:
 			void				_VisitURL(const BString& url);
 			void 				_SmartURLHandler(const BString& url);
 
-			void				_HandlePageSourceResult(
-									const BMessage* message);
-
 			void				_ShowBookmarkBar(bool show);
 
 			void				_ReopenClosedTab();
 			void				_UpdateReopenClosedTabItem();
-
-			void				_CheckFormDirtyFinished();
 
 private:
 			struct ClosedTabInfo {
@@ -308,11 +307,7 @@ private:
 
 			class TabSearchWindow* fTabSearchWindow;
 
-			bool				fForceClose;
-			bool				fFormCheckPending;
-			int32				fTabsToCheck;
-			int32				fDirtyTabs;
-			BMessageRunner*		fFormCheckTimeoutRunner;
+			FormSafetyHelper*	fFormSafetyHelper;
 };
 
 
