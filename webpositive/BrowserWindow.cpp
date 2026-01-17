@@ -31,6 +31,7 @@
 
 #include "BrowserWindow.h"
 
+#include <OS.h>
 #include <Alert.h>
 #include <Application.h>
 #include <Bitmap.h>
@@ -327,9 +328,11 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fReaderMode(false),
 	fToolbarBottom(false),
 	fIsLoading(false),
+	fLowRAMMode(false),
 	fTabSearchWindow(NULL),
 	fLastHistoryGeneration(0),
-	fPermissionsWindow(NULL)
+	fPermissionsWindow(NULL),
+	fMemoryPressureRunner(NULL)
 {
 	fFormSafetyHelper = new FormSafetyHelper(this);
 
@@ -345,6 +348,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		fAutoHideBookmarkBar);
 	fToolbarBottom = fAppSettings->GetValue(kSettingsKeyToolbarBottom,
 		fToolbarBottom);
+	fLowRAMMode = fAppSettings->GetValue(kSettingsKeyLowRAMMode, false);
 
 	fNewWindowPolicy = fAppSettings->GetValue(kSettingsKeyNewWindowPolicy,
 		(uint32)OpenStartPage);
@@ -738,6 +742,9 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	}
 	unmodified.MakeEmpty();
 
+	BMessage memMsg(CHECK_MEMORY_PRESSURE);
+	fMemoryPressureRunner = new BMessageRunner(BMessenger(this), &memMsg, 30000000); // 30 seconds
+
 	be_app->PostMessage(WINDOW_OPENED);
 }
 
@@ -747,6 +754,7 @@ BrowserWindow::~BrowserWindow()
 	fAppSettings->RemoveListener(BMessenger(this));
 	delete fTabManager;
 	delete fPulseRunner;
+	delete fMemoryPressureRunner;
 	delete fSavePanel;
 	delete fFormSafetyHelper;
 	if (fPermissionsWindow) {
@@ -1486,6 +1494,10 @@ BrowserWindow::MessageReceived(BMessage* message)
 			} else if (name == kSettingsShowBookmarkBar
 				&& message->FindBool("value", &flag) == B_OK) {
 				_ShowBookmarkBar(flag);
+			} else if (name == kSettingsKeyLowRAMMode
+				&& message->FindBool("value", &flag) == B_OK) {
+				fLowRAMMode = flag;
+				_CheckMemoryPressure();
 			}
 			break;
 		}
@@ -1496,6 +1508,10 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case CHECK_FORM_DIRTY_TIMEOUT:
 			fFormSafetyHelper->MessageReceived(message);
+			break;
+
+		case CHECK_MEMORY_PRESSURE:
+			_CheckMemoryPressure();
 			break;
 
 		case B_COPY_TARGET:
@@ -1764,6 +1780,20 @@ BrowserWindow::SetCurrentWebView(BWebView* webView)
 
 		// Trigger update of the interface to the new page, by requesting
 		// to resend all notifications.
+		if (userData != NULL) {
+			if (userData->IsLazy()) {
+				userData->SetIsLazy(false);
+				BString url = userData->PendingURL();
+				if (url.Length() > 0)
+					webView->LoadURL(url);
+			} else if (userData->IsDiscarded()) {
+				userData->SetIsDiscarded(false);
+				BString url = userData->PendingURL();
+				if (url.Length() > 0)
+					webView->LoadURL(url);
+			}
+		}
+
 		webView->WebPage()->ResendNotifications();
 	} else
 		_UpdateTitle("");
@@ -1783,7 +1813,7 @@ BrowserWindow::IsBlankTab() const
 
 void
 BrowserWindow::CreateNewTab(const BString& _url, bool select,
-	BWebView* webView)
+	BWebView* webView, bool lazy)
 {
 	bool applyNewPagePolicy = webView == NULL;
 	// Executed in app thread (new BWebPage needs to be created in app thread).
@@ -1798,8 +1828,19 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 	if (applyNewPagePolicy && url.Length() == 0)
 		url = _NewTabURL(isNewWindow);
 
-	if (url.Length() > 0)
-		webView->LoadURL(url.String());
+	if (url.Length() > 0) {
+		if (lazy) {
+			_SetPageIcon(webView, NULL); // Ensure userData exists
+			PageUserData* userData = static_cast<PageUserData*>(webView->GetUserData());
+			if (userData) {
+				userData->SetIsLazy(true);
+				userData->SetPendingURL(url);
+			}
+			// Don't load URL
+		} else {
+			webView->LoadURL(url.String());
+		}
+	}
 
 	if (select) {
 		fTabManager->SelectTab(fTabManager->CountTabs() - 1);
@@ -3085,6 +3126,50 @@ BrowserWindow::_UpdateRecentlyClosedMenu()
 		}
 
 		fRecentlyClosedMenu->SetEnabled(hasClosedTabs);
+	}
+}
+
+
+void
+BrowserWindow::_CheckMemoryPressure()
+{
+	if (fLowRAMMode) {
+		_DiscardBackgroundTabs();
+		return;
+	}
+
+	system_info info;
+	if (get_system_info(&info) == B_OK) {
+		uint64 usedPages = info.used_pages;
+		uint64 maxPages = info.max_pages;
+		// If more than 90% memory used
+		if (usedPages > (uint64)(maxPages * 0.9)) {
+			_DiscardBackgroundTabs();
+		}
+	}
+}
+
+
+void
+BrowserWindow::_DiscardBackgroundTabs()
+{
+	BWebView* current = CurrentWebView();
+	int32 count = fTabManager->CountTabs();
+	for (int32 i = 0; i < count; i++) {
+		BView* view = fTabManager->ViewForTab(i);
+		BWebView* webView = dynamic_cast<BWebView*>(view);
+		if (webView && webView != current) {
+			PageUserData* userData = static_cast<PageUserData*>(webView->GetUserData());
+			if (userData && !userData->IsDiscarded() && !userData->IsLazy() && !userData->IsLoading()) {
+				// Save URL
+				BString url = webView->MainFrameURL();
+				if (url.Length() > 0 && url != "about:blank") {
+					userData->SetPendingURL(url);
+					userData->SetIsDiscarded(true);
+					webView->LoadURL("about:blank");
+				}
+			}
+		}
 	}
 }
 
