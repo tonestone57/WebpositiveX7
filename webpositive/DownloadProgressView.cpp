@@ -874,4 +874,3 @@ DownloadProgressView::_StopNodeMonitor()
 {
 	stop_watching(this);
 }
-
