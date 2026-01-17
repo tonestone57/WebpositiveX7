@@ -804,7 +804,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 
 	AddShortcut('F', B_COMMAND_KEY | B_SHIFT_KEY,
 		new BMessage(EDIT_HIDE_FIND_GROUP));
-	AddShortcut(B_HOME, B_COMMAND_KEY, new BMessage(HOME));
+	AddShortcut('H', B_COMMAND_KEY | B_SHIFT_KEY, new BMessage(HOME));
 
 	// Add shortcuts to select a particular tab
 	for (int32 i = 1; i <= 9; i++) {
