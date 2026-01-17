@@ -2349,15 +2349,33 @@ BrowserWindow::AuthenticationChallenge(BString message, BString& inOutUser,
 	CredentialsStorage* sessionStorage
 		= CredentialsStorage::SessionInstance();
 
-	// TODO: Using the message as key here is not so smart.
-	BString keyString(message);
+	// Build a stronger and more specific key for credential storage.
+	BString keyString;
+
 	if (view != NULL) {
 		BUrl url(view->MainFrameURL());
-		if (url.IsValid())
-			keyString.Prepend(BString().SetToFormat("%s:", url.Host().String()));
+		if (url.IsValid()) {
+			// protocol://host:port
+			BString proto(url.Protocol());
+			BString host(url.Host());
+			int32 port = url.Port();
+
+			if (port >= 0) {
+				keyString.SetToFormat("%s://%s:%" B_PRId32 ":",
+					proto.String(), host.String(), port);
+			} else {
+				keyString.SetToFormat("%s://%s:",
+					proto.String(), host.String());
+			}
+		}
 	}
+
+	// Append the realm/message last
+	keyString << message;
+
 	HashString key(keyString);
 
+	// Try the new specific key first
 	if (failureCount == 0) {
 		if (persistentStorage->Contains(key)) {
 			Credentials credentials = persistentStorage->GetCredentials(key);
@@ -2370,7 +2388,33 @@ BrowserWindow::AuthenticationChallenge(BString message, BString& inOutUser,
 			inOutPassword = credentials.Password();
 			return true;
 		}
+
+		// Backward compatibility: Try the old less specific key
+		BString legacyKeyString(message);
+		if (view != NULL) {
+			BUrl url(view->MainFrameURL());
+			if (url.IsValid())
+				legacyKeyString.Prepend(BString().SetToFormat("%s:", url.Host().String()));
+		}
+		HashString legacyKey(legacyKeyString);
+
+		if (persistentStorage->Contains(legacyKey)) {
+			Credentials credentials = persistentStorage->GetCredentials(legacyKey);
+			inOutUser = credentials.Username();
+			inOutPassword = credentials.Password();
+			// Auto-migrate to new key
+			persistentStorage->PutCredentials(key, credentials);
+			return true;
+		} else if (sessionStorage->Contains(legacyKey)) {
+			Credentials credentials = sessionStorage->GetCredentials(legacyKey);
+			inOutUser = credentials.Username();
+			inOutPassword = credentials.Password();
+			// Auto-migrate to new key
+			sessionStorage->PutCredentials(key, credentials);
+			return true;
+		}
 	}
+
 	// Switch to the page for which this authentication is required.
 	if (!_ShowPage(view))
 		return false;
