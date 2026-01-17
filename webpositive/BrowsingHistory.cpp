@@ -6,6 +6,7 @@
 
 #include "BrowsingHistory.h"
 
+#include <algorithm>
 #include <new>
 #include <stdio.h>
 #include <vector>
@@ -188,7 +189,6 @@ BrowsingHistory::BrowsingHistory()
 	:
 	BHandler("browsing history"),
 	BLocker("browsing history"),
-	fCacheIsDirty(true),
 	fMaxHistoryItemAge(7),
 	fSettingsLoaded(false),
 	fSaveRunner(NULL),
@@ -238,7 +238,7 @@ BrowsingHistory::BrowsingHistory::CountItems() const
 {
 	BAutolock _(const_cast<BrowsingHistory*>(this));
 
-	return fHistorySet.size();
+	return fHistoryList.size();
 }
 
 
@@ -246,8 +246,7 @@ const BrowsingHistoryItem*
 BrowsingHistory::HistoryItemAt(int32 index) const
 {
 	BAutolock _(const_cast<BrowsingHistory*>(this));
-	_UpdateCache();
-	return fHistoryItemsCache[index];
+	return fHistoryList[index];
 }
 
 
@@ -302,13 +301,12 @@ BrowsingHistory::MaxHistoryItemAge() const
 void
 BrowsingHistory::_Clear()
 {
-	for (HistorySet::iterator it = fHistorySet.begin();
-		it != fHistorySet.end(); ++it) {
+	for (HistoryList::iterator it = fHistoryList.begin();
+		it != fHistoryList.end(); ++it) {
 		delete *it;
 	}
-	fHistorySet.clear();
+	fHistoryList.clear();
 	fHistoryMap.clear();
-	fCacheIsDirty = true;
 	fGeneration++;
 }
 
@@ -320,10 +318,40 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 		= fHistoryMap.find(item.URL());
 	if (it != fHistoryMap.end()) {
 		if (!internal) {
-			fHistorySet.erase(it->second);
-			it->second->Invoked();
-			fHistorySet.insert(it->second);
-			fCacheIsDirty = true;
+			// Update the item position to keep list sorted (by date/url)
+			// Remove from old position
+			BrowsingHistoryItem* historyItem = it->second;
+
+			HistoryList::iterator listIt = std::lower_bound(fHistoryList.begin(),
+				fHistoryList.end(), historyItem, BrowsingHistoryItemPointerCompare());
+
+			// We might find a different item with same sort key, or the item itself.
+			// Since we have the exact pointer, we can verify.
+			// But std::lower_bound returns the first item that is NOT < historyItem.
+			// Since historyItem is in the list, *listIt should be equal to historyItem
+			// according to the comparator, but we need to find the exact pointer
+			// if there are duplicates in sort order (unlikely with URL tie-break).
+			// However, since we are updating Invoked(), the sort key CHANGES.
+			// So we must remove it BEFORE updating.
+
+			// Warning: lower_bound uses the current values. If we haven't changed
+			// the item yet, we can find it.
+			while (listIt != fHistoryList.end() && *listIt != historyItem
+					&& !BrowsingHistoryItemPointerCompare()(historyItem, *listIt)) {
+				++listIt;
+			}
+
+			if (listIt != fHistoryList.end() && *listIt == historyItem) {
+				fHistoryList.erase(listIt);
+			}
+
+			historyItem->Invoked();
+
+			// Re-insert
+			listIt = std::lower_bound(fHistoryList.begin(),
+				fHistoryList.end(), historyItem, BrowsingHistoryItemPointerCompare());
+			fHistoryList.insert(listIt, historyItem);
+
 			_ScheduleSave();
 		}
 		return true;
@@ -334,10 +362,17 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 		return false;
 
 	try {
-		fHistorySet.insert(newItem);
-		fHistoryMap[newItem->URL()] = newItem;
+		HistoryList::iterator listIt = std::lower_bound(fHistoryList.begin(),
+			fHistoryList.end(), newItem, BrowsingHistoryItemPointerCompare());
+		listIt = fHistoryList.insert(listIt, newItem);
+		try {
+			fHistoryMap[newItem->URL()] = newItem;
+		} catch (...) {
+			fHistoryList.erase(listIt);
+			throw;
+		}
 	} catch (...) {
-		fHistorySet.erase(newItem);
+		// If vector insert fails, we need to clean up
 		delete newItem;
 		return false;
 	}
@@ -347,7 +382,6 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 		_ScheduleSave();
 	}
 
-	fCacheIsDirty = true;
 	fGeneration++;
 
 	return true;
@@ -363,11 +397,22 @@ BrowsingHistory::_RemoveUrl(const BString& url)
 		return false;
 
 	BrowsingHistoryItem* item = it->second;
-	fHistorySet.erase(item);
+
+	HistoryList::iterator listIt = std::lower_bound(fHistoryList.begin(),
+		fHistoryList.end(), item, BrowsingHistoryItemPointerCompare());
+
+	while (listIt != fHistoryList.end() && *listIt != item
+			&& !BrowsingHistoryItemPointerCompare()(item, *listIt)) {
+		++listIt;
+	}
+
+	if (listIt != fHistoryList.end() && *listIt == item) {
+		fHistoryList.erase(listIt);
+	}
+
 	fHistoryMap.erase(it);
 	delete item;
 
-	fCacheIsDirty = true;
 	_ScheduleSave();
 	fGeneration++;
 
@@ -396,13 +441,33 @@ BrowsingHistory::_LoadSettings()
 		oldestAllowedDateTime.Date().AddDays(-fMaxHistoryItemAge);
 
 		BMessage historyItemArchive;
+		int32 count = 0;
+		// Count items first to reserve vector
+		type_code type;
+		if (settingsArchive.GetInfo("history item", &type, &count) != B_OK)
+			count = 0;
+
+		if (count > 0)
+			fHistoryList.reserve(count);
+
 		for (int32 i = 0; settingsArchive.FindMessage("history item", i,
 				&historyItemArchive) == B_OK; i++) {
 			BrowsingHistoryItem item(&historyItemArchive);
-			if (oldestAllowedDateTime < item.DateTime())
-				_AddItem(item, true);
+			if (oldestAllowedDateTime < item.DateTime()) {
+				// Bulk load: create item and push back, sort later
+				if (fHistoryMap.find(item.URL()) == fHistoryMap.end()) {
+					BrowsingHistoryItem* newItem = new(std::nothrow) BrowsingHistoryItem(item);
+					if (newItem) {
+						fHistoryList.push_back(newItem);
+						fHistoryMap[newItem->URL()] = newItem;
+					}
+				}
+			}
 			historyItemArchive.MakeEmpty();
 		}
+
+		// Sort the list once after bulk insertion
+		std::sort(fHistoryList.begin(), fHistoryList.end(), BrowsingHistoryItemPointerCompare());
 	}
 }
 
@@ -414,8 +479,8 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 		BMessage settingsArchive;
 		settingsArchive.AddInt32("max history item age", fMaxHistoryItemAge);
 		BMessage historyItemArchive;
-		for (HistorySet::const_iterator it = fHistorySet.begin();
-			it != fHistorySet.end(); ++it) {
+		for (HistoryList::const_iterator it = fHistoryList.begin();
+			it != fHistoryList.end(); ++it) {
 			const BrowsingHistoryItem* item = *it;
 			if (!item || item->Archive(&historyItemArchive) != B_OK)
 				break;
@@ -439,9 +504,9 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 	context->maxAge = fMaxHistoryItemAge;
 
 	try {
-		context->items.reserve(fHistorySet.size());
-		for (HistorySet::const_iterator it = fHistorySet.begin();
-			it != fHistorySet.end(); ++it) {
+		context->items.reserve(fHistoryList.size());
+		for (HistoryList::const_iterator it = fHistoryList.begin();
+			it != fHistoryList.end(); ++it) {
 			const BrowsingHistoryItem* item = *it;
 			if (item)
 				context->items.push_back(*item);
@@ -492,15 +557,6 @@ BrowsingHistory::_SaveHistoryThread(void* cookie)
 }
 
 
-void
-BrowsingHistory::_UpdateCache() const
-{
-	if (!fCacheIsDirty)
-		return;
-
-	fHistoryItemsCache.assign(fHistorySet.begin(), fHistorySet.end());
-	fCacheIsDirty = false;
-}
 
 
 void
