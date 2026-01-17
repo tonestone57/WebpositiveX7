@@ -115,7 +115,8 @@ enum {
 	RELOAD							= 'reld',
 	PIN_TAB							= 'ptab',
 	UNPIN_TAB						= 'uptb',
-	CLOSE_TAB						= 'cltb'
+	CLOSE_TAB						= 'cltb',
+	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb'
 };
 
 
