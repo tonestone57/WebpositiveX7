@@ -260,6 +260,22 @@ DownloadWindow::MessageReceived(BMessage* message)
 			}
 			break;
 		}
+		case B_SIMPLE_DATA:
+		{
+			// Check for URL drops
+			BString url;
+			if (message->FindString("url", &url) == B_OK) {
+				// Handle URL drop by initiating a download
+				// We reuse RESTART_DOWNLOAD_IN_WINDOW because it correctly creates a new context/window
+				// if needed or starts the download in the browser.
+				// However, if we want to just download without opening a tab, we still need a context.
+				// For now, delegating to the app via RESTART_DOWNLOAD_IN_WINDOW is the safest bet to get a BWebDownload.
+				BMessage* request = new BMessage(RESTART_DOWNLOAD_IN_WINDOW);
+				request->AddString("url", url);
+				be_app->PostMessage(request);
+			}
+			break;
+		}
 		case B_DOWNLOAD_STARTED:
 		{
 			BWebDownload* download;
