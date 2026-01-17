@@ -614,7 +614,34 @@ URLInputGroup::URLInputGroup(BMessage* goMessage)
 	// We use SHOW_PERMISSIONS_WINDOW message defined in BrowserWindow.h
 	// URLInputGroup.cpp already includes BrowserWindow.h
 	fPermissionsButton = new BButton(NULL, NULL, new BMessage(SHOW_PERMISSIONS_WINDOW));
-	fPermissionsButton->SetLabel("Site");
+
+	// Create Shield Icon
+	BBitmap* shieldIcon = new BBitmap(BRect(0, 0, 15, 15), B_RGBA32, true);
+	if (shieldIcon->InitCheck() == B_OK) {
+		memset(shieldIcon->Bits(), 0, shieldIcon->BitsLength());
+		BView* drawer = new BView(shieldIcon->Bounds(), "drawer", B_FOLLOW_NONE, 0);
+		shieldIcon->AddChild(drawer);
+		if (shieldIcon->Lock()) {
+			drawer->SetHighColor(ui_color(B_PANEL_TEXT_COLOR));
+			BPoint points[5];
+			points[0] = BPoint(3, 2);
+			points[1] = BPoint(12, 2);
+			points[2] = BPoint(12, 8);
+			points[3] = BPoint(7.5, 14);
+			points[4] = BPoint(3, 8);
+			drawer->FillPolygon(points, 5);
+			drawer->Sync();
+			shieldIcon->Unlock();
+		}
+		shieldIcon->RemoveChild(drawer);
+		delete drawer;
+		fPermissionsButton->SetIcon(shieldIcon);
+		delete shieldIcon;
+	} else {
+		fPermissionsButton->SetLabel("Site");
+		delete shieldIcon;
+	}
+
 	fPermissionsButton->SetToolTip("Site Permissions");
 	fPermissionsButton->SetExplicitMinSize(BSize(20, 20));
 	GroupLayout()->AddView(fPermissionsButton, 0.0f);

@@ -627,6 +627,7 @@ WebTabView::MouseDown(BPoint where, uint32 buttons)
 		menu->AddItem(new BMenuItem(B_TRANSLATE("Close tab"), msg));
 
 		menu->SetTargetForItems(Window()); // Send to BrowserWindow
+		menu->SetAsyncAutoDestruct(true);
 		menu->Go(ConvertToScreen(where), true, true, true);
 		return;
 	}
