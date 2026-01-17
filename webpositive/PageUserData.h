@@ -30,7 +30,8 @@ public:
 		fURLInputSelectionStart(-1),
 		fURLInputSelectionEnd(-1),
 		fIsLoading(false),
-		fIsDownloadRestart(false)
+		fIsDownloadRestart(false),
+		fHttpsUpgraded(false)
 	{
 	}
 
@@ -141,6 +142,26 @@ public:
 		return fIsDownloadRestart;
 	}
 
+	void SetExpectedUpgradedUrl(const BString& url)
+	{
+		fExpectedUpgradedUrl = url;
+	}
+
+	const BString& ExpectedUpgradedUrl() const
+	{
+		return fExpectedUpgradedUrl;
+	}
+
+	void SetHttpsUpgraded(bool upgraded)
+	{
+		fHttpsUpgraded = upgraded;
+	}
+
+	bool IsHttpsUpgraded() const
+	{
+		return fHttpsUpgraded;
+	}
+
 private:
 	BView*		fFocusedView;
 	BBitmap*	fPageIcon;
@@ -150,6 +171,8 @@ private:
 	int32		fURLInputSelectionEnd;
 	bool		fIsLoading;
 	bool		fIsDownloadRestart;
+	BString		fExpectedUpgradedUrl;
+	bool		fHttpsUpgraded;
 };
 
 
