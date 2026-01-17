@@ -248,12 +248,30 @@ CookieWindow::Show()
 }
 
 
+void
+CookieWindow::Hide()
+{
+	BWindow::Hide();
+	_EmptyDomainList();
+}
+
+
 bool
 CookieWindow::QuitRequested()
 {
 	if (!IsHidden())
 		Hide();
 	return false;
+}
+
+
+void
+CookieWindow::_EmptyDomainList()
+{
+	for (int i = fDomains->FullListCountItems() - 1; i >= 1; i--) {
+		delete fDomains->FullListItemAt(i);
+	}
+	fDomains->MakeEmpty();
 }
 
 
@@ -268,11 +286,7 @@ CookieWindow::_BuildDomainList()
 	// expiration date). A more robust solution would require changes to the
 	// BNetworkCookieJar API itself.
 
-	// Empty the domain list (TODO should we do this when hiding instead?)
-	for (int i = fDomains->FullListCountItems() - 1; i >= 1; i--) {
-		delete fDomains->FullListItemAt(i);
-	}
-	fDomains->MakeEmpty();
+	_EmptyDomainList();
 
 	// BOutlineListView does not handle parent = NULL in many methods, so let's
 	// make sure everything always has a parent.

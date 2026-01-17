@@ -535,9 +535,8 @@ DownloadProgressView::MessageReceived(BMessage* message)
 			// the original context is long gone (possibly the browser was
 			// restarted). So we create a new window to restart the download
 			// in a fresh context.
-			// FIXME this has of course the huge downside of leaving the new
-			// window open with a blank page. I can't think of a better
-			// solution right now...
+			// BrowserWindow handles closing the new window if the download
+			// restarts successfully.
 			BMessage* request = new BMessage(RESTART_DOWNLOAD_IN_WINDOW);
 			request->AddString("url", fURL);
 			be_app->PostMessage(request);
