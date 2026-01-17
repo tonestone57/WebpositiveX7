@@ -62,6 +62,9 @@ protected:
 		virtual	void			MouseDown(BPoint point);
 		virtual	void			AttachedToWindow();
 
+				BAutoCompleter::CompletionStyle* Completer() const
+									{ return fCompleter; }
+
 	private:
 				BAutoCompleter::CompletionStyle* fCompleter;
 	};
