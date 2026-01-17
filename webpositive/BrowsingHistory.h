@@ -95,16 +95,12 @@ private:
 			void				_SaveSettings(bool forceSync = false);
 			void				_ScheduleSave();
 	static	status_t			_SaveHistoryThread(void* cookie);
-			void				_UpdateCache() const;
 			bool				_OpenSettingsFile(BFile& file, uint32 mode);
 
 private:
-			typedef std::set<BrowsingHistoryItem*,
-				BrowsingHistoryItemPointerCompare> HistorySet;
+			typedef std::vector<BrowsingHistoryItem*> HistoryList;
 
-			HistorySet			fHistorySet;
-			mutable std::vector<BrowsingHistoryItem*> fHistoryItemsCache;
-			mutable bool		fCacheIsDirty;
+			HistoryList			fHistoryList;
 
 			std::map<BString, BrowsingHistoryItem*> fHistoryMap;
 			int32				fMaxHistoryItemAge;
