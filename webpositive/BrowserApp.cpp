@@ -343,6 +343,34 @@ BrowserApp::MessageReceived(BMessage* message)
 		_CreateNewWindow(url);
 		break;
 	}
+	case RESTART_DOWNLOAD_IN_WINDOW: {
+		BString url;
+		if (message->FindString("url", &url) != B_OK)
+			break;
+		BrowserWindow* window = _FindWindowOnCurrentWorkspace();
+		if (window != NULL) {
+			if (window->Lock()) {
+				window->RestartDownload(url);
+				window->Unlock();
+			}
+		} else {
+			window = _CreateNewWindow(url);
+			// _CreateNewWindow returns a shown window with loading started.
+			// We need to flag it as download restart.
+			// The window has 1 tab (index 0).
+			if (window->Lock()) {
+				BWebView* view = window->CurrentWebView();
+				if (view) {
+					PageUserData* data
+						= static_cast<PageUserData*>(view->GetUserData());
+					if (data)
+						data->SetIsDownloadRestart(true);
+				}
+				window->Unlock();
+			}
+		}
+		break;
+	}
 	case NEW_TAB: {
 		BrowserWindow* window;
 		if (message->FindPointer("window",

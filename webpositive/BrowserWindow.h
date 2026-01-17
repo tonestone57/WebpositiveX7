@@ -103,7 +103,8 @@ enum {
 	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb',
 	SHOW_HIDE_BOOKMARK_BAR			= 'shbb',
 	TAB_SEARCH_WINDOW_QUIT			= 'tswq',
-	CHECK_FORM_DIRTY_TIMEOUT		= 'cfdt'
+	CHECK_FORM_DIRTY_TIMEOUT		= 'cfdt',
+	RESTART_DOWNLOAD_IN_WINDOW		= 'rdwn'
 };
 
 
@@ -136,6 +137,7 @@ public:
 			bool				IsBlankTab() const;
 			void				CreateNewTab(const BString& url, bool select,
 									BWebView* webView = 0);
+			void				RestartDownload(const BString& url);
 
 			BRect				WindowFrame() const;
 

@@ -1833,6 +1833,24 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 }
 
 
+void
+BrowserWindow::RestartDownload(const BString& url)
+{
+	CreateNewTab(url, false);
+	BWebView* view = dynamic_cast<BWebView*>(
+		fTabManager->ViewForTab(fTabManager->CountTabs() - 1));
+	if (view != NULL) {
+		PageUserData* data = static_cast<PageUserData*>(view->GetUserData());
+		if (data == NULL) {
+			data = new(std::nothrow) PageUserData(NULL);
+			view->SetUserData(data);
+		}
+		if (data != NULL)
+			data->SetIsDownloadRestart(true);
+	}
+}
+
+
 BRect
 BrowserWindow::WindowFrame() const
 {
@@ -2057,8 +2075,11 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 	}
 
 	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
-	if (userData != NULL)
+	if (userData != NULL) {
 		userData->SetIsLoading(false);
+		if (userData->IsDownloadRestart())
+			userData->SetIsDownloadRestart(false);
+	}
 
 	if (view != CurrentWebView())
 		return;
@@ -2088,6 +2109,13 @@ void
 BrowserWindow::MainDocumentError(const BString& failingURL,
 	const BString& localizedDescription, BWebView* view)
 {
+	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+	if (userData != NULL && userData->IsDownloadRestart()
+		&& localizedDescription.FindFirst("interrupted") >= 0) {
+		_ShutdownTab(fTabManager->TabForView(view));
+		return;
+	}
+
 	// Make sure we show the page that contains the view.
 	if (!_ShowPage(view))
 		return;

@@ -29,7 +29,8 @@ public:
 		fPageIconLarge(NULL),
 		fURLInputSelectionStart(-1),
 		fURLInputSelectionEnd(-1),
-		fIsLoading(false)
+		fIsLoading(false),
+		fIsDownloadRestart(false)
 	{
 	}
 
@@ -130,6 +131,16 @@ public:
 		return fIsLoading;
 	}
 
+	void SetIsDownloadRestart(bool isDownloadRestart)
+	{
+		fIsDownloadRestart = isDownloadRestart;
+	}
+
+	bool IsDownloadRestart() const
+	{
+		return fIsDownloadRestart;
+	}
+
 private:
 	BView*		fFocusedView;
 	BBitmap*	fPageIcon;
@@ -138,6 +149,7 @@ private:
 	int32		fURLInputSelectionStart;
 	int32		fURLInputSelectionEnd;
 	bool		fIsLoading;
+	bool		fIsDownloadRestart;
 };
 
 
