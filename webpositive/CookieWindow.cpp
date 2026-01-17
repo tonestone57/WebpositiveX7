@@ -223,13 +223,15 @@ CookieWindow::_BuildDomainList()
 
 	// Populate the domain list
 	fCookieMap.clear();
+	std::map<BString, BStringItem*> domainItemMap;
+
 	BPrivate::Network::BNetworkCookieJar::Iterator it = fCookieJar.GetIterator();
 
 	const BPrivate::Network::BNetworkCookie* cookie;
 	while ((cookie = it.Next()) != NULL) {
 		BString domain = cookie->Domain();
 		if (fCookieMap.find(domain) == fCookieMap.end())
-			_AddDomain(domain, false);
+			_AddDomain(domain, false, domainItemMap);
 
 		fCookieMap[domain].push_back(*cookie);
 	}
@@ -286,30 +288,27 @@ CookieWindow::_BuildDomainList()
 
 
 BStringItem*
-CookieWindow::_AddDomain(BString domain, bool fake)
+CookieWindow::_AddDomain(BString domain, bool fake,
+	std::map<BString, BStringItem*>& domainMap)
 {
+	if (domainMap.count(domain) != 0) {
+		DomainItem* item = (DomainItem*)domainMap[domain];
+		if (!fake)
+			item->fEmpty = false;
+		return item;
+	}
+
 	BStringItem* parent = NULL;
 	int firstDot = domain.FindFirst('.');
 	if (firstDot >= 0) {
 		BString parentDomain(domain);
 		parentDomain.Remove(0, firstDot + 1);
-		parent = _AddDomain(parentDomain, true);
+		parent = _AddDomain(parentDomain, true, domainMap);
 	} else {
 		parent = (BStringItem*)fDomains->FullListItemAt(0);
 	}
 
-	BListItem* existing;
 	int i = 0;
-	// check that we aren't already there
-	while ((existing = fDomains->ItemUnderAt(parent, true, i++)) != NULL) {
-		DomainItem* stringItem = (DomainItem*)existing;
-		if (stringItem->Text() == domain) {
-			if (fake == false)
-				stringItem->fEmpty = false;
-			return stringItem;
-		}
-	}
-
 #if 0
 	puts("==============================");
 	for (i = 0; i < fDomains->FullListCountItems(); i++) {
@@ -322,6 +321,7 @@ CookieWindow::_AddDomain(BString domain, bool fake)
 
 	// Insert the new item, keeping the list alphabetically sorted
 	BStringItem* domainItem = new DomainItem(domain, fake);
+	domainMap[domain] = domainItem;
 	domainItem->SetOutlineLevel(parent->OutlineLevel() + 1);
 	BStringItem* sibling = NULL;
 	int siblingCount = fDomains->CountItemsUnder(parent, true);
