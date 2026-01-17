@@ -76,6 +76,7 @@ enum {
 
 	MSG_HTTPS_ONLY_CHANGED						= 'honly',
 	MSG_BLOCK_ADS_CHANGED						= 'blads',
+	MSG_LOAD_IMAGES_CHANGED						= 'ldimg',
 	MSG_LOW_RAM_MODE_CHANGED					= 'lram',
 
 	MSG_CHOOSE_DOWNLOAD_FOLDER					= 'swop',
@@ -314,6 +315,7 @@ SettingsWindow::MessageReceived(BMessage* message)
 		case MSG_PROXY_PASSWORD_CHANGED:
 		case MSG_HTTPS_ONLY_CHANGED:
 		case MSG_BLOCK_ADS_CHANGED:
+		case MSG_LOAD_IMAGES_CHANGED:
 		case MSG_LOW_RAM_MODE_CHANGED:
 			// These settings cannot change live, as we don't want partial
 			// input to be applied.
@@ -358,10 +360,14 @@ SettingsWindow::_CreatePrivacyPage(float spacing)
 	fBlockAdsCheckBox = new BCheckBox("block ads",
 		B_TRANSLATE("Block ads (basic CSS hiding)"),
 		new BMessage(MSG_BLOCK_ADS_CHANGED));
+	fLoadImagesCheckBox = new BCheckBox("load images",
+		B_TRANSLATE("Load images automatically"),
+		new BMessage(MSG_LOAD_IMAGES_CHANGED));
 
 	BView* view = BGroupLayoutBuilder(B_VERTICAL, 0)
 		.Add(fHttpsOnlyCheckBox)
 		.Add(fBlockAdsCheckBox)
+		.Add(fLoadImagesCheckBox)
 		.AddGlue()
 		.SetInsets(B_USE_WINDOW_SPACING, B_USE_WINDOW_SPACING,
 			B_USE_WINDOW_SPACING, B_USE_DEFAULT_SPACING)
@@ -784,6 +790,8 @@ SettingsWindow::_CanApplySettings() const
 		!= fSettings->GetValue(kSettingsKeyHttpsOnly, false));
 	canApply = canApply || ((fBlockAdsCheckBox->Value() == B_CONTROL_ON)
 		!= fSettings->GetValue(kSettingsKeyBlockAds, false));
+	canApply = canApply || ((fLoadImagesCheckBox->Value() == B_CONTROL_ON)
+		!= fSettings->GetValue(kSettingsKeyLoadImages, true));
 
 	return canApply;
 }
@@ -821,6 +829,8 @@ SettingsWindow::_ApplySettings()
 		fHttpsOnlyCheckBox->Value() == B_CONTROL_ON);
 	fSettings->SetValue(kSettingsKeyBlockAds,
 		fBlockAdsCheckBox->Value() == B_CONTROL_ON);
+	fSettings->SetValue(kSettingsKeyLoadImages,
+		fLoadImagesCheckBox->Value() == B_CONTROL_ON);
 
 	fSettings->Save();
 
@@ -963,6 +973,8 @@ SettingsWindow::_RevertSettings()
 		false));
 	fBlockAdsCheckBox->SetValue(fSettings->GetValue(kSettingsKeyBlockAds,
 		false));
+	fLoadImagesCheckBox->SetValue(fSettings->GetValue(kSettingsKeyLoadImages,
+		true));
 
 	_ValidateControlsEnabledStatus();
 }
