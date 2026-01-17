@@ -86,6 +86,7 @@
 #include "PermissionsWindow.h"
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
+#include "SitePermissionsManager.h"
 #include "TabManager.h"
 #include "TabSearchWindow.h"
 #include "URLInputGroup.h"
@@ -2120,46 +2121,14 @@ void
 BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 {
 	// Apply per-site permissions
-	BPath path;
-	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
-		path.Append(kApplicationName);
-		path.Append("SitePermissions");
-		SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.Path());
+	bool allowPopups = true;
+	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowPopups);
 
-		int32 i = 0;
-		BMessage domainMsg;
-		bool found = false;
-		bool allowPopups = true; // Default to true? Or false? Browsers usually default true but block intrusive.
-		                         // But our checkbox says "Allow Popups", defaulting to False in UI?
-		                         // Let's assume default is false for popups, true for JS/Cookies.
-
-		// Simple domain matching (substring/host check needed in real app)
-		// For now, exact string match or simple substring.
-		BUrl bUrl(url);
-		BString host = bUrl.Host();
-
-		while (settings.FindMessage("domain", i++, &domainMsg) == B_OK) {
-			BString name;
-			if (domainMsg.FindString("name", &name) == B_OK) {
-				if (host.IFindFirst(name) >= 0) { // e.g. google.com matches www.google.com
-					found = true;
-					// bool js; domainMsg.FindBool("js", &js);
-					// bool cookies; domainMsg.FindBool("cookies", &cookies);
-					bool popups;
-					if (domainMsg.FindBool("popups", &popups) == B_OK) {
-						allowPopups = popups;
-					} else allowPopups = false;
-					break;
-				}
-			}
-		}
-
-		if (found && !allowPopups) {
-			// Enforce No Popups via JS
-			if (view && view->WebPage()) {
-				view->WebPage()->ExecuteJavaScript(
-					"window.open = function() { console.log('Popups blocked by WebPositive permissions'); return null; };");
-			}
+	if (found && !allowPopups) {
+		// Enforce No Popups via JS
+		if (view && view->WebPage()) {
+			view->WebPage()->ExecuteJavaScript(
+				"window.open = function() { console.log('Popups blocked by WebPositive permissions'); return null; };");
 		}
 	}
 
