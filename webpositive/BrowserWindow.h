@@ -63,6 +63,7 @@ class SettingsMessage;
 class TabManager;
 class URLInputGroup;
 class PermissionsWindow;
+class NetworkWindow;
 
 namespace BPrivate {
 	class BIconButton;
@@ -99,6 +100,7 @@ enum {
 	SHOW_DOWNLOAD_WINDOW			= 'sdwd',
 	SHOW_SETTINGS_WINDOW			= 'sswd',
 	SHOW_CONSOLE_WINDOW				= 'scwd',
+	SHOW_NETWORK_WINDOW				= 'snwd',
 	SHOW_COOKIE_WINDOW				= 'skwd',
 	SHOW_CERTIFICATE_WINDOW			= 'scrw',
 
@@ -115,6 +117,7 @@ enum {
 	TOGGLE_AUTO_HIDE_BOOKMARK_BAR	= 'tahb',
 	REOPEN_CLOSED_TAB_WITH_INDEX	= 'rcti',
 	RELOAD							= 'reld',
+	RELOAD_BYPASS_CACHE				= 'rlbc',
 	PIN_TAB							= 'ptab',
 	UNPIN_TAB						= 'uptb',
 	CLOSE_TAB						= 'cltb',
@@ -338,6 +341,8 @@ private:
 			FormSafetyHelper*	fFormSafetyHelper;
 
 			PermissionsWindow*	fPermissionsWindow;
+			NetworkWindow*		fNetworkWindow;
+			bool				fIsBypassingCache;
 
 			BMessageRunner*		fMemoryPressureRunner;
 };

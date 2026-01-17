@@ -12,6 +12,7 @@
 #include <Clipboard.h>
 #include <Message.h>
 #include <Button.h>
+#include <CheckBox.h>
 #include <GroupLayout.h>
 #include <GroupLayoutBuilder.h>
 #include <LayoutBuilder.h>
@@ -32,7 +33,8 @@
 
 enum {
 	EVAL_CONSOLE_WINDOW_COMMAND = 'ecwc',
-	CLEAR_CONSOLE_MESSAGES = 'ccms'
+	CLEAR_CONSOLE_MESSAGES = 'ccms',
+	FILTER_ERRORS_ONLY = 'feon'
 };
 
 
@@ -53,11 +55,13 @@ ConsoleWindow::ConsoleWindow(BRect frame)
 		new BMessage(CLEAR_CONSOLE_MESSAGES));
 	fCopyMessagesButton = new BButton(B_TRANSLATE("Copy"),
 		new BMessage(B_COPY));
+	fErrorsOnlyCheckBox = new BCheckBox("Errors only", new BMessage(FILTER_ERRORS_ONLY));
 
 	AddChild(BGroupLayoutBuilder(B_VERTICAL, 0.0)
 		.Add(new BScrollView("Console messages scroll",
 			fMessagesListView, 0, true, true))
 		.Add(BGroupLayoutBuilder(B_HORIZONTAL, B_USE_SMALL_SPACING)
+			.Add(fErrorsOnlyCheckBox)
 			.AddGlue()
 			.Add(fClearMessagesButton)
 			.Add(fCopyMessagesButton)
@@ -81,6 +85,14 @@ ConsoleWindow::MessageReceived(BMessage* message)
 			int32 lineNumber = message->FindInt32("line");
 			int32 columnNumber = message->FindInt32("column");
 			BString text = message->FindString("string");
+			// Crude filtering for errors only
+			if (fErrorsOnlyCheckBox->Value() == B_CONTROL_ON) {
+				if (text.FindFirst("Error") == B_ERROR && text.FindFirst("error") == B_ERROR && text.FindFirst("Exception") == B_ERROR) {
+					// Likely not an error, skip
+					break;
+				}
+			}
+
 			BString finalText;
 			finalText.SetToFormat("%s:%" B_PRIi32 ":%" B_PRIi32 ": %s\n",
 				source.String(), lineNumber, columnNumber, text.String());

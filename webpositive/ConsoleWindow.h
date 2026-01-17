@@ -16,6 +16,7 @@
 
 class BListView;
 class BButton;
+class BCheckBox;
 
 
 class ConsoleWindow : public BWindow {
@@ -31,6 +32,7 @@ private:
 			BListView*			fMessagesListView;
 			BButton* 			fClearMessagesButton;
 			BButton* 			fCopyMessagesButton;
+			BCheckBox*			fErrorsOnlyCheckBox;
 			BString				fPreviousText;
 			int32				fRepeatCounter;
 };
