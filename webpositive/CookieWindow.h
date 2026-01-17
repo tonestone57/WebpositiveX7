@@ -30,10 +30,12 @@ public:
 									BPrivate::Network::BNetworkCookieJar& jar);
 	virtual	void				MessageReceived(BMessage* message);
 	virtual void				Show();
+	virtual void				Hide();
 	virtual	bool				QuitRequested();
 
 private:
 			void				_BuildDomainList();
+			void				_EmptyDomainList();
 			BStringItem*		_AddDomain(BString domain, bool fake,
 									std::map<BString, BStringItem*>& domainMap);
 			void				_ShowCookiesForDomain(BString domain);

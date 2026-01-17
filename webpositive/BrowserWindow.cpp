@@ -2720,6 +2720,8 @@ BrowserWindow::MainDocumentError(const BString& failingURL,
 	if (userData != NULL && userData->IsDownloadRestart()
 		&& localizedDescription.FindFirst("interrupted") >= 0) {
 		_ShutdownTab(fTabManager->TabForView(view));
+		if (fTabManager->CountTabs() == 0)
+			PostMessage(B_QUIT_REQUESTED);
 		return;
 	}
 
