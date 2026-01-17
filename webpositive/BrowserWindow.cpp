@@ -3228,13 +3228,8 @@ BrowserWindow::_ShowInterface(bool show)
 		fStatusGroup->SetVisible(false);
 	}
 
-	if (fIsLoading) {
-		if (fLoadingProgressBar->IsHidden())
-			fLoadingProgressBar->Show();
-	} else {
-		while (!fLoadingProgressBar->IsHidden())
-			fLoadingProgressBar->Hide();
-	}
+	while (!fLoadingProgressBar->IsHidden())
+		fLoadingProgressBar->Hide();
 }
 
 

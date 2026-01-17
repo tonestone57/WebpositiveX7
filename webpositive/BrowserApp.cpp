@@ -216,7 +216,6 @@ BrowserApp::ReadyToRun()
 	// Since we will essentially run the GUI...
 	set_thread_priority(Thread(), B_DISPLAY_PRIORITY);
 
-	BWebPage::InitializeOnce();
 	BWebPage::SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
 
 	BPath path;
@@ -468,8 +467,6 @@ BrowserApp::QuitRequested()
 			}
 		}
 	}
-
-	BWebPage::ShutdownOnce();
 
 	fSettings->SetValue("window frame", fLastWindowFrame);
 	if (fDownloadWindow->Lock()) {
