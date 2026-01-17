@@ -117,7 +117,13 @@ enum {
 	PIN_TAB							= 'ptab',
 	UNPIN_TAB						= 'uptb',
 	CLOSE_TAB						= 'cltb',
-	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb'
+	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb',
+
+	EXPORT_BOOKMARKS							= 'exbm',
+	IMPORT_BOOKMARKS							= 'imbm',
+	EXPORT_HISTORY								= 'exhi',
+	SYNC_EXPORT									= 'syex',
+	SYNC_IMPORT									= 'syim'
 };
 
 

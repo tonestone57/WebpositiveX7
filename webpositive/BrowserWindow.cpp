@@ -88,6 +88,7 @@
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
 #include "SitePermissionsManager.h"
+#include "Sync.h"
 #include "TabManager.h"
 #include "TabSearchWindow.h"
 #include "URLInputGroup.h"
@@ -398,6 +399,16 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Save page as" B_UTF8_ELLIPSIS),
 		new BMessage(SAVE_PAGE), 'S'));
 	menu->AddSeparatorItem();
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Import bookmarks" B_UTF8_ELLIPSIS),
+		new BMessage(IMPORT_BOOKMARKS)));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Export bookmarks" B_UTF8_ELLIPSIS),
+		new BMessage(EXPORT_BOOKMARKS)));
+	menu->AddSeparatorItem();
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Import profile" B_UTF8_ELLIPSIS),
+		new BMessage(SYNC_IMPORT)));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Export profile" B_UTF8_ELLIPSIS),
+		new BMessage(SYNC_EXPORT)));
+	menu->AddSeparatorItem();
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Downloads"),
 		new BMessage(SHOW_DOWNLOAD_WINDOW), 'D'));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Settings"),
@@ -511,6 +522,9 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fHistoryMenu->AddItem(fRecentlyClosedMenu = new BMenu(
 		B_TRANSLATE("Recently closed tabs")));
 	fRecentlyClosedMenu->SetEnabled(false);
+	fHistoryMenu->AddSeparatorItem();
+	fHistoryMenu->AddItem(new BMenuItem(B_TRANSLATE("Export history" B_UTF8_ELLIPSIS),
+		new BMessage(EXPORT_HISTORY)));
 	fHistoryMenu->AddSeparatorItem();
 	fHistoryMenuFixedItemCount = fHistoryMenu->CountItems();
 	mainMenu->AddItem(fHistoryMenu);
@@ -911,8 +925,56 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case SAVE_PAGE:
 		{
+			BMessage saveMsg(B_SAVE_REQUESTED);
+			saveMsg.AddInt32("type", SAVE_PAGE);
+			fSavePanel->SetMessage(&saveMsg);
 			fSavePanel->SetSaveText(CurrentWebView()->MainFrameTitle());
 			fSavePanel->Show();
+			break;
+		}
+
+		case EXPORT_BOOKMARKS:
+		{
+			BMessage saveMsg(B_SAVE_REQUESTED);
+			saveMsg.AddInt32("type", EXPORT_BOOKMARKS);
+			fSavePanel->SetMessage(&saveMsg);
+			fSavePanel->SetSaveText("bookmarks.html");
+			fSavePanel->Show();
+			break;
+		}
+
+		case IMPORT_BOOKMARKS:
+		{
+			BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
+				NULL, B_FILE_NODE, false, new BMessage(IMPORT_BOOKMARKS));
+			panel->Show();
+			break;
+		}
+
+		case EXPORT_HISTORY:
+		{
+			BMessage saveMsg(B_SAVE_REQUESTED);
+			saveMsg.AddInt32("type", EXPORT_HISTORY);
+			fSavePanel->SetMessage(&saveMsg);
+			fSavePanel->SetSaveText("history.csv");
+			fSavePanel->Show();
+			break;
+		}
+
+		case SYNC_EXPORT:
+		{
+			BFilePanel* panel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this),
+				NULL, B_DIRECTORY_NODE, false, new BMessage(SYNC_EXPORT));
+			panel->SetSaveText("WebPositiveProfile");
+			panel->Show();
+			break;
+		}
+
+		case SYNC_IMPORT:
+		{
+			BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
+				NULL, B_DIRECTORY_NODE, false, new BMessage(SYNC_IMPORT));
+			panel->Show();
 			break;
 		}
 
@@ -920,15 +982,81 @@ BrowserWindow::MessageReceived(BMessage* message)
 		{
 			entry_ref ref;
 			BString name;
+			int32 type = SAVE_PAGE;
+			message->FindInt32("type", &type);
 
 			if (message->FindRef("directory", &ref) == B_OK
 				&& message->FindString("name", &name) == B_OK) {
 				BDirectory dir(&ref);
-				BFile output(&dir, name,
-					B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
-				CurrentWebView()->WebPage()->GetContentsAsMHTML(output);
-			}
 
+				if (type == EXPORT_BOOKMARKS) {
+					BPath path(&ref);
+					path.Append(name);
+					status_t status = BookmarkManager::ExportBookmarks(path);
+					if (status != B_OK) {
+						BString errorMsg(B_TRANSLATE("Failed to export bookmarks"));
+						errorMsg << ": " << strerror(status);
+						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+							errorMsg.String(), B_TRANSLATE("OK"));
+						alert->Go();
+					}
+				} else if (type == EXPORT_HISTORY) {
+					BPath path(&ref);
+					path.Append(name);
+					status_t status = BrowsingHistory::ExportHistory(path);
+					if (status != B_OK) {
+						BString errorMsg(B_TRANSLATE("Failed to export history"));
+						errorMsg << ": " << strerror(status);
+						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+							errorMsg.String(), B_TRANSLATE("OK"));
+						alert->Go();
+					}
+				} else if (type == SAVE_PAGE) {
+					BFile output(&dir, name,
+						B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+					CurrentWebView()->WebPage()->GetContentsAsMHTML(output);
+				}
+			}
+			break;
+		}
+
+		case SYNC_EXPORT:
+		{
+			// BFilePanel for directory selection might send this if we set the message
+			entry_ref ref;
+			BString name;
+			if (message->FindRef("directory", &ref) == B_OK
+				&& message->FindString("name", &name) == B_OK) {
+				BPath path(&ref);
+				path.Append(name);
+				status_t status = Sync::ExportProfile(path, fContext->GetCookieJar());
+				if (status != B_OK) {
+					BString errorMsg(B_TRANSLATE("Failed to export profile"));
+					errorMsg << ": " << strerror(status);
+					BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+						errorMsg.String(), B_TRANSLATE("OK"));
+					alert->Go();
+				}
+			}
+			break;
+		}
+
+		case SYNC_IMPORT:
+		{
+			entry_ref ref;
+			if (message->FindRef("refs", &ref) == B_OK) {
+				BPath path(&ref);
+				status_t status = Sync::ImportProfile(path, fContext->GetCookieJar());
+				if (status != B_OK) {
+					BString errorMsg(B_TRANSLATE("Failed to import profile"));
+					errorMsg << ": " << strerror(status);
+					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+						errorMsg.String(), B_TRANSLATE("OK"));
+					alert->Go();
+				}
+				// Refresh cookies?
+				// Refresh bookmarks?
+			}
 			break;
 		}
 
@@ -986,6 +1114,24 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case SHOW_BOOKMARKS:
 			BookmarkManager::ShowBookmarks();
 			break;
+
+		case IMPORT_BOOKMARKS:
+		{
+			// Handle Import from FilePanel selection
+			entry_ref ref;
+			if (message->FindRef("refs", &ref) == B_OK) {
+				BPath path(&ref);
+				status_t status = BookmarkManager::ImportBookmarks(path);
+				if (status != B_OK) {
+					BString errorMsg(B_TRANSLATE("Failed to import bookmarks"));
+					errorMsg << ": " << strerror(status);
+					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+						errorMsg.String(), B_TRANSLATE("OK"));
+					alert->Go();
+				}
+			}
+			break;
+		}
 
 		case B_REFS_RECEIVED:
 		{
