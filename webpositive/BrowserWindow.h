@@ -109,7 +109,9 @@ enum {
 	SHOW_HIDE_BOOKMARK_BAR			= 'shbb',
 	TAB_SEARCH_WINDOW_QUIT			= 'tswq',
 	CHECK_FORM_DIRTY_TIMEOUT		= 'cfdt',
-	RESTART_DOWNLOAD_IN_WINDOW		= 'rdwn'
+	RESTART_DOWNLOAD_IN_WINDOW		= 'rdwn',
+	TOGGLE_AUTO_HIDE_BOOKMARK_BAR	= 'tahb',
+	REOPEN_CLOSED_TAB_WITH_INDEX	= 'rcti'
 };
 
 
@@ -222,7 +224,7 @@ private:
 			void				_ShowBookmarkBar(bool show);
 
 			void				_ReopenClosedTab();
-			void				_UpdateReopenClosedTabItem();
+			void				_UpdateRecentlyClosedMenu();
 
 private:
 			struct ClosedTabInfo {
@@ -230,6 +232,7 @@ private:
 				BString title;
 			};
 			std::deque<ClosedTabInfo> fClosedTabs;
+			BMenu*				fRecentlyClosedMenu;
 			BMenuItem*			fReopenClosedTabMenuItem;
 
 			BMenu*				fHistoryMenu;
@@ -294,6 +297,7 @@ private:
 			bool				fAutoHideBookmarkBar;
 
 			BMenuItem*			fBookmarkBarMenuItem;
+			BMenuItem*			fAutoHideBookmarkBarMenuItem;
 			BookmarkBar*		fBookmarkBar;
 			BFilePanel*			fSavePanel;
 

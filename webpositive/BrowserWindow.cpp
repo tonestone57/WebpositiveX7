@@ -449,6 +449,10 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fBookmarkBarMenuItem = new BMenuItem(B_TRANSLATE("Show bookmark bar"),
 		new BMessage(SHOW_HIDE_BOOKMARK_BAR));
 	menu->AddItem(fBookmarkBarMenuItem);
+	fAutoHideBookmarkBarMenuItem = new BMenuItem(B_TRANSLATE("Auto-hide bookmark bar"),
+		new BMessage(TOGGLE_AUTO_HIDE_BOOKMARK_BAR));
+	fAutoHideBookmarkBarMenuItem->SetMarked(fAutoHideBookmarkBar);
+	menu->AddItem(fAutoHideBookmarkBarMenuItem);
 	menu->AddSeparatorItem();
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Increase size"),
 		new BMessage(ZOOM_FACTOR_INCREASE), '+'));
@@ -465,6 +469,11 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(TOGGLE_DARK_MODE));
 	fDarkModeMenuItem->SetMarked(fDarkMode);
 	menu->AddItem(fDarkModeMenuItem);
+
+	fReaderModeMenuItem = new BMenuItem(B_TRANSLATE("Reader mode"),
+		new BMessage(TOGGLE_READER_MODE));
+	fReaderModeMenuItem->SetMarked(fReaderMode);
+	menu->AddItem(fReaderModeMenuItem);
 
 	menu->AddSeparatorItem();
 	fFullscreenItem = new BMenuItem(B_TRANSLATE("Full screen"),
@@ -484,6 +493,9 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		B_TRANSLATE("Reopen closed tab"), new BMessage(REOPEN_CLOSED_TAB), 'T',
 		B_SHIFT_KEY));
 	fReopenClosedTabMenuItem->SetEnabled(false);
+	fHistoryMenu->AddItem(fRecentlyClosedMenu = new BMenu(
+		B_TRANSLATE("Recently closed tabs")));
+	fRecentlyClosedMenu->SetEnabled(false);
 	fHistoryMenu->AddSeparatorItem();
 	fHistoryMenuFixedItemCount = fHistoryMenu->CountItems();
 	mainMenu->AddItem(fHistoryMenu);
@@ -842,6 +854,14 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case SHOW_HIDE_BOOKMARK_BAR:
 			_ShowBookmarkBar(fBookmarkBar->IsHidden());
+			if (fAutoHideBookmarkBarMenuItem)
+				fAutoHideBookmarkBarMenuItem->SetEnabled(!fBookmarkBar->IsHidden());
+			break;
+
+		case TOGGLE_AUTO_HIDE_BOOKMARK_BAR:
+			fAutoHideBookmarkBar = !fAutoHideBookmarkBar;
+			fAutoHideBookmarkBarMenuItem->SetMarked(fAutoHideBookmarkBar);
+			_CheckAutoHideInterface();
 			break;
 
 		case GOTO_URL:
@@ -1306,6 +1326,20 @@ BrowserWindow::MessageReceived(BMessage* message)
 			_ReopenClosedTab();
 			break;
 
+		case REOPEN_CLOSED_TAB_WITH_INDEX:
+		{
+			int32 index;
+			if (message->FindInt32("index", &index) == B_OK) {
+				if (index >= 0 && index < (int32)fClosedTabs.size()) {
+					ClosedTabInfo info = fClosedTabs[index];
+					fClosedTabs.erase(fClosedTabs.begin() + index);
+					_UpdateRecentlyClosedMenu();
+					CreateNewTab(info.url, true);
+				}
+			}
+			break;
+		}
+
 		case PIN_TAB:
 		case UNPIN_TAB:
 		{
@@ -1316,45 +1350,20 @@ BrowserWindow::MessageReceived(BMessage* message)
 					TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
 					if (tab) {
 						bool pinned = (message->what == PIN_TAB);
+						if (tab->IsPinned() == pinned) break;
+
 						tab->SetPinned(pinned);
 
-						if (pinned) {
-							// Move to start (0)
-							// But careful about other pinned tabs.
-							// We should move it after the last pinned tab.
-							// For simplicity, let's just move to 0 for now, making it the "first" pinned tab.
-							// Or iterate to find first unpinned index.
-							int32 targetIndex = 0;
-							for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
-								TabView* t = fTabManager->GetTabContainerView()->TabAt(i);
-								if (t && !t->IsPinned()) {
-									targetIndex = i;
-									break;
-								}
-								// If all before are pinned, target is i+1, but loop continues.
-								// Wait, if i is pinned, we want to insert after it?
-								// No, we want to find the first unpinned slot.
-								// If index 0 is pinned, target 1.
-								if (t && t->IsPinned()) targetIndex = i + 1;
-							}
-
-							// If we are pinning, we move to targetIndex.
-							// But we must check if we are moving left.
-							if (tabIndex > targetIndex) {
-								// Correcting targetIndex is tricky if we don't account for self.
-								// Actually, just moving to 0 is a good start for "Pin".
-								// But users expect pinned tabs on left.
-								// Let's iterate.
-								int32 insertPos = 0;
-								for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
-									TabView* t = fTabManager->GetTabContainerView()->TabAt(i);
-									if (t == tab) continue;
-									if (t && t->IsPinned()) insertPos++;
-									else break;
-								}
-								fTabManager->MoveTab(tabIndex, insertPos);
+						int32 pinnedCount = 0;
+						for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
+							TabView* t = fTabManager->GetTabContainerView()->TabAt(i);
+							if (t && t->IsPinned() && t != tab) {
+								pinnedCount++;
 							}
 						}
+
+						if (tabIndex != pinnedCount)
+							fTabManager->MoveTab(tabIndex, pinnedCount);
 					}
 				}
 			}
@@ -1533,6 +1542,10 @@ BrowserWindow::MenusBeginning()
 {
 	_UpdateHistoryMenu();
 	_UpdateClipboardItems();
+	_UpdateRecentlyClosedMenu();
+
+	if (fAutoHideBookmarkBarMenuItem && fBookmarkBar)
+		fAutoHideBookmarkBarMenuItem->SetEnabled(!fBookmarkBar->IsHidden());
 
 	// Tab pinning menu items
 	// Check if the current view is a WebView (it should be)
@@ -2454,7 +2467,7 @@ BrowserWindow::_ShutdownTab(int32 index)
 			fClosedTabs.push_back(info);
 			if (fClosedTabs.size() > 10)
 				fClosedTabs.pop_front();
-			_UpdateReopenClosedTabItem();
+			_UpdateRecentlyClosedMenu();
 		}
 	}
 
@@ -2917,17 +2930,39 @@ BrowserWindow::_ReopenClosedTab()
 
 	ClosedTabInfo info = fClosedTabs.back();
 	fClosedTabs.pop_back();
-	_UpdateReopenClosedTabItem();
+	_UpdateRecentlyClosedMenu();
 
 	CreateNewTab(info.url, true);
 }
 
 
 void
-BrowserWindow::_UpdateReopenClosedTabItem()
+BrowserWindow::_UpdateRecentlyClosedMenu()
 {
+	bool hasClosedTabs = !fClosedTabs.empty();
 	if (fReopenClosedTabMenuItem != NULL)
-		fReopenClosedTabMenuItem->SetEnabled(!fClosedTabs.empty());
+		fReopenClosedTabMenuItem->SetEnabled(hasClosedTabs);
+
+	if (fRecentlyClosedMenu != NULL) {
+		fRecentlyClosedMenu->RemoveItems(0, fRecentlyClosedMenu->CountItems(), true);
+
+		for (int32 i = (int32)fClosedTabs.size() - 1; i >= 0; i--) {
+			const ClosedTabInfo& info = fClosedTabs[i];
+			BMessage* msg = new BMessage(REOPEN_CLOSED_TAB_WITH_INDEX);
+			msg->AddInt32("index", i);
+
+			BString label = info.title;
+			if (label.IsEmpty()) label = info.url;
+			if (label.Length() > 50) {
+				label.Truncate(50);
+				label << B_UTF8_ELLIPSIS;
+			}
+
+			fRecentlyClosedMenu->AddItem(new BMenuItem(label, msg));
+		}
+
+		fRecentlyClosedMenu->SetEnabled(hasClosedTabs);
+	}
 }
 
 
