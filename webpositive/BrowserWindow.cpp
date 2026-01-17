@@ -710,7 +710,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		int32 count = unmodified.CountStrings();
 		for (int32 i = 0; i < count; i++) {
 			uint32 key = BUnicodeChar::FromUTF8(unmodified.StringAt(i));
-			if (!HasShortcut(key, 0)) {
+			if (!HasShortcut(key, B_COMMAND_KEY)) {
 				// Add semantic zoom in shortcut, bug #7428
 				AddShortcut(key, B_COMMAND_KEY,
 					new BMessage(ZOOM_FACTOR_INCREASE));
