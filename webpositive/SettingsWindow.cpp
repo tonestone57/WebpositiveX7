@@ -76,6 +76,7 @@ enum {
 
 	MSG_HTTPS_ONLY_CHANGED						= 'honly',
 	MSG_BLOCK_ADS_CHANGED						= 'blads',
+	MSG_DISABLE_CACHE_CHANGED					= 'dcch',
 
 	MSG_CHOOSE_DOWNLOAD_FOLDER					= 'swop',
 	MSG_HANDLE_DOWNLOAD_FOLDER					= 'oprs',
@@ -313,6 +314,7 @@ SettingsWindow::MessageReceived(BMessage* message)
 		case MSG_PROXY_PASSWORD_CHANGED:
 		case MSG_HTTPS_ONLY_CHANGED:
 		case MSG_BLOCK_ADS_CHANGED:
+		case MSG_DISABLE_CACHE_CHANGED:
 			// These settings cannot change live, as we don't want partial
 			// input to be applied.
 			_ValidateControlsEnabledStatus();
@@ -357,9 +359,14 @@ SettingsWindow::_CreatePrivacyPage(float spacing)
 		B_TRANSLATE("Block ads (basic CSS hiding)"),
 		new BMessage(MSG_BLOCK_ADS_CHANGED));
 
+	fDisableCacheCheckBox = new BCheckBox("disable cache",
+		B_TRANSLATE("Disable cache (for testing)"),
+		new BMessage(MSG_DISABLE_CACHE_CHANGED));
+
 	BView* view = BGroupLayoutBuilder(B_VERTICAL, 0)
 		.Add(fHttpsOnlyCheckBox)
 		.Add(fBlockAdsCheckBox)
+		.Add(fDisableCacheCheckBox)
 		.AddGlue()
 		.SetInsets(B_USE_WINDOW_SPACING, B_USE_WINDOW_SPACING,
 			B_USE_WINDOW_SPACING, B_USE_DEFAULT_SPACING)
@@ -773,6 +780,8 @@ SettingsWindow::_CanApplySettings() const
 		!= fSettings->GetValue(kSettingsKeyHttpsOnly, false));
 	canApply = canApply || ((fBlockAdsCheckBox->Value() == B_CONTROL_ON)
 		!= fSettings->GetValue(kSettingsKeyBlockAds, false));
+	canApply = canApply || ((fDisableCacheCheckBox->Value() == B_CONTROL_ON)
+		!= fSettings->GetValue(kSettingsKeyDisableCache, false));
 
 	return canApply;
 }
@@ -808,6 +817,8 @@ SettingsWindow::_ApplySettings()
 		fHttpsOnlyCheckBox->Value() == B_CONTROL_ON);
 	fSettings->SetValue(kSettingsKeyBlockAds,
 		fBlockAdsCheckBox->Value() == B_CONTROL_ON);
+	fSettings->SetValue(kSettingsKeyDisableCache,
+		fDisableCacheCheckBox->Value() == B_CONTROL_ON);
 
 	fSettings->Save();
 
@@ -947,6 +958,8 @@ SettingsWindow::_RevertSettings()
 	fHttpsOnlyCheckBox->SetValue(fSettings->GetValue(kSettingsKeyHttpsOnly,
 		false));
 	fBlockAdsCheckBox->SetValue(fSettings->GetValue(kSettingsKeyBlockAds,
+		false));
+	fDisableCacheCheckBox->SetValue(fSettings->GetValue(kSettingsKeyDisableCache,
 		false));
 
 	_ValidateControlsEnabledStatus();

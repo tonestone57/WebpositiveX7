@@ -45,6 +45,7 @@ const char* kSettingsShowBookmarkBar = "show bookmarks bar";
 
 const char* kSettingsKeyHttpsOnly = "https only mode";
 const char* kSettingsKeyBlockAds = "block ads";
+const char* kSettingsKeyDisableCache = "disable cache";
 
 
 const struct SearchEngine kSearchEngines[] = {

@@ -42,6 +42,7 @@ local sources =
 	CredentialsStorage.cpp
 	DownloadProgressView.cpp
 	DownloadWindow.cpp
+	NetworkWindow.cpp
 	PermissionsWindow.cpp
 	SettingsKeys.cpp
 	SettingsWindow.cpp
