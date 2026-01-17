@@ -26,9 +26,12 @@ public:
 
 	virtual	void				MessageReceived(BMessage* message);
 	virtual	bool				QuitRequested();
+	virtual void				Show();
 
+			void				PrepareToQuit();
 private:
 			void				_LoadPermissions();
+			void				_ClearPermissions();
 			void				_SavePermissions();
 			void				_UpdateFields();
 			void				_ClearSiteData(const char* domain);
@@ -36,6 +39,7 @@ private:
 private:
 			BPrivate::Network::BNetworkCookieJar& fCookieJar;
 
+			bool				fQuitting;
 			BListView*			fDomainList;
 			BCheckBox*			fJSEnabled;
 			BCheckBox*			fCookiesEnabled;

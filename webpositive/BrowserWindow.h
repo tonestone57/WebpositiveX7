@@ -62,6 +62,7 @@ class BookmarkBar;
 class SettingsMessage;
 class TabManager;
 class URLInputGroup;
+class PermissionsWindow;
 
 namespace BPrivate {
 	class BIconButton;
@@ -318,6 +319,8 @@ private:
 			class TabSearchWindow* fTabSearchWindow;
 
 			FormSafetyHelper*	fFormSafetyHelper;
+
+			PermissionsWindow*	fPermissionsWindow;
 };
 
 
