@@ -27,8 +27,9 @@
 #define B_TRANSLATION_CONTEXT "Tab Manager"
 
 
+// Horizontal insets for the tab layout
 static const float kLeftTabInset = 4;
-static const float kRightTabInset = 10;
+static const float kRightTabInset = 4;
 
 
 TabContainerView::TabContainerView(Controller* controller)
@@ -522,6 +523,7 @@ TabContainerView::_AvailableWidthForTabs() const
 	float left;
 	float right;
 	GroupLayout()->GetInsets(&left, NULL, &right, NULL);
+	// Subtract insets (kLeftTabInset + kRightTabInset) to get available width for tabs.
 	width -= left + right;
 
 	return width;
