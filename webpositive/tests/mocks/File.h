@@ -13,8 +13,10 @@ enum {
 class BFile {
 public:
 	BFile() {}
+	BFile(const char* path, uint32 mode) {}
 	status_t SetTo(const char* path, uint32 mode) { return B_OK; }
 	status_t InitCheck() const { return B_OK; }
+	ssize_t Write(const void* buffer, size_t size) { return size; }
 };
 
 #endif

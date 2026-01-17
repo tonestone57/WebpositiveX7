@@ -3,6 +3,7 @@
 #include "SupportDefs.h"
 #include <string>
 #include <iostream>
+#include <stdio.h>
 
 class BString {
 public:
@@ -21,6 +22,16 @@ public:
     int32 FindFirst(char c) const {
          size_t pos = fString.find(c);
          return (pos == std::string::npos) ? B_ERROR : (int32)pos;
+    }
+
+    // Add EndsWith
+    bool EndsWith(const BString& str) const {
+        if (str.Length() > Length()) return false;
+        return fString.compare(Length() - str.Length(), str.Length(), str.fString) == 0;
+    // Case insensitive find
+    int32 IFindFirst(const char* str) const {
+        // Just forward to normal find for mock
+        return FindFirst(str);
     }
 
     void CopyInto(BString& dest, int32 from, int32 length) const {
@@ -62,6 +73,9 @@ public:
 
     void SetByteAt(int32 index, char c) { fString[index] = c; }
 
+    // ByteAt for convenience in tests (though real BString doesn't always have it, it might use [])
+    char ByteAt(int32 index) const { return fString[index]; }
+
     void Insert(const char* str, int32 pos) { fString.insert(pos, str); }
 
     int Compare(const char* str, int32 len) const { return fString.compare(0, len, str, len); }
@@ -71,12 +85,38 @@ public:
     BString& operator+=(const char* str) { fString += str; return *this; }
     BString& operator+=(const BString& str) { fString += str.fString; return *this; }
 
+    BString& operator<<(int32 val) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%d", (int)val);
+        fString += buf;
+        return *this;
+    }
+
+    BString& operator<<(uint32 val) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%u", (unsigned int)val);
+        fString += buf;
+        return *this;
+    }
+
     void SetTo(const char* str) { fString = str; }
 
     // Helper for Truncate
     void Truncate(int32 newLength) {
         if (newLength < fString.length()) fString.resize(newLength);
     }
+
+    bool StartsWith(const char* prefix) const {
+        return fString.find(prefix) == 0;
+    }
+
+    void ToUpper() {
+        for (size_t i = 0; i < fString.length(); ++i) {
+            fString[i] = toupper(fString[i]);
+        }
+    }
+
+    bool IsEmpty() const { return fString.empty(); }
 
     // ICompare (Case insensitive)
     int ICompare(const char* str) const {

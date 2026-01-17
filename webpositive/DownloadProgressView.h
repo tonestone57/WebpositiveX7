@@ -20,7 +20,11 @@ class SmallButton;
 
 
 enum {
-	SAVE_SETTINGS = 'svst'
+	SAVE_SETTINGS = 'svst',
+	PAUSE_DOWNLOAD = 'padn',
+	RESUME_DOWNLOAD = 'rsdn',
+	SET_MIME_TYPE = 'smmt',
+	TOGGLE_OPEN_WHEN_DONE = 'topd'
 };
 
 
@@ -68,10 +72,13 @@ private:
 			BStringView*		fInfoView;
 			SmallButton*		fTopButton;
 			SmallButton*		fBottomButton;
+			SmallButton*		fPauseButton;
+			BCheckBox*			fOpenWhenDoneCheckBox;
 			BWebDownload*		fDownload;
 			BString				fURL;
 			BPath				fPath;
 
+			time_t				fFinishTime;
 			off_t				fCurrentSize;
 			off_t				fExpectedSize;
 			off_t				fLastSpeedReferenceSize;

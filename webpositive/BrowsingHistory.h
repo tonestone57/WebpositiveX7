@@ -67,6 +67,8 @@ class BrowsingHistory : public BHandler, public BLocker {
 public:
 	static	BrowsingHistory*	DefaultInstance();
 
+	static	status_t			ExportHistory(const BPath& path);
+
 	virtual	void				MessageReceived(BMessage* message);
 
 			bool				AddItem(const BrowsingHistoryItem& item);

@@ -29,9 +29,15 @@ public:
 	static void AddBookmarkURLsRecursively(BDirectory& directory,
 		BMessage* message, uint32& addedCount);
 
+	static status_t ImportBookmarks(const BPath& path);
+	static status_t ExportBookmarks(const BPath& path);
+
 private:
 	static void _CreateBookmark(const BPath& path, BString fileName, const BString& title,
 		const BString& url, const BBitmap* miniIcon, const BBitmap* largeIcon);
+
+	static status_t _ExportBookmarksRecursively(BDirectory& directory, BFile& file,
+		int32 indentLevel);
 };
 
 #endif // BOOKMARK_MANAGER_H

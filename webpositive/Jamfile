@@ -47,6 +47,7 @@ local sources =
 	SettingsKeys.cpp
 	SettingsWindow.cpp
 	SitePermissionsManager.cpp
+	SourceWindow.cpp
 	TabSearchWindow.cpp
 	URLInputGroup.cpp
 ;

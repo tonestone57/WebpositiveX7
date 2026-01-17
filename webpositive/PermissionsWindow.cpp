@@ -32,8 +32,8 @@ enum {
 
 class PermissionItem : public BStringItem {
 public:
-	PermissionItem(const char* text, bool js, bool cookies, bool popups)
-		: BStringItem(text), fJS(js), fCookies(cookies), fPopups(popups) {}
+	PermissionItem(const char* text, bool js, bool cookies, bool popups, float zoom, bool forceDesktop)
+		: BStringItem(text), fJS(js), fCookies(cookies), fPopups(popups), fZoom(zoom), fForceDesktop(forceDesktop) {}
 
 	void SetJS(bool enable) { fJS = enable; }
 	bool JS() const { return fJS; }
@@ -44,10 +44,18 @@ public:
 	void SetPopups(bool enable) { fPopups = enable; }
 	bool Popups() const { return fPopups; }
 
+	void SetZoom(float zoom) { fZoom = zoom; }
+	float Zoom() const { return fZoom; }
+
+	void SetForceDesktop(bool enable) { fForceDesktop = enable; }
+	bool ForceDesktop() const { return fForceDesktop; }
+
 private:
 	bool fJS;
 	bool fCookies;
 	bool fPopups;
+	float fZoom;
+	bool fForceDesktop;
 };
 
 PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCookieJar& jar)
@@ -73,11 +81,16 @@ PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCoo
 	fJSEnabled = new BCheckBox("Allow JavaScript", new BMessage(MSG_SAVE_PERMISSIONS));
 	fCookiesEnabled = new BCheckBox("Allow Cookies", new BMessage(MSG_SAVE_PERMISSIONS));
 	fPopupsEnabled = new BCheckBox("Allow Popups", new BMessage(MSG_SAVE_PERMISSIONS));
+	fForceDesktopCheckBox = new BCheckBox("Force Desktop Mode", new BMessage(MSG_SAVE_PERMISSIONS));
+
+	fZoomControl = new BTextControl("zoom", "Zoom:", "1.0", new BMessage(MSG_SAVE_PERMISSIONS));
 
 	// Default state (disabled until domain selected)
 	fJSEnabled->SetEnabled(false);
 	fCookiesEnabled->SetEnabled(false);
 	fPopupsEnabled->SetEnabled(false);
+	fForceDesktopCheckBox->SetEnabled(false);
+	fZoomControl->SetEnabled(false);
 
 	AddChild(BGroupLayoutBuilder(B_VERTICAL, 10)
 		.Add(new BScrollView("scroll", fDomainList, 0, false, true))
@@ -89,6 +102,8 @@ PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCoo
 		.Add(fJSEnabled)
 		.Add(fCookiesEnabled)
 		.Add(fPopupsEnabled)
+		.Add(fForceDesktopCheckBox)
+		.Add(fZoomControl)
 		.Add(fClearDataButton)
 		.SetInsets(10)
 	);
@@ -141,6 +156,11 @@ PermissionsWindow::MessageReceived(BMessage* message)
 					item->SetJS(fJSEnabled->Value() == B_CONTROL_ON);
 					item->SetCookies(fCookiesEnabled->Value() == B_CONTROL_ON);
 					item->SetPopups(fPopupsEnabled->Value() == B_CONTROL_ON);
+					item->SetForceDesktop(fForceDesktopCheckBox->Value() == B_CONTROL_ON);
+					float zoom = atof(fZoomControl->Text());
+					if (zoom < 0.1) zoom = 0.1;
+					if (zoom > 10.0) zoom = 10.0;
+					item->SetZoom(zoom);
 				}
 			}
 			_SavePermissions();
@@ -197,14 +217,18 @@ PermissionsWindow::Show()
 
 // Helper to manage BMessage per domain
 static void
-SetDomainSettings(BMessage& msg, bool js, bool cookies, bool popups)
+SetDomainSettings(BMessage& msg, bool js, bool cookies, bool popups, float zoom, bool forceDesktop)
 {
 	msg.RemoveName("js");
 	msg.RemoveName("cookies");
 	msg.RemoveName("popups");
+	msg.RemoveName("zoom");
+	msg.RemoveName("forceDesktop");
 	msg.AddBool("js", js);
 	msg.AddBool("cookies", cookies);
 	msg.AddBool("popups", popups);
+	msg.AddFloat("zoom", zoom);
+	msg.AddBool("forceDesktop", forceDesktop);
 }
 
 void
@@ -225,11 +249,15 @@ PermissionsWindow::_LoadPermissions()
 				bool js = true;
 				bool cookies = true;
 				bool popups = false;
+				float zoom = 1.0;
+				bool forceDesktop = false;
 				domainMsg.FindBool("js", &js);
 				domainMsg.FindBool("cookies", &cookies);
 				domainMsg.FindBool("popups", &popups);
+				domainMsg.FindFloat("zoom", &zoom);
+				domainMsg.FindBool("forceDesktop", &forceDesktop);
 
-				PermissionItem* item = new PermissionItem(domain, js, cookies, popups);
+				PermissionItem* item = new PermissionItem(domain, js, cookies, popups, zoom, forceDesktop);
 				fDomainList->AddItem(item);
 			}
 		}
@@ -247,31 +275,22 @@ PermissionsWindow::_ClearPermissions()
 void
 PermissionsWindow::_SavePermissions()
 {
-	BPath path;
-	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
-		path.Append(kApplicationName);
-		path.Append("SitePermissions");
-		SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.Path());
-		settings.MakeEmpty();
+	for (int32 i = 0; i < fDomainList->CountItems(); i++) {
+		PermissionItem* item = dynamic_cast<PermissionItem*>(fDomainList->ItemAt(i));
+		if (!item) continue;
 
-		for (int32 i = 0; i < fDomainList->CountItems(); i++) {
-			PermissionItem* item = dynamic_cast<PermissionItem*>(fDomainList->ItemAt(i));
-			if (!item) continue;
+		SitePermissionsManager::PermissionEntry entry;
+		entry.domain = item->Text();
+		entry.js = item->JS();
+		entry.cookies = item->Cookies();
+		entry.popups = item->Popups();
+		entry.zoom = item->Zoom();
+		entry.forceDesktop = item->ForceDesktop();
 
-			BString domain = item->Text();
-			BMessage domainMsg;
-			domainMsg.AddString("name", domain);
-
-			SetDomainSettings(domainMsg,
-				item->JS(),
-				item->Cookies(),
-				item->Popups());
-
-			settings.AddMessage("domain", &domainMsg);
-		}
-		settings.Save();
-		SitePermissionsManager::Instance()->Reload();
+		SitePermissionsManager::Instance()->UpdatePermission(entry);
 	}
+	SitePermissionsManager::Instance()->Save();
+	// Reload not needed since we updated the manager directly
 }
 
 
@@ -285,6 +304,8 @@ PermissionsWindow::_UpdateFields()
 	fJSEnabled->SetEnabled(hasSelection);
 	fCookiesEnabled->SetEnabled(hasSelection);
 	fPopupsEnabled->SetEnabled(hasSelection);
+	fForceDesktopCheckBox->SetEnabled(hasSelection);
+	fZoomControl->SetEnabled(hasSelection);
 	fClearDataButton->SetEnabled(hasSelection);
 
 	if (hasSelection) {
@@ -293,6 +314,10 @@ PermissionsWindow::_UpdateFields()
 			fJSEnabled->SetValue(item->JS() ? B_CONTROL_ON : B_CONTROL_OFF);
 			fCookiesEnabled->SetValue(item->Cookies() ? B_CONTROL_ON : B_CONTROL_OFF);
 			fPopupsEnabled->SetValue(item->Popups() ? B_CONTROL_ON : B_CONTROL_OFF);
+			fForceDesktopCheckBox->SetValue(item->ForceDesktop() ? B_CONTROL_ON : B_CONTROL_OFF);
+			BString zoomStr;
+			zoomStr << item->Zoom();
+			fZoomControl->SetText(zoomStr.String());
 		}
 	}
 }

@@ -19,12 +19,25 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "SourceWindow.h"
+
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "Page Source Saver"
 
 void
 PageSourceSaver::HandlePageSourceResult(const BMessage* message)
 {
+	BString source;
+	if (message->FindString("source", &source) == B_OK) {
+		BString url;
+		message->FindString("url", &url);
+		BString title = "Source: ";
+		title << url;
+		SourceWindow* window = new SourceWindow(title.String(), source);
+		window->Show();
+		return;
+	}
+
 	BMessage* copy = new BMessage(*message);
 	thread_id thread = spawn_thread(_PageSourceThread, "Page Source Saver",
 		B_NORMAL_PRIORITY, copy);

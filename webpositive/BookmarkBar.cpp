@@ -13,6 +13,7 @@
 #include <Entry.h>
 #include <GroupLayout.h>
 #include <IconMenuItem.h>
+#include <MessageQueue.h>
 #include <MessageRunner.h>
 #include <Messenger.h>
 #include <PopUpMenu.h>
@@ -292,8 +293,20 @@ BookmarkBar::MessageReceived(BMessage* message)
 					ref.set_name(name);
 
 					BEntry entry(&ref);
-					if (entry.InitCheck() == B_OK)
-						_AddItem(inode, &entry);
+					if (entry.InitCheck() == B_OK) {
+						// Only relayout if this is the last message
+						_AddItem(inode, &entry, false);
+						BMessageQueue* queue = Window()->MessageQueue();
+						queue->Lock();
+						BMessage* next = queue->FindMessage(0);
+						bool more = (next != NULL && next->what == B_NODE_MONITOR);
+						queue->Unlock();
+
+						if (!more) {
+							BRect rect = Bounds();
+							FrameResized(rect.Width(), rect.Height());
+						}
+					}
 					break;
 				}
 				case B_ENTRY_MOVED:
@@ -310,7 +323,18 @@ BookmarkBar::MessageReceived(BMessage* message)
 					BEntry followedEntry(&ref, true); // traverse in case it's a symlink
 
 					if (fItemsMap[inode] == NULL) {
-						_AddItem(inode, &entry);
+						_AddItem(inode, &entry, false);
+
+						BMessageQueue* queue = Window()->MessageQueue();
+						queue->Lock();
+						BMessage* next = queue->FindMessage(0);
+						bool more = (next != NULL && next->what == B_NODE_MONITOR);
+						queue->Unlock();
+
+						if (!more) {
+							BRect rect = Bounds();
+							FrameResized(rect.Width(), rect.Height());
+						}
 						break;
 					} else {
 						// Existing item. Check if it's a rename or a move
@@ -344,8 +368,16 @@ BookmarkBar::MessageReceived(BMessage* message)
 					delete item;
 
 					// Reevaluate whether the "more" menu is still needed
-					BRect rect = Bounds();
-					FrameResized(rect.Width(), rect.Height());
+					BMessageQueue* queue = Window()->MessageQueue();
+					queue->Lock();
+					BMessage* next = queue->FindMessage(0);
+					bool more = (next != NULL && next->what == B_NODE_MONITOR);
+					queue->Unlock();
+
+					if (!more) {
+						BRect rect = Bounds();
+						FrameResized(rect.Width(), rect.Height());
+					}
 					break;
 				}
 			}
