@@ -1914,25 +1914,27 @@ void
 BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 {
 	// Ad-Block List
-	static const char* kBlockedDomains[] = {
-		"doubleclick.net",
-		"googlesyndication.com",
-		"google-analytics.com",
-		"adservice.google.com",
-		"facebook.net",
-		"connect.facebook.net",
-		NULL
-	};
+	if (fAppSettings->GetValue(kSettingsKeyBlockAds, false)) {
+		static const char* kBlockedDomains[] = {
+			"doubleclick.net",
+			"googlesyndication.com",
+			"google-analytics.com",
+			"adservice.google.com",
+			"facebook.net",
+			"connect.facebook.net",
+			NULL
+		};
 
-	BUrl checkUrl(url);
-	if (checkUrl.IsValid()) {
-		BString host = checkUrl.Host();
-		for (int i = 0; kBlockedDomains[i]; i++) {
-			// Check if host matches exactly or ends with .domain
-			if (host == kBlockedDomains[i] || host.EndsWith(BString(".") << kBlockedDomains[i])) {
-				if (view)
-					view->LoadURL("about:blank");
-				return;
+		BUrl checkUrl(url);
+		if (checkUrl.IsValid()) {
+			BString host = checkUrl.Host();
+			for (int i = 0; kBlockedDomains[i]; i++) {
+				// Check if host matches exactly or ends with .domain
+				if (host == kBlockedDomains[i] || host.EndsWith(BString(".") << kBlockedDomains[i])) {
+					if (view)
+						view->LoadURL("about:blank");
+					return;
+				}
 			}
 		}
 	}
