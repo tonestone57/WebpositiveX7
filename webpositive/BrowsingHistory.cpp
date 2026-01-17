@@ -188,7 +188,7 @@ BrowsingHistory::BrowsingHistory()
 	:
 	BHandler("browsing history"),
 	BLocker("browsing history"),
-	fHistoryItems(64),
+	fCacheIsDirty(true),
 	fMaxHistoryItemAge(7),
 	fSettingsLoaded(false),
 	fSaveRunner(NULL),
@@ -238,7 +238,7 @@ BrowsingHistory::BrowsingHistory::CountItems() const
 {
 	BAutolock _(const_cast<BrowsingHistory*>(this));
 
-	return fHistoryItems.CountItems();
+	return fHistorySet.size();
 }
 
 
@@ -246,8 +246,8 @@ const BrowsingHistoryItem*
 BrowsingHistory::HistoryItemAt(int32 index) const
 {
 	BAutolock _(const_cast<BrowsingHistory*>(this));
-
-	return reinterpret_cast<BrowsingHistoryItem*>(fHistoryItems.ItemAt(index));
+	_UpdateCache();
+	return fHistoryItemsCache[index];
 }
 
 
@@ -302,14 +302,13 @@ BrowsingHistory::MaxHistoryItemAge() const
 void
 BrowsingHistory::_Clear()
 {
-	int32 count = CountItems();
-	for (int32 i = 0; i < count; i++) {
-		BrowsingHistoryItem* item = reinterpret_cast<BrowsingHistoryItem*>(
-			fHistoryItems.ItemAtFast(i));
-		delete item;
+	for (HistorySet::iterator it = fHistorySet.begin();
+		it != fHistorySet.end(); ++it) {
+		delete *it;
 	}
-	fHistoryItems.MakeEmpty();
+	fHistorySet.clear();
 	fHistoryMap.clear();
+	fCacheIsDirty = true;
 	fGeneration++;
 }
 
@@ -321,84 +320,24 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 		= fHistoryMap.find(item.URL());
 	if (it != fHistoryMap.end()) {
 		if (!internal) {
-			// Find and remove old item using binary search
-			int32 count = fHistoryItems.CountItems();
-			int32 low = 0;
-			int32 high = count - 1;
-			int32 index = -1;
-			while (low <= high) {
-				int32 mid = low + (high - low) / 2;
-				const BrowsingHistoryItem* midItem
-					= (const BrowsingHistoryItem*)fHistoryItems.ItemAtFast(mid);
-				if (it->second == midItem) {
-					index = mid;
-					break;
-				}
-				if (*it->second < *midItem) {
-					high = mid - 1;
-				} else {
-					low = mid + 1;
-				}
-			}
-
-			if (index >= 0)
-				fHistoryItems.RemoveItem(index);
-			else
-				fHistoryItems.RemoveItem(it->second);
-
+			fHistorySet.erase(it->second);
 			it->second->Invoked();
-
-			// Re-insert sorted
-			count = fHistoryItems.CountItems();
-			int32 insertionIndex = count;
-			low = 0;
-			high = count - 1;
-			while (low <= high) {
-				int32 mid = low + (high - low) / 2;
-				const BrowsingHistoryItem* midItem
-					= (const BrowsingHistoryItem*)fHistoryItems.ItemAtFast(mid);
-				if (*it->second < *midItem) {
-					insertionIndex = mid;
-					high = mid - 1;
-				} else {
-					low = mid + 1;
-				}
-			}
-			fHistoryItems.AddItem(it->second, insertionIndex);
-
+			fHistorySet.insert(it->second);
+			fCacheIsDirty = true;
 			_ScheduleSave();
 		}
 		return true;
 	}
 
-	int32 count = CountItems();
-	int32 insertionIndex = count;
-
-	// Binary search for insertion index (O(log N))
-	int32 low = 0;
-	int32 high = count - 1;
-	while (low <= high) {
-		int32 mid = low + (high - low) / 2;
-		const BrowsingHistoryItem* midItem
-			= (const BrowsingHistoryItem*)fHistoryItems.ItemAtFast(mid);
-
-		if (item < *midItem) {
-			insertionIndex = mid;
-			high = mid - 1;
-		} else {
-			low = mid + 1;
-		}
-	}
 	BrowsingHistoryItem* newItem = new(std::nothrow) BrowsingHistoryItem(item);
-	if (!newItem || !fHistoryItems.AddItem(newItem, insertionIndex)) {
-		delete newItem;
+	if (!newItem)
 		return false;
-	}
 
 	try {
+		fHistorySet.insert(newItem);
 		fHistoryMap[newItem->URL()] = newItem;
 	} catch (...) {
-		fHistoryItems.RemoveItem(newItem);
+		fHistorySet.erase(newItem);
 		delete newItem;
 		return false;
 	}
@@ -408,6 +347,7 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 		_ScheduleSave();
 	}
 
+	fCacheIsDirty = true;
 	fGeneration++;
 
 	return true;
@@ -423,35 +363,11 @@ BrowsingHistory::_RemoveUrl(const BString& url)
 		return false;
 
 	BrowsingHistoryItem* item = it->second;
-	// Binary search for index
-	int32 index = -1;
-	int32 low = 0;
-	int32 high = fHistoryItems.CountItems() - 1;
-	while (low <= high) {
-		int32 mid = low + (high - low) / 2;
-		const BrowsingHistoryItem* midItem
-			= (const BrowsingHistoryItem*)fHistoryItems.ItemAtFast(mid);
-
-		if (midItem == item) {
-			index = mid;
-			break;
-		}
-
-		if (*item < *midItem) {
-			high = mid - 1;
-		} else {
-			low = mid + 1;
-		}
-	}
-
-	if (index >= 0)
-		fHistoryItems.RemoveItem(index);
-	else
-		fHistoryItems.RemoveItem(item);
-
+	fHistorySet.erase(item);
 	fHistoryMap.erase(it);
 	delete item;
 
+	fCacheIsDirty = true;
 	_ScheduleSave();
 	fGeneration++;
 
@@ -498,9 +414,9 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 		BMessage settingsArchive;
 		settingsArchive.AddInt32("max history item age", fMaxHistoryItemAge);
 		BMessage historyItemArchive;
-		int32 count = CountItems();
-		for (int32 i = 0; i < count; i++) {
-			const BrowsingHistoryItem* item = HistoryItemAt(i);
+		for (HistorySet::const_iterator it = fHistorySet.begin();
+			it != fHistorySet.end(); ++it) {
+			const BrowsingHistoryItem* item = *it;
 			if (!item || item->Archive(&historyItemArchive) != B_OK)
 				break;
 			if (settingsArchive.AddMessage("history item",
@@ -521,12 +437,12 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 		return;
 
 	context->maxAge = fMaxHistoryItemAge;
-	int32 count = CountItems();
 
 	try {
-		context->items.reserve(count);
-		for (int32 i = 0; i < count; i++) {
-			const BrowsingHistoryItem* item = HistoryItemAt(i);
+		context->items.reserve(fHistorySet.size());
+		for (HistorySet::const_iterator it = fHistorySet.begin();
+			it != fHistorySet.end(); ++it) {
+			const BrowsingHistoryItem* item = *it;
 			if (item)
 				context->items.push_back(*item);
 		}
@@ -577,6 +493,17 @@ BrowsingHistory::_SaveHistoryThread(void* cookie)
 
 
 void
+BrowsingHistory::_UpdateCache() const
+{
+	if (!fCacheIsDirty)
+		return;
+
+	fHistoryItemsCache.assign(fHistorySet.begin(), fHistorySet.end());
+	fCacheIsDirty = false;
+}
+
+
+void
 BrowsingHistory::_ScheduleSave()
 {
 	if (fSaveRunner)
@@ -602,4 +529,3 @@ BrowsingHistory::_OpenSettingsFile(BFile& file, uint32 mode)
 	}
 	return file.SetTo(path.Path(), mode) == B_OK;
 }
-
