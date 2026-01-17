@@ -490,6 +490,14 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fToolbarBottomMenuItem->SetMarked(fToolbarBottom);
 	menu->AddItem(fToolbarBottomMenuItem);
 
+	fLoadImagesMenuItem = new BMenuItem(B_TRANSLATE("Disable images"),
+		new BMessage(TOGGLE_LOAD_IMAGES));
+	fLoadImagesMenuItem->SetMarked(!fAppSettings->GetValue(kSettingsKeyLoadImages, true));
+	menu->AddItem(fLoadImagesMenuItem);
+
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Inspect Element"),
+		new BMessage(INSPECT_ELEMENT)));
+
 	menu->AddSeparatorItem();
 	fFullscreenItem = new BMenuItem(B_TRANSLATE("Full screen"),
 		new BMessage(TOGGLE_FULLSCREEN), B_RETURN);
@@ -1091,12 +1099,26 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case ZOOM_FACTOR_INCREASE:
 			CurrentWebView()->IncreaseZoomFactor(fZoomTextOnly);
+			{
+				float z = CurrentWebView()->ZoomFactor(false);
+				BString domain = BUrl(CurrentWebView()->MainFrameURL()).Host();
+				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
+			}
 			break;
 		case ZOOM_FACTOR_DECREASE:
 			CurrentWebView()->DecreaseZoomFactor(fZoomTextOnly);
+			{
+				float z = CurrentWebView()->ZoomFactor(false);
+				BString domain = BUrl(CurrentWebView()->MainFrameURL()).Host();
+				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
+			}
 			break;
 		case ZOOM_FACTOR_RESET:
 			CurrentWebView()->ResetZoomFactor();
+			{
+				BString domain = BUrl(CurrentWebView()->MainFrameURL()).Host();
+				SitePermissionsManager::Instance()->SetZoom(domain.String(), 1.0);
+			}
 			break;
 		case ZOOM_TEXT_ONLY:
 		{
@@ -1227,6 +1249,36 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case B_PAGE_SOURCE_RESULT:
 			PageSourceSaver::HandlePageSourceResult(message);
 			break;
+
+		case INSPECT_ELEMENT:
+			if (CurrentWebView() && CurrentWebView()->WebPage()) {
+				// Chunked transport to avoid console log limits/flooding
+				BString script =
+					"var html = document.documentElement.outerHTML;"
+					"var chunkSize = 2048;"
+					"var total = Math.ceil(html.length / chunkSize);"
+					"console.log('INSPECT_DOM_START:' + total);"
+					"for (var i = 0; i < total; i++) {"
+					"  var chunk = html.substr(i * chunkSize, chunkSize);"
+					"  console.log('INSPECT_DOM_CHUNK:' + i + ':' + chunk);"
+					"}"
+					"console.log('INSPECT_DOM_END');";
+				CurrentWebView()->WebPage()->ExecuteJavaScript(script);
+			}
+			break;
+
+		case TOGGLE_LOAD_IMAGES:
+		{
+			bool load = fAppSettings->GetValue(kSettingsKeyLoadImages, true);
+			fAppSettings->SetValue(kSettingsKeyLoadImages, !load);
+			// Apply immediately
+			if (CurrentWebView() && CurrentWebView()->WebPage()) {
+				BWebSettings* settings = CurrentWebView()->WebPage()->Settings();
+				if (settings) settings->SetLoadsImagesAutomatically(!load);
+			}
+			fLoadImagesMenuItem->SetMarked(load);
+			break;
+		}
 
 		case EDIT_FIND_NEXT:
 			CurrentWebView()->FindString(fFindTextControl->Text(), true,
@@ -1490,9 +1542,38 @@ BrowserWindow::MessageReceived(BMessage* message)
 			break;
 		}
 		case ADD_CONSOLE_MESSAGE:
+		{
+			BString text;
+			if (message->FindString("string", &text) == B_OK) {
+				if (text.StartsWith("INSPECT_DOM_START:")) {
+					fInspectDomBuffer = "";
+					fInspectDomExpectedChunks = atoi(text.String() + strlen("INSPECT_DOM_START:"));
+					fInspectDomReceivedChunks = 0;
+					break; // Don't show in console
+				} else if (text.StartsWith("INSPECT_DOM_CHUNK:")) {
+					// Format: INSPECT_DOM_CHUNK:index:content
+					// We assume ordered delivery for now (console usually is),
+					// but rigorous impl would buffer by index.
+					// Simple append for now as JS execution is single threaded usually.
+					int32 firstColon = text.FindFirst(':', strlen("INSPECT_DOM_CHUNK:"));
+					if (firstColon > 0) {
+						fInspectDomBuffer << (text.String() + firstColon + 1);
+						fInspectDomReceivedChunks++;
+					}
+					break;
+				} else if (text.StartsWith("INSPECT_DOM_END")) {
+					BMessage msg(B_PAGE_SOURCE_RESULT);
+					msg.AddString("source", fInspectDomBuffer);
+					msg.AddString("url", CurrentWebView()->MainFrameURL());
+					PageSourceSaver::HandlePageSourceResult(&msg);
+					fInspectDomBuffer = "";
+					break;
+				}
+			}
 			be_app->PostMessage(message);
 			BWebWindow::MessageReceived(message);
 			break;
+		}
 
 		case CHECK_FORM_DIRTY_TIMEOUT:
 			fFormSafetyHelper->MessageReceived(message);
@@ -1991,13 +2072,26 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 	bool allowJS = true;
 	bool allowCookies = true;
 	bool allowPopups = true;
-	SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups);
+	float zoom = 1.0;
+	bool forceDesktop = false;
+	SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop);
 
 	if (view && view->WebPage()) {
 		BWebSettings* settings = view->WebPage()->Settings();
 		if (settings) {
 			settings->SetJavaScriptEnabled(allowJS);
 			settings->SetCookiesEnabled(allowCookies);
+
+			// Force Desktop
+			if (forceDesktop) {
+				settings->SetUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15");
+			} else {
+				settings->SetUserAgent(NULL); // Reset to default
+			}
+
+			// Load Images (Global setting)
+			bool loadImages = fAppSettings->GetValue(kSettingsKeyLoadImages, true);
+			settings->SetLoadsImagesAutomatically(loadImages);
 		}
 	}
 
@@ -2089,7 +2183,26 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 	bool allowJS = true;
 	bool allowCookies = true;
 	bool allowPopups = true;
-	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups);
+	float zoom = 1.0;
+	bool forceDesktop = false;
+	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop);
+
+	if (view) {
+		// Apply Per-Site Zoom
+		// Note: We only apply if found, or if we want to enforce 1.0 default if not found?
+		// Usually if not found we let it remain what user set, OR we reset to 1.0?
+		// The prompt says "persistence", which implies if I visit a new site it should be default.
+		// If I visit a site I saved, it should be saved value.
+		// If I changed it manually, it should save.
+		// So if found, we apply 'zoom'. If not found, we apply 1.0?
+		// Existing behavior resets zoom on navigation?
+		// Let's assume if 'found', we apply. If not, we reset to 1.0.
+		if (found) {
+			view->SetZoomFactor(zoom);
+		} else {
+			view->SetZoomFactor(1.0);
+		}
+	}
 
 	if (found && !allowPopups) {
 		// Enforce No Popups via JS

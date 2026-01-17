@@ -14,19 +14,25 @@ class SitePermissionsManager {
 public:
 	static SitePermissionsManager* Instance();
 
-	bool CheckPermission(const char* url, bool& allowJS, bool& allowCookies, bool& allowPopups);
+	bool CheckPermission(const char* url, bool& allowJS, bool& allowCookies, bool& allowPopups, float& zoom, bool& forceDesktop);
 	void Reload();
-
-private:
-	SitePermissionsManager();
-	~SitePermissionsManager();
+	void SetZoom(const char* domain, float zoom);
 
 	struct PermissionEntry {
 		BString domain;
 		bool js;
 		bool cookies;
 		bool popups;
+		float zoom;
+		bool forceDesktop;
 	};
+
+	void UpdatePermission(const PermissionEntry& entry);
+	void Save();
+
+private:
+	SitePermissionsManager();
+	~SitePermissionsManager();
 
 	std::vector<PermissionEntry> fPermissions;
 	BLocker fLock;

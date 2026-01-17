@@ -314,7 +314,12 @@ private:
 			BMenuItem*			fReaderModeMenuItem;
 			bool				fToolbarBottom;
 			BMenuItem*			fToolbarBottomMenuItem;
+	BMenuItem*			fLoadImagesMenuItem;
 			bool				fIsLoading;
+
+	BString				fInspectDomBuffer;
+	int32				fInspectDomExpectedChunks;
+	int32				fInspectDomReceivedChunks;
 
 			class TabSearchWindow* fTabSearchWindow;
 
