@@ -1159,14 +1159,17 @@ BrowserWindow::MessageReceived(BMessage* message)
 			CurrentWebView()->ResetZoomFactor();
 			break;
 		case ZOOM_TEXT_ONLY:
+		{
 			fZoomTextOnly = !fZoomTextOnly;
 			fZoomTextOnlyMenuItem->SetMarked(fZoomTextOnly);
-			if (CurrentWebView() != NULL) {
-				float zoomFactor = CurrentWebView()->ZoomFactor(!fZoomTextOnly);
-				CurrentWebView()->SetZoomFactor(1.0, !fZoomTextOnly);
-				CurrentWebView()->SetZoomFactor(zoomFactor, fZoomTextOnly);
+			BWebView* webView = CurrentWebView();
+			if (webView != NULL) {
+				float zoomFactor = webView->ZoomFactor(!fZoomTextOnly);
+				webView->SetZoomFactor(1.0, !fZoomTextOnly);
+				webView->SetZoomFactor(zoomFactor, fZoomTextOnly);
 			}
 			break;
+		}
 
 		case TOGGLE_FULLSCREEN:
 			ToggleFullscreen();
