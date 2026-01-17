@@ -328,7 +328,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fToolbarBottom(false),
 	fIsLoading(false),
 	fTabSearchWindow(NULL),
-	fLastHistoryGeneration(0)
+	fLastHistoryGeneration(0),
+	fPermissionsWindow(NULL)
 {
 	fFormSafetyHelper = new FormSafetyHelper(this);
 
@@ -748,6 +749,10 @@ BrowserWindow::~BrowserWindow()
 	delete fPulseRunner;
 	delete fSavePanel;
 	delete fFormSafetyHelper;
+	if (fPermissionsWindow) {
+		fPermissionsWindow->PrepareToQuit();
+		fPermissionsWindow->Quit();
+	}
 }
 
 
@@ -1296,10 +1301,16 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case SHOW_PERMISSIONS_WINDOW:
 		{
-			// Open non-modal window. In a real app we'd track the instance to avoid duplicates.
-			PermissionsWindow* window = new PermissionsWindow(BRect(100, 100, 400, 400),
-				fContext->GetCookieJar());
-			window->Show();
+			if (fPermissionsWindow) {
+				if (fPermissionsWindow->IsHidden())
+					fPermissionsWindow->Show();
+				else
+					fPermissionsWindow->Activate();
+			} else {
+				fPermissionsWindow = new PermissionsWindow(BRect(100, 100, 400, 400),
+					fContext->GetCookieJar());
+				fPermissionsWindow->Show();
+			}
 			break;
 		}
 

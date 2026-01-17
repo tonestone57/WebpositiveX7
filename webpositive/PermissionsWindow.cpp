@@ -54,7 +54,8 @@ PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCoo
 	:
 	BWindow(frame, "Site Permissions", B_TITLED_WINDOW,
 		B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS),
-	fCookieJar(jar)
+	fCookieJar(jar),
+	fQuitting(false)
 {
 	SetLayout(new BGroupLayout(B_VERTICAL));
 
@@ -92,7 +93,6 @@ PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCoo
 		.SetInsets(10)
 	);
 
-	_LoadPermissions();
 	CenterOnScreen();
 }
 
@@ -169,7 +169,29 @@ PermissionsWindow::MessageReceived(BMessage* message)
 bool
 PermissionsWindow::QuitRequested()
 {
-	return true;
+	if (fQuitting)
+		return true;
+
+	if (!IsHidden()) {
+		_ClearPermissions();
+		Hide();
+	}
+	return false;
+}
+
+
+void
+PermissionsWindow::PrepareToQuit()
+{
+	fQuitting = true;
+}
+
+
+void
+PermissionsWindow::Show()
+{
+	_LoadPermissions();
+	BWindow::Show();
 }
 
 
@@ -212,6 +234,13 @@ PermissionsWindow::_LoadPermissions()
 			}
 		}
 	}
+}
+
+
+void
+PermissionsWindow::_ClearPermissions()
+{
+	fDomainList->MakeEmpty();
 }
 
 
