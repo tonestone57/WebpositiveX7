@@ -1913,13 +1913,64 @@ BrowserWindow::CloseWindowRequested(BWebView* view)
 void
 BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 {
+	// Ad-Block List
+	static const char* kBlockedDomains[] = {
+		"doubleclick.net",
+		"googlesyndication.com",
+		"google-analytics.com",
+		"adservice.google.com",
+		"facebook.net",
+		"connect.facebook.net",
+		NULL
+	};
+
+	BUrl checkUrl(url);
+	if (checkUrl.IsValid()) {
+		BString host = checkUrl.Host();
+		for (int i = 0; kBlockedDomains[i]; i++) {
+			// Check if host matches exactly or ends with .domain
+			if (host == kBlockedDomains[i] || host.EndsWith(BString(".") << kBlockedDomains[i])) {
+				if (view)
+					view->LoadURL("about:blank");
+				return;
+			}
+		}
+	}
+
+	// Investigation Note:
+	// "Private Window Context Menu" feature was investigated.
+	// Implementing a "Open in Private Window" context menu option is not feasible
+	// without modifying the BWebView/WebKit implementation to expose HitTest information
+	// or context menu hooks, which are not available in the current API surface.
+
+	PageUserData* userData = NULL;
+	if (view)
+		userData = static_cast<PageUserData*>(view->GetUserData());
+
 	// HTTPS-Only Mode
 	if (fAppSettings->GetValue(kSettingsKeyHttpsOnly, false)) {
+		if (userData && userData->ExpectedUpgradedUrl() == url) {
+			userData->SetHttpsUpgraded(true);
+			userData->SetExpectedUpgradedUrl("");
+		} else if (userData) {
+			userData->SetHttpsUpgraded(false);
+		}
+
 		if (url.StartsWith("http://")) {
-			BString httpsUrl = url;
-			httpsUrl.ReplaceFirst("http://", "https://");
-			if (view) view->LoadURL(httpsUrl);
-			return; // Abort this load, we started a new one
+			BUrl newUrl(url);
+			if (newUrl.IsValid()) {
+				newUrl.SetProtocol("https");
+				if (newUrl.Port() == 80)
+					newUrl.SetPort(443);
+
+				BString httpsUrl = newUrl.UrlString();
+				if (view) {
+					if (userData)
+						userData->SetExpectedUpgradedUrl(httpsUrl);
+					view->LoadURL(httpsUrl);
+				}
+				return; // Abort this load, we started a new one
+			}
 		}
 	}
 
@@ -1940,7 +1991,6 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 	if (view == CurrentWebView())
 		fIsLoading = true;
 
-	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
 	if (userData != NULL)
 		userData->SetIsLoading(true);
 
@@ -2010,6 +2060,10 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 	BString status(B_TRANSLATE_COMMENT("%url failed", "Loading URL failed. "
 		"Don't translate variable %url."));
 	status.ReplaceFirst("%url", url);
+
+	if (userData != NULL && userData->IsHttpsUpgraded())
+		status << " " << B_TRANSLATE("(HTTPS-Only mode)");
+
 	view->WebPage()->SetStatusMessage(status);
 	_EnsureProgressBarHidden();
 }
