@@ -8,6 +8,7 @@ typedef int64_t int64;
 typedef uint64_t uint64;
 typedef int32_t status_t;
 typedef int64_t bigtime_t;
+typedef uint32_t type_code;
 #define B_OK 0
 #define B_ERROR -1
 #define B_BAD_VALUE -2

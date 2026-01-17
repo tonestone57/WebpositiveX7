@@ -31,7 +31,9 @@ public:
 		fURLInputSelectionEnd(-1),
 		fIsLoading(false),
 		fIsDownloadRestart(false),
-		fHttpsUpgraded(false)
+		fHttpsUpgraded(false),
+		fIsLazy(false),
+		fIsDiscarded(false)
 	{
 	}
 
@@ -162,6 +164,36 @@ public:
 		return fHttpsUpgraded;
 	}
 
+	void SetPendingURL(const BString& url)
+	{
+		fPendingURL = url;
+	}
+
+	const BString& PendingURL() const
+	{
+		return fPendingURL;
+	}
+
+	void SetIsLazy(bool lazy)
+	{
+		fIsLazy = lazy;
+	}
+
+	bool IsLazy() const
+	{
+		return fIsLazy;
+	}
+
+	void SetIsDiscarded(bool discarded)
+	{
+		fIsDiscarded = discarded;
+	}
+
+	bool IsDiscarded() const
+	{
+		return fIsDiscarded;
+	}
+
 private:
 	BView*		fFocusedView;
 	BBitmap*	fPageIcon;
@@ -173,6 +205,9 @@ private:
 	bool		fIsDownloadRestart;
 	BString		fExpectedUpgradedUrl;
 	bool		fHttpsUpgraded;
+	BString		fPendingURL;
+	bool		fIsLazy;
+	bool		fIsDiscarded;
 };
 
 

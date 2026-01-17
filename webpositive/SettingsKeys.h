@@ -44,6 +44,7 @@ extern const char* kSettingsShowBookmarkBar;
 
 extern const char* kSettingsKeyHttpsOnly;
 extern const char* kSettingsKeyBlockAds;
+extern const char* kSettingsKeyLowRAMMode;
 
 struct SearchEngine {
 	const char* name;

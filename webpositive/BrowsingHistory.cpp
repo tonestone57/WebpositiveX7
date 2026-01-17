@@ -153,6 +153,48 @@ BrowsingHistoryItem::Invoked()
 }
 
 
+/*static*/ status_t
+BrowsingHistory::ExportHistory(const BPath& path)
+{
+	BAutolock lock(DefaultInstance());
+	if (!lock.IsLocked())
+		return B_ERROR;
+
+	BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+	status_t status = file.InitCheck();
+	if (status != B_OK)
+		return status;
+
+	BString header = "URL,Date,Count\n";
+	file.Write(header.String(), header.Length());
+
+	for (int32 i = 0; i < DefaultInstance()->CountItems(); i++) {
+		const BrowsingHistoryItem* item = DefaultInstance()->HistoryItemAt(i);
+		if (item) {
+			BString line;
+			BString url = item->URL();
+			if (url.FindFirst(',') >= 0 || url.FindFirst('"') >= 0) {
+				url.ReplaceAll("\"", "\"\"");
+				line << "\"" << url << "\",";
+			} else {
+				line << url << ",";
+			}
+
+			// Format date
+			char dateStr[64];
+			time_t t = item->DateTime().Time_t();
+			strftime(dateStr, sizeof(dateStr), "%Y-%m-%d %H:%M:%S", localtime(&t));
+
+			line << dateStr << ",";
+			line << item->InvokationCount() << "\n";
+
+			file.Write(line.String(), line.Length());
+		}
+	}
+	return B_OK;
+}
+
+
 // #pragma mark - BrowsingHistory
 
 

@@ -117,7 +117,14 @@ enum {
 	PIN_TAB							= 'ptab',
 	UNPIN_TAB						= 'uptb',
 	CLOSE_TAB						= 'cltb',
-	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb'
+	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb',
+
+	EXPORT_BOOKMARKS							= 'exbm',
+	IMPORT_BOOKMARKS							= 'imbm',
+	EXPORT_HISTORY								= 'exhi',
+	SYNC_EXPORT									= 'syex',
+	SYNC_IMPORT									= 'syim'
+	CHECK_MEMORY_PRESSURE			= 'cmem'
 };
 
 
@@ -149,7 +156,7 @@ public:
 
 			bool				IsBlankTab() const;
 			void				CreateNewTab(const BString& url, bool select,
-									BWebView* webView = 0);
+									BWebView* webView = 0, bool lazy = false);
 			void				RestartDownload(const BString& url);
 
 			BRect				WindowFrame() const;
@@ -233,6 +240,9 @@ private:
 			void				_ReopenClosedTab();
 			void				_UpdateRecentlyClosedMenu();
 
+			void				_CheckMemoryPressure();
+			void				_DiscardBackgroundTabs();
+
 private:
 			struct ClosedTabInfo {
 				BString url;
@@ -315,12 +325,15 @@ private:
 			bool				fToolbarBottom;
 			BMenuItem*			fToolbarBottomMenuItem;
 			bool				fIsLoading;
+			bool				fLowRAMMode;
 
 			class TabSearchWindow* fTabSearchWindow;
 
 			FormSafetyHelper*	fFormSafetyHelper;
 
 			PermissionsWindow*	fPermissionsWindow;
+
+			BMessageRunner*		fMemoryPressureRunner;
 };
 
 
