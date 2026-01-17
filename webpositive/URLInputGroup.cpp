@@ -610,6 +610,15 @@ URLInputGroup::URLInputGroup(BMessage* goMessage)
 	fIconView = new PageIconView();
 	GroupLayout()->AddView(fIconView, 0.0f);
 
+	// Permissions Button (Shield)
+	// We use SHOW_PERMISSIONS_WINDOW message defined in BrowserWindow.h
+	// URLInputGroup.cpp already includes BrowserWindow.h
+	fPermissionsButton = new BButton(NULL, NULL, new BMessage(SHOW_PERMISSIONS_WINDOW));
+	fPermissionsButton->SetLabel("Site");
+	fPermissionsButton->SetToolTip("Site Permissions");
+	fPermissionsButton->SetExplicitMinSize(BSize(20, 20));
+	GroupLayout()->AddView(fPermissionsButton, 0.0f);
+
 	fTextView = new URLTextView(this);
 	AddChild(fTextView);
 

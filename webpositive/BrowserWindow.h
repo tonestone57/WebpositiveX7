@@ -111,7 +111,11 @@ enum {
 	CHECK_FORM_DIRTY_TIMEOUT		= 'cfdt',
 	RESTART_DOWNLOAD_IN_WINDOW		= 'rdwn',
 	TOGGLE_AUTO_HIDE_BOOKMARK_BAR	= 'tahb',
-	REOPEN_CLOSED_TAB_WITH_INDEX	= 'rcti'
+	REOPEN_CLOSED_TAB_WITH_INDEX	= 'rcti',
+	RELOAD							= 'reld',
+	PIN_TAB							= 'ptab',
+	UNPIN_TAB						= 'uptb',
+	CLOSE_TAB						= 'cltb'
 };
 
 

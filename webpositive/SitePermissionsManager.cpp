@@ -71,23 +71,22 @@ SitePermissionsManager::Reload()
 
 
 bool
-SitePermissionsManager::CheckPermission(const char* url, bool& allowPopups)
+SitePermissionsManager::CheckPermission(const char* url, bool& allowJS, bool& allowCookies, bool& allowPopups)
 {
 	BUrl bUrl(url);
 	BString host = bUrl.Host();
 	bool found = false;
-	allowPopups = true; // Default behavior if not found?
-	// In BrowserWindow logic:
-	// bool allowPopups = true;
-	// ... if found ... if (domainMsg.FindBool("popups", &popups) == B_OK) allowPopups = popups; else allowPopups = false;
-	// if (found && !allowPopups) -> Block
+	allowJS = true;
+	allowCookies = true;
+	allowPopups = true;
 
 	BAutolock lock(fLock);
 	for (size_t i = 0; i < fPermissions.size(); i++) {
 		const PermissionEntry& entry = fPermissions[i];
-		// Existing logic: host.IFindFirst(name) >= 0
 		if (host.IFindFirst(entry.domain) >= 0) {
 			found = true;
+			allowJS = entry.js;
+			allowCookies = entry.cookies;
 			allowPopups = entry.popups;
 			break;
 		}

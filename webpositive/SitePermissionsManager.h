@@ -14,7 +14,7 @@ class SitePermissionsManager {
 public:
 	static SitePermissionsManager* Instance();
 
-	bool CheckPermission(const char* url, bool& allowPopups);
+	bool CheckPermission(const char* url, bool& allowJS, bool& allowCookies, bool& allowPopups);
 	void Reload();
 
 private:

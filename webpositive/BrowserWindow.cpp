@@ -92,6 +92,7 @@
 #include "TabSearchWindow.h"
 #include "URLInputGroup.h"
 #include "WebPage.h"
+#include "WebSettings.h"
 #include "WebView.h"
 #include "WebViewConstants.h"
 #include "WindowIcon.h"
@@ -109,8 +110,6 @@ enum {
 	STOP										= 'stop',
 	HOME										= 'home',
 	GOTO_URL									= 'goul',
-	RELOAD										= 'reld',
-	SHOW_HIDE_BOOKMARK_BAR						= 'shbb',
 	CLEAR_HISTORY								= 'clhs',
 
 	CREATE_BOOKMARK								= 'crbm',
@@ -139,10 +138,7 @@ enum {
 	REOPEN_CLOSED_TAB							= 'roct',
 	COPY_AS_MARKDOWN							= 'cpmd',
 	COPY_AS_HTML								= 'cpht',
-	COPY_AS_PLAIN_TEXT							= 'cppt',
-
-	PIN_TAB										= 'ptab',
-	UNPIN_TAB									= 'uptb',
+	COPY_AS_PLAIN_TEXT							= 'cppt'
 };
 
 
@@ -857,8 +853,18 @@ BrowserWindow::MessageReceived(BMessage* message)
 			break;
 
 		case RELOAD:
-			CurrentWebView()->Reload();
+		{
+			BWebView* webView = NULL;
+			int32 tabIndex = -1;
+			if (message->FindInt32("tab index", &tabIndex) == B_OK)
+				webView = dynamic_cast<BWebView*>(fTabManager->ViewForTab(tabIndex));
+			else
+				webView = CurrentWebView();
+
+			if (webView)
+				webView->Reload();
 			break;
+		}
 
 		case SHOW_HIDE_BOOKMARK_BAR:
 			_ShowBookmarkBar(fBookmarkBar->IsHidden());
@@ -1329,9 +1335,15 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case PIN_TAB:
 		case UNPIN_TAB:
 		{
-			BWebView* currentWebView = CurrentWebView();
-			if (currentWebView) {
-				int32 tabIndex = fTabManager->TabForView(currentWebView);
+			BWebView* webView = NULL;
+			int32 tabIndex = -1;
+			if (message->FindInt32("tab index", &tabIndex) == B_OK)
+				webView = dynamic_cast<BWebView*>(fTabManager->ViewForTab(tabIndex));
+			else
+				webView = CurrentWebView();
+
+			if (webView) {
+				tabIndex = fTabManager->TabForView(webView);
 				if (tabIndex >= 0) {
 					TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
 					if (tab) {
@@ -1880,6 +1892,20 @@ BrowserWindow::CloseWindowRequested(BWebView* view)
 void
 BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 {
+	// Apply per-site permissions
+	bool allowJS = true;
+	bool allowCookies = true;
+	bool allowPopups = true;
+	SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups);
+
+	if (view && view->WebPage()) {
+		BWebSettings* settings = view->WebPage()->Settings();
+		if (settings) {
+			settings->SetJavaScriptEnabled(allowJS);
+			settings->SetCookiesEnabled(allowCookies);
+		}
+	}
+
 	if (view == CurrentWebView())
 		fIsLoading = true;
 
@@ -1961,9 +1987,11 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 void
 BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 {
-	// Apply per-site permissions
+	// Check permissions for popups and dark mode injection
+	bool allowJS = true;
+	bool allowCookies = true;
 	bool allowPopups = true;
-	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowPopups);
+	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups);
 
 	if (found && !allowPopups) {
 		// Enforce No Popups via JS
