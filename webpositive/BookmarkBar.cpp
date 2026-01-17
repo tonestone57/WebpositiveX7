@@ -503,6 +503,8 @@ BookmarkBar::FrameResized(float width, float height)
 	if (overflowMenuAttached)
 		count--;
 
+	allItems.reserve(count + fOverflowMenu->CountItems());
+
 	for (int32 k = 0; k < count; k++)
 		allItems.push_back(ItemAt(k));
 	for (int32 k = 0; k < fOverflowMenu->CountItems(); k++)
