@@ -220,6 +220,7 @@ private:
 			void				_CheckAutoHideInterface();
 			void				_ShowInterface(bool show);
 			void				_ShowProgressBar(bool);
+			void				_ForceHideProgressBar();
 			void				_InvokeButtonVisibly(BButton* button);
 
 			BString				_NewTabURL(bool isNewWindow) const;
