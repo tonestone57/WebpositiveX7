@@ -109,6 +109,7 @@ private:
 			BCheckBox*			fLoadImagesCheckBox;
 			BCheckBox*			fDisableCacheCheckBox;
 			BCheckBox*			fLowRAMModeCheckBox;
+			BCheckBox*			fEnableGPUCheckBox;
 
 			BButton*			fApplyButton;
 			BButton*			fCancelButton;

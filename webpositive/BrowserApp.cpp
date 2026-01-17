@@ -41,8 +41,10 @@
 #include <UrlContext.h>
 #include <debugger.h>
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <signal.h>
+#include <unistd.h>
 
 #include "BrowserWindow.h"
 #include "BrowsingHistory.h"
@@ -67,10 +69,34 @@ extern const char* kApplicationSignature = "application/x-vnd.Haiku-WebPositive"
 extern const char* kApplicationName = B_TRANSLATE_SYSTEM_NAME("WebPositive");
 static const uint32 PRELOAD_BROWSING_HISTORY = 'plbh';
 static const uint32 AUTO_SAVE_SESSION = 'assn';
+static char sCrashLogPath[B_PATH_NAME_LENGTH];
 
 
 void crash_handler(int sig)
 {
+	int fd = open(sCrashLogPath, O_WRONLY | O_CREAT | O_APPEND, 0644);
+	if (fd >= 0) {
+		const char* msg = "WebPositive Internal Crash: Signal Caught\n";
+		write(fd, msg, 42);
+		char sigNum[16];
+		// Simple integer to string conversion safe for signal handler
+		int len = 0;
+		int temp = sig;
+		if (temp == 0) sigNum[len++] = '0';
+		else {
+			char buffer[16];
+			int i = 0;
+			while (temp > 0) {
+				buffer[i++] = (temp % 10) + '0';
+				temp /= 10;
+			}
+			while (i > 0) sigNum[len++] = buffer[--i];
+		}
+		sigNum[len++] = '\n';
+		write(fd, "Signal: ", 8);
+		write(fd, sigNum, len);
+		close(fd);
+	}
 	debugger("WebPositive Internal Crash: Signal Caught");
 }
 
@@ -106,6 +132,15 @@ BrowserApp::BrowserApp()
 		exit(-1);
 	}
 #endif
+
+	// Setup crash log path
+	BPath desktopPath;
+	if (find_directory(B_DESKTOP_DIRECTORY, &desktopPath) == B_OK) {
+		snprintf(sCrashLogPath, sizeof(sCrashLogPath), "%s/WebPositive_Crash.log", desktopPath.Path());
+	} else {
+		// Fallback
+		strncpy(sCrashLogPath, "/boot/home/Desktop/WebPositive_Crash.log", sizeof(sCrashLogPath));
+	}
 
 	BString cookieStorePath = kApplicationName;
 	cookieStorePath << "/Cookies";
@@ -229,7 +264,10 @@ BrowserApp::ReadyToRun()
 	// Since we will essentially run the GUI...
 	set_thread_priority(Thread(), B_DISPLAY_PRIORITY);
 
-	BWebPage::SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
+	if (fSettings->GetValue(kSettingsKeyLowRAMMode, false))
+		BWebPage::SetCacheModel(B_WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
+	else
+		BWebPage::SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
 
 	BPath path;
 	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK

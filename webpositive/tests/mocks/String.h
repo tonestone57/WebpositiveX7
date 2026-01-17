@@ -28,6 +28,8 @@ public:
     bool EndsWith(const BString& str) const {
         if (str.Length() > Length()) return false;
         return fString.compare(Length() - str.Length(), str.Length(), str.fString) == 0;
+    }
+
     // Case insensitive find
     int32 IFindFirst(const char* str) const {
         // Just forward to normal find for mock
