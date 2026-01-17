@@ -321,7 +321,51 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 		= fHistoryMap.find(item.URL());
 	if (it != fHistoryMap.end()) {
 		if (!internal) {
+			// Find and remove old item using binary search
+			int32 count = fHistoryItems.CountItems();
+			int32 low = 0;
+			int32 high = count - 1;
+			int32 index = -1;
+			while (low <= high) {
+				int32 mid = low + (high - low) / 2;
+				const BrowsingHistoryItem* midItem
+					= (const BrowsingHistoryItem*)fHistoryItems.ItemAtFast(mid);
+				if (it->second == midItem) {
+					index = mid;
+					break;
+				}
+				if (*it->second < *midItem) {
+					high = mid - 1;
+				} else {
+					low = mid + 1;
+				}
+			}
+
+			if (index >= 0)
+				fHistoryItems.RemoveItem(index);
+			else
+				fHistoryItems.RemoveItem(it->second);
+
 			it->second->Invoked();
+
+			// Re-insert sorted
+			count = fHistoryItems.CountItems();
+			int32 insertionIndex = count;
+			low = 0;
+			high = count - 1;
+			while (low <= high) {
+				int32 mid = low + (high - low) / 2;
+				const BrowsingHistoryItem* midItem
+					= (const BrowsingHistoryItem*)fHistoryItems.ItemAtFast(mid);
+				if (*it->second < *midItem) {
+					insertionIndex = mid;
+					high = mid - 1;
+				} else {
+					low = mid + 1;
+				}
+			}
+			fHistoryItems.AddItem(it->second, insertionIndex);
+
 			_ScheduleSave();
 		}
 		return true;
@@ -379,7 +423,32 @@ BrowsingHistory::_RemoveUrl(const BString& url)
 		return false;
 
 	BrowsingHistoryItem* item = it->second;
-	fHistoryItems.RemoveItem(item);
+	// Binary search for index
+	int32 index = -1;
+	int32 low = 0;
+	int32 high = fHistoryItems.CountItems() - 1;
+	while (low <= high) {
+		int32 mid = low + (high - low) / 2;
+		const BrowsingHistoryItem* midItem
+			= (const BrowsingHistoryItem*)fHistoryItems.ItemAtFast(mid);
+
+		if (midItem == item) {
+			index = mid;
+			break;
+		}
+
+		if (*item < *midItem) {
+			high = mid - 1;
+		} else {
+			low = mid + 1;
+		}
+	}
+
+	if (index >= 0)
+		fHistoryItems.RemoveItem(index);
+	else
+		fHistoryItems.RemoveItem(item);
+
 	fHistoryMap.erase(it);
 	delete item;
 
