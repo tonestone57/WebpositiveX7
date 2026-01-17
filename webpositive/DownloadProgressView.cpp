@@ -736,8 +736,10 @@ DownloadProgressView::ShowContextMenu(BPoint screenWhere)
 		new BMessage(OPEN_CONTAINING_FOLDER));
 	contextMenu->AddItem(openFolder);
 
-	contextMenu->AddItem(new BMenuItem(B_TRANSLATE("Set MIME type..."),
-		new BMessage(SET_MIME_TYPE)));
+	if (BEntry(fPath.Path()).Exists()) {
+		contextMenu->AddItem(new BMenuItem(B_TRANSLATE("Set MIME type..."),
+			new BMessage(SET_MIME_TYPE)));
+	}
 
 	contextMenu->SetTargetForItems(this);
 	contextMenu->Go(screenWhere, true, true, true);
