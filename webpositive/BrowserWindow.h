@@ -101,7 +101,8 @@ enum {
 	TOGGLE_READER_MODE				= 'trdm',
 	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb',
 	SHOW_HIDE_BOOKMARK_BAR			= 'shbb',
-	TAB_SEARCH_WINDOW_QUIT			= 'tswq'
+	TAB_SEARCH_WINDOW_QUIT			= 'tswq',
+	CHECK_FORM_DIRTY_TIMEOUT		= 'cfdt'
 };
 
 
@@ -236,6 +237,8 @@ private:
 			void				_ReopenClosedTab();
 			void				_UpdateReopenClosedTabItem();
 
+			void				_CheckFormDirtyFinished();
+
 private:
 			struct ClosedTabInfo {
 				BString url;
@@ -315,6 +318,12 @@ private:
 			bool				fIsLoading;
 
 			class TabSearchWindow* fTabSearchWindow;
+
+			bool				fForceClose;
+			bool				fFormCheckPending;
+			int32				fTabsToCheck;
+			int32				fDirtyTabs;
+			BMessageRunner*		fFormCheckTimeoutRunner;
 };
 
 
