@@ -210,6 +210,14 @@ CookieWindow::QuitRequested()
 void
 CookieWindow::_BuildDomainList()
 {
+	// NOTE: This function is called every time the window is shown. Attempts to
+	// optimize this by caching the list and only rebuilding it when the cookie
+	// jar has changed have been unsuccessful. The BNetworkCookieJar API does not
+	// provide an efficient way to track changes. A simple cookie count is not
+	// enough, as it won't detect changes to existing cookies (e.g. value or
+	// expiration date). A more robust solution would require changes to the
+	// BNetworkCookieJar API itself.
+
 	// Empty the domain list (TODO should we do this when hiding instead?)
 	for (int i = fDomains->FullListCountItems() - 1; i >= 1; i--) {
 		delete fDomains->FullListItemAt(i);
