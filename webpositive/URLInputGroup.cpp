@@ -26,7 +26,6 @@
 #include <stdlib.h>
 
 #include "BaseURL.h"
-#include "BitmapButton.h"
 #include "BrowserWindow.h"
 #include "BrowsingHistory.h"
 #include "IconButton.h"
