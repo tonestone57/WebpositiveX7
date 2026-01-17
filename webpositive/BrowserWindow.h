@@ -32,6 +32,7 @@
 #include "WebWindow.h"
 
 #include <deque>
+#include <DateTime.h>
 #include <Messenger.h>
 #include <String.h>
 #include <UrlContext.h>
@@ -249,6 +250,9 @@ private:
 
 			BMenu*				fHistoryMenu;
 			int32				fHistoryMenuFixedItemCount;
+
+			uint32				fLastHistoryGeneration;
+			BDateTime			fLastHistoryMenuDate;
 
 			BMenuItem*			fCutMenuItem;
 			BMenuItem*			fCopyMenuItem;

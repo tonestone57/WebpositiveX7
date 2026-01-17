@@ -463,7 +463,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fFormCheckPending(false),
 	fTabsToCheck(0),
 	fDirtyTabs(0),
-	fFormCheckTimeoutRunner(NULL)
+	fFormCheckTimeoutRunner(NULL),
+	fLastHistoryGeneration(0)
 {
 	// Begin listening to settings changes and read some current values.
 	fAppSettings->AddListener(BMessenger(this));
@@ -2967,13 +2968,25 @@ addOrDeleteMenu(BMenu* menu, BMenu* toMenu)
 void
 BrowserWindow::_UpdateHistoryMenu()
 {
-	BMenuItem* menuItem;
-	while ((menuItem = fHistoryMenu->RemoveItem(fHistoryMenuFixedItemCount)))
-		delete menuItem;
-
 	BrowsingHistory* history = BrowsingHistory::DefaultInstance();
 	if (!history->Lock())
 		return;
+
+	BDateTime todayStart = BDateTime::CurrentDateTime(B_LOCAL_TIME);
+	todayStart.SetTime(BTime(0, 0, 0));
+
+	if (history->Generation() == fLastHistoryGeneration
+		&& todayStart.Date() == fLastHistoryMenuDate.Date()) {
+		history->Unlock();
+		return;
+	}
+
+	fLastHistoryGeneration = history->Generation();
+	fLastHistoryMenuDate = todayStart;
+
+	BMenuItem* menuItem;
+	while ((menuItem = fHistoryMenu->RemoveItem(fHistoryMenuFixedItemCount)))
+		delete menuItem;
 
 	int32 count = history->CountItems();
 	BMenuItem* clearHistoryItem = new BMenuItem(B_TRANSLATE("Clear history"),
@@ -2985,9 +2998,6 @@ BrowserWindow::_UpdateHistoryMenu()
 		return;
 	}
 	fHistoryMenu->AddSeparatorItem();
-
-	BDateTime todayStart = BDateTime::CurrentDateTime(B_LOCAL_TIME);
-	todayStart.SetTime(BTime(0, 0, 0));
 
 	BDateTime oneDayAgoStart = todayStart;
 	oneDayAgoStart.Date().AddDays(-1);
