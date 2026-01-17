@@ -222,6 +222,7 @@ private:
 			void 				_SmartURLHandler(const BString& url);
 
 			void				_ShowBookmarkBar(bool show);
+			void				_UpdateToolbarPlacement();
 
 			void				_ReopenClosedTab();
 			void				_UpdateRecentlyClosedMenu();

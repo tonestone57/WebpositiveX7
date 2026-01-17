@@ -344,6 +344,10 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 
 	fAutoHidePointer = fAppSettings->GetValue(kSettingsKeyAutoHidePointer,
 		fAutoHidePointer);
+	fAutoHideBookmarkBar = fAppSettings->GetValue(kSettingsKeyAutoHideBookmarkBar,
+		fAutoHideBookmarkBar);
+	fToolbarBottom = fAppSettings->GetValue(kSettingsKeyToolbarBottom,
+		fToolbarBottom);
 
 	fNewWindowPolicy = fAppSettings->GetValue(kSettingsKeyNewWindowPolicy,
 		(uint32)OpenStartPage);
@@ -679,6 +683,10 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 
 	fFindGroup->SetVisible(false);
 	fToggleFullscreenButton->SetVisible(false);
+
+	// Apply toolbar placement logic
+	if (fToolbarBottom)
+		_UpdateToolbarPlacement();
 
 	CreateNewTab(url, true, webView);
 	_ShowInterface(true);
@@ -1154,30 +1162,8 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case TOGGLE_TOOLBAR_BOTTOM:
 			fToolbarBottom = !fToolbarBottom;
 			fToolbarBottomMenuItem->SetMarked(fToolbarBottom);
-
-			// Re-layout
-			// Navigation group is index 1 or 2. We move it to bottom (after tab container or status)
-			// Current layout: Menu(0), Tabs(1), Nav(2), Bookmark(3), Web(4), Find(5), Status(6)
-			// If Bottom: Menu(0), Tabs(1), Bookmark(2), Web(3), Find(4), Nav(5), Status(6)
-			// BGroupView layout removal/addition is tricky.
-			// Let's just remove nav group and add it at appropriate index.
-			// fNavigationGroup is BLayoutItem*
-			// LayoutBuilder might not be modifiable easily.
-			// We can access GetLayout()->RemoveItem(fNavigationGroup) and AddItem(fNavigationGroup, index).
-			{
-				BLayout* layout = GetLayout();
-				layout->RemoveItem(fNavigationGroup);
-				if (fToolbarBottom) {
-					// Add before status bar (last item)
-					int32 count = layout->CountItems();
-					layout->AddItem(fNavigationGroup, count - 1);
-				} else {
-					// Add after tabs (index 2 usually, 0=menu, 1=tabs)
-					// If integrated menu, index 1.
-					// Let's assume standard layout.
-					layout->AddItem(fNavigationGroup, 2);
-				}
-			}
+			fAppSettings->SetValue(kSettingsKeyToolbarBottom, fToolbarBottom);
+			_UpdateToolbarPlacement();
 			break;
 
 		case TOGGLE_DARK_MODE:
@@ -2743,11 +2729,11 @@ BrowserWindow::_CheckAutoHideInterface()
 			// Show if mouse at top (e.g. over menu/tabs/nav)
 			// Navigation group bottom is a good threshold.
 			if (fLastMousePos.y <= fNavigationGroup->Frame().bottom)
-				_ShowBookmarkBar(true);
+				fBookmarkBar->Show();
 		} else {
 			// Hide if mouse moves away
 			if (fLastMousePos.y > fBookmarkBar->Frame().bottom + 10)
-				_ShowBookmarkBar(false);
+				fBookmarkBar->Hide();
 		}
 	}
 
@@ -2966,3 +2952,28 @@ BrowserWindow::_UpdateRecentlyClosedMenu()
 }
 
 
+void
+BrowserWindow::_UpdateToolbarPlacement()
+{
+	BLayout* layout = GetLayout();
+	// Check if navigation group is already in the layout
+	int32 index = layout->IndexOfItem(fNavigationGroup);
+	if (index >= 0)
+		layout->RemoveItem(fNavigationGroup);
+
+	if (fToolbarBottom) {
+		// Add before status bar (last item)
+		int32 count = layout->CountItems();
+		layout->AddItem(fNavigationGroup, count - 1);
+	} else {
+		// Add after tabs.
+		// Layout items:
+		// 0: Menu (if not integrated) or Tabs (if integrated)
+		// 1: Tabs (if not integrated)
+		// ...
+		// We want to insert after Tab Group.
+		int32 tabIndex = layout->IndexOfItem(fTabGroup);
+		int32 insertIndex = (tabIndex >= 0) ? tabIndex + 1 : 2;
+		layout->AddItem(fNavigationGroup, insertIndex);
+	}
+}
