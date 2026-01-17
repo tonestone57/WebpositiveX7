@@ -86,6 +86,7 @@
 #include "NavMenu.h"
 #include "PageUserData.h"
 #include "PermissionsWindow.h"
+#include "NetworkWindow.h"
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
 #include "SitePermissionsManager.h"
@@ -333,6 +334,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fTabSearchWindow(NULL),
 	fLastHistoryGeneration(0),
 	fPermissionsWindow(NULL),
+	fNetworkWindow(NULL),
+	fIsBypassingCache(false)
 	fMemoryPressureRunner(NULL)
 {
 	fFormSafetyHelper = new FormSafetyHelper(this);
@@ -423,6 +426,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(SHOW_COOKIE_WINDOW)));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Script console"),
 		new BMessage(SHOW_CONSOLE_WINDOW)));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Network inspector"),
+		new BMessage(SHOW_NETWORK_WINDOW)));
 	BMenuItem* aboutItem = new BMenuItem(B_TRANSLATE("About"),
 		new BMessage(B_ABOUT_REQUESTED));
 	menu->AddItem(aboutItem);
@@ -470,6 +475,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	menu = new BMenu(B_TRANSLATE("View"));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Reload"), new BMessage(RELOAD),
 		'R'));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Force Reload (no cache)"), new BMessage(RELOAD_BYPASS_CACHE),
+		'R', B_SHIFT_KEY));
 	// the label will be replaced with the appropriate text later on
 	fBookmarkBarMenuItem = new BMenuItem(B_TRANSLATE("Show bookmark bar"),
 		new BMessage(SHOW_HIDE_BOOKMARK_BAR));
@@ -783,6 +790,10 @@ BrowserWindow::~BrowserWindow()
 		fPermissionsWindow->PrepareToQuit();
 		fPermissionsWindow->Quit();
 	}
+	if (fNetworkWindow) {
+		fNetworkWindow->Lock();
+		fNetworkWindow->Quit();
+	}
 }
 
 
@@ -912,6 +923,31 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 			if (webView)
 				webView->Reload();
+			break;
+		}
+		case RELOAD_BYPASS_CACHE:
+		{
+			BWebView* webView = NULL;
+			int32 tabIndex = -1;
+			if (message->FindInt32("tab index", &tabIndex) == B_OK)
+				webView = dynamic_cast<BWebView*>(fTabManager->ViewForTab(tabIndex));
+			else
+				webView = CurrentWebView();
+
+			if (webView) {
+				// To simulate "Bypass Cache", we set the cache model to DOCUMENT_VIEWER
+				// (assuming this reduces caching) and set a flag to revert it later.
+				// We cannot revert immediately because Reload() is async.
+				if (webView->WebPage()) {
+					// Use a constant that implies less caching if possible.
+					// Assuming DOCUMENT_BROWSER (default?) vs something else.
+					// If standard is WEB_BROWSER, maybe DOCUMENT_VIEWER is stricter?
+					// I'll stick to what I used but persistent:
+					webView->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
+					fIsBypassingCache = true;
+				}
+				webView->Reload();
+			}
 			break;
 		}
 
@@ -1283,6 +1319,20 @@ BrowserWindow::MessageReceived(BMessage* message)
 				float zoomFactor = webView->ZoomFactor(!fZoomTextOnly);
 				webView->SetZoomFactor(1.0, !fZoomTextOnly);
 				webView->SetZoomFactor(zoomFactor, fZoomTextOnly);
+			}
+			break;
+		}
+
+		case SHOW_NETWORK_WINDOW:
+		{
+			if (fNetworkWindow) {
+				if (fNetworkWindow->IsHidden())
+					fNetworkWindow->Show();
+				else
+					fNetworkWindow->Activate();
+			} else {
+				fNetworkWindow = new NetworkWindow(BRect(150, 150, 600, 500));
+				fNetworkWindow->Show();
 			}
 			break;
 		}
@@ -1692,6 +1742,14 @@ BrowserWindow::MessageReceived(BMessage* message)
 			} else if (name == kSettingsShowBookmarkBar
 				&& message->FindBool("value", &flag) == B_OK) {
 				_ShowBookmarkBar(flag);
+			} else if (name == kSettingsKeyDisableCache
+				&& message->FindBool("value", &flag) == B_OK) {
+				if (CurrentWebView() && CurrentWebView()->WebPage()) {
+					if (flag)
+						CurrentWebView()->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
+					else
+						CurrentWebView()->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
+				}
 			} else if (name == kSettingsKeyLowRAMMode
 				&& message->FindBool("value", &flag) == B_OK) {
 				fLowRAMMode = flag;
@@ -2192,6 +2250,12 @@ BrowserWindow::CloseWindowRequested(BWebView* view)
 void
 BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 {
+	if (fNetworkWindow) {
+		BMessage msg(ADD_NETWORK_REQUEST);
+		msg.AddString("url", url);
+		fNetworkWindow->PostMessage(&msg);
+	}
+
 	// Ad-Block List
 	if (fAppSettings->GetValue(kSettingsKeyBlockAds, false)) {
 		static const char* kBlockedDomains[] = {
@@ -2279,6 +2343,14 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 			settings->SetJavaScriptEnabled(allowJS);
 			settings->SetCookiesEnabled(allowCookies);
 
+			// Only apply global cache setting if we are NOT currently in a forced reload (bypass cache) state
+			if (!fIsBypassingCache) {
+				if (fAppSettings->GetValue(kSettingsKeyDisableCache, false)) {
+					view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
+				} else {
+					view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
+				}
+			}
 			// Force Desktop
 			if (forceDesktop) {
 				settings->SetUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15");
@@ -2352,6 +2424,21 @@ BrowserWindow::LoadProgress(float progress, BWebView* view)
 void
 BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 {
+	if (fNetworkWindow) {
+		BMessage msg(UPDATE_NETWORK_REQUEST);
+		msg.AddString("url", url);
+		msg.AddString("status", "Failed");
+		fNetworkWindow->PostMessage(&msg);
+	}
+
+	if (fIsBypassingCache && view && view->WebPage()) {
+		// Restore cache model on failure too
+		if (!fAppSettings->GetValue(kSettingsKeyDisableCache, false)) {
+			view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
+		}
+		fIsBypassingCache = false;
+	}
+
 	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
 	if (userData != NULL)
 		userData->SetIsLoading(false);
@@ -2376,6 +2463,21 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 void
 BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 {
+	if (fNetworkWindow) {
+		BMessage msg(UPDATE_NETWORK_REQUEST);
+		msg.AddString("url", url);
+		msg.AddString("status", "Finished");
+		fNetworkWindow->PostMessage(&msg);
+	}
+
+	if (fIsBypassingCache && view && view->WebPage()) {
+		// Restore cache model if we were bypassing, UNLESS disable cache setting is on
+		if (!fAppSettings->GetValue(kSettingsKeyDisableCache, false)) {
+			view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
+		}
+		fIsBypassingCache = false;
+	}
+
 	// Check permissions for popups and dark mode injection
 	bool allowJS = true;
 	bool allowCookies = true;

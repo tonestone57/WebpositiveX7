@@ -106,6 +106,7 @@ private:
 
 			BCheckBox*			fHttpsOnlyCheckBox;
 			BCheckBox*			fBlockAdsCheckBox;
+			BCheckBox*			fDisableCacheCheckBox;
 			BCheckBox*			fLowRAMModeCheckBox;
 
 			BButton*			fApplyButton;
