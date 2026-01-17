@@ -42,7 +42,7 @@ private:
 			void				_ValidateButtonStatus();
 			void				_SaveSettings();
 			void				_ScheduleSaveSettings();
-			void				_PerformSaveSettings();
+			void				_PerformSaveSettings(bool wait = false);
 			void				_LoadSettings();
 			bool				_OpenSettingsFile(BFile& file, uint32 mode);
 
