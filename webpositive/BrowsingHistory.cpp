@@ -154,6 +154,7 @@ BrowsingHistoryItem::Invoked()
 
 BrowsingHistory
 BrowsingHistory::sDefaultInstance;
+static BLocker* sSaveLock = new BLocker("history save lock");
 
 
 BrowsingHistory::BrowsingHistory()
@@ -170,7 +171,7 @@ BrowsingHistory::BrowsingHistory()
 
 BrowsingHistory::~BrowsingHistory()
 {
-	_SaveSettings();
+	_SaveSettings(true);
 	_Clear();
 	delete fSaveRunner;
 }
@@ -227,7 +228,7 @@ BrowsingHistory::Clear()
 {
 	BAutolock _(this);
 	_Clear();
-	_SaveSettings();
+	_ScheduleSave();
 }	
 
 
@@ -238,7 +239,7 @@ BrowsingHistory::MessageReceived(BMessage* message)
 		case SAVE_HISTORY:
 		{
 			BAutolock _(this);
-			_SaveSettings();
+			_SaveSettings(false);
 			delete fSaveRunner;
 			fSaveRunner = NULL;
 			break;
@@ -342,7 +343,7 @@ BrowsingHistory::_RemoveUrl(const BString& url)
 	fHistoryMap.erase(it);
 	delete item;
 
-	_SaveSettings();
+	_ScheduleSave();
 	return true;
 }
 
@@ -380,27 +381,60 @@ BrowsingHistory::_LoadSettings()
 
 
 void
-BrowsingHistory::_SaveSettings()
+BrowsingHistory::_SaveSettings(bool forceSync)
 {
-	BFile settingsFile;
-	if (_OpenSettingsFile(settingsFile,
-			B_CREATE_FILE | B_ERASE_FILE | B_WRITE_ONLY)) {
-		BMessage settingsArchive;
-		settingsArchive.AddInt32("max history item age", fMaxHistoryItemAge);
-		BMessage historyItemArchive;
-		int32 count = CountItems();
-		for (int32 i = 0; i < count; i++) {
-			const BrowsingHistoryItem* item = HistoryItemAt(i);
-			if (!item || item->Archive(&historyItemArchive) != B_OK)
-				break;
-			if (settingsArchive.AddMessage("history item",
-					&historyItemArchive) != B_OK) {
-				break;
-			}
-			historyItemArchive.MakeEmpty();
+	BMessage* settingsArchive = new(std::nothrow) BMessage();
+	if (settingsArchive == NULL)
+		return;
+
+	settingsArchive->AddInt32("max history item age", fMaxHistoryItemAge);
+	BMessage historyItemArchive;
+	int32 count = CountItems();
+	for (int32 i = 0; i < count; i++) {
+		const BrowsingHistoryItem* item = HistoryItemAt(i);
+		if (!item || item->Archive(&historyItemArchive) != B_OK)
+			break;
+		if (settingsArchive->AddMessage("history item",
+				&historyItemArchive) != B_OK) {
+			break;
 		}
-		settingsArchive.Flatten(&settingsFile);
+		historyItemArchive.MakeEmpty();
 	}
+
+	if (forceSync) {
+		_SaveHistoryThread(settingsArchive);
+	} else {
+		thread_id thread = spawn_thread(_SaveHistoryThread,
+			"save history", B_LOW_PRIORITY, settingsArchive);
+		if (thread >= 0) {
+			resume_thread(thread);
+		} else {
+			_SaveHistoryThread(settingsArchive);
+		}
+	}
+}
+
+
+/*static*/ status_t
+BrowsingHistory::_SaveHistoryThread(void* cookie)
+{
+	BMessage* settingsArchive = (BMessage*)cookie;
+	BAutolock _(sSaveLock);
+
+	// Implement logic similar to _OpenSettingsFile but standalone to avoid
+	// dependency on the singleton instance which might be destroyed.
+	BFile settingsFile;
+	BPath path;
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK
+		&& path.Append(kApplicationName) == B_OK
+		&& path.Append("BrowsingHistory") == B_OK) {
+		if (settingsFile.SetTo(path.Path(), B_CREATE_FILE | B_ERASE_FILE | B_WRITE_ONLY) == B_OK) {
+			settingsArchive->Flatten(&settingsFile);
+		}
+	}
+
+	delete settingsArchive;
+	return B_OK;
 }
 
 

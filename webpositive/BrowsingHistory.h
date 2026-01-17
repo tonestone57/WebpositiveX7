@@ -83,8 +83,9 @@ private:
 			bool				_RemoveUrl(const BString& url);
 
 			void				_LoadSettings();
-			void				_SaveSettings();
+			void				_SaveSettings(bool forceSync = false);
 			void				_ScheduleSave();
+	static	status_t			_SaveHistoryThread(void* cookie);
 			bool				_OpenSettingsFile(BFile& file, uint32 mode);
 
 private:
