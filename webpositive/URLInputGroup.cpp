@@ -84,8 +84,9 @@ class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
 		BString lastBaseURL;
 		int32 priority = INT_MAX;
 
+		const int32 kMaxChoices = 50;
 		count = history->CountItems();
-		for (int32 i = 0; i < count; i++) {
+		for (int32 i = count - 1; i >= 0; i--) {
 			BrowsingHistoryItem item = history->HistoryItemAt(i);
 			const BString& choiceText = item.URL();
 			int32 matchPos = choiceText.IFindFirst(pattern);
@@ -99,6 +100,9 @@ class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
 			lastBaseURL = baseURL(choiceText);
 			fChoices.AddItem(new URLChoice(choiceText,
 				choiceText, matchPos, pattern.Length(), priority));
+
+			if (fChoices.CountItems() >= kMaxChoices)
+				break;
 		}
 
 		history->Unlock();
