@@ -2379,7 +2379,7 @@ BrowserWindow::SetStatusBarVisible(bool flag, BWebView* view)
 	if (view != CurrentWebView())
 		return;
 
-	// Ignore request when there is more than one BWebView embedded.
+	// Ignore request when there is more than one BWebView embedded!
 	if (fTabManager->CountTabs() > 1)
 		return;
 
@@ -2389,7 +2389,7 @@ BrowserWindow::SetStatusBarVisible(bool flag, BWebView* view)
 		fVisibleInterfaceElements &= ~INTERFACE_ELEMENT_STATUS;
 
 	if (fInterfaceVisible)
-		fStatusGroup->SetVisible(flag);
+		fStatusGroup->SetVisible(flag); // Update status group visibility
 }
 
 
