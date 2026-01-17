@@ -121,6 +121,7 @@ BrowsingHistoryItem::operator<(const BrowsingHistoryItem& other) const
 bool
 BrowsingHistoryItem::operator<=(const BrowsingHistoryItem& other) const
 {
+	return !(*this > other);
 	return !(other < *this);
 }
 
@@ -322,13 +323,13 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 	int32 count = CountItems();
 	int32 insertionIndex = count;
 
-	// Binary search for insertion index
+	// Binary search for insertion index (O(log N))
 	int32 low = 0;
 	int32 high = count - 1;
 	while (low <= high) {
 		int32 mid = low + (high - low) / 2;
-		BrowsingHistoryItem* midItem = reinterpret_cast<BrowsingHistoryItem*>(
-			fHistoryItems.ItemAtFast(mid));
+		const BrowsingHistoryItem* midItem
+			= (const BrowsingHistoryItem*)fHistoryItems.ItemAtFast(mid);
 
 		if (item < *midItem) {
 			insertionIndex = mid;

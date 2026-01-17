@@ -99,13 +99,25 @@ LoadBookmarksThread(void* data)
 				bookmarkItem->inode = ref.node;
 				bookmarkItem->item = item;
 				items->push_back(bookmarkItem);
+
+				if (items->size() >= 20) {
+					BMessage message(kMsgInitialBookmarksLoaded);
+					message.AddPointer("list", items);
+					params->target.SendMessage(&message);
+					items = new std::vector<BookmarkItem*>();
+				}
 			}
 		}
 	}
 
-	BMessage message(kMsgInitialBookmarksLoaded);
-	message.AddPointer("list", items);
-	params->target.SendMessage(&message);
+	if (!items->empty()) {
+		BMessage message(kMsgInitialBookmarksLoaded);
+		message.AddPointer("list", items);
+		params->target.SendMessage(&message);
+	} else {
+		delete items;
+	}
+
 	delete params;
 	return B_OK;
 }
@@ -200,16 +212,6 @@ BookmarkBar::AttachedToWindow()
 		resume_thread(loader);
 	} else {
 		delete params;
-		// Fallback to synchronous loading
-		BDirectory dir(&fNodeRef);
-		BEntry bookmark;
-		while (dir.GetNextEntry(&bookmark, false) == B_OK) {
-			node_ref ref;
-			if (bookmark.GetNodeRef(&ref) == B_OK)
-				_AddItem(ref.node, &bookmark, false);
-		}
-		BRect rect = Bounds();
-		FrameResized(rect.Width(), rect.Height());
 	}
 }
 
