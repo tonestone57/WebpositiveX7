@@ -3151,8 +3151,7 @@ BrowserWindow::_ShowInterface(bool show)
 		fStatusGroup->SetVisible(false);
 	}
 
-	while (!fLoadingProgressBar->IsHidden())
-		fLoadingProgressBar->Hide();
+	_ForceHideProgressBar();
 }
 
 
@@ -3168,11 +3167,19 @@ BrowserWindow::_ShowProgressBar(bool show)
 		if (!fInterfaceVisible)
 			fStatusGroup->SetVisible(false);
 
-		// TODO: This is also used in _ShowInterface. Without it the status bar
-		// doesn't always hide again. It may be an Interface Kit bug.
-		while (!fLoadingProgressBar->IsHidden())
-			fLoadingProgressBar->Hide();
+		_ForceHideProgressBar();
 	}
+}
+
+
+void
+BrowserWindow::_ForceHideProgressBar()
+{
+	// TODO: This is also used in _ShowInterface. Without it the status bar
+	// doesn't always hide again. It may be an Interface Kit bug.
+	int32 maxTries = 10;
+	while (!fLoadingProgressBar->IsHidden() && maxTries-- > 0)
+		fLoadingProgressBar->Hide();
 }
 
 
