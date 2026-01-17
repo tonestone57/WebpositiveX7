@@ -140,7 +140,9 @@ enum {
 	REOPEN_CLOSED_TAB							= 'roct',
 	COPY_AS_MARKDOWN							= 'cpmd',
 	COPY_AS_HTML								= 'cpht',
-	COPY_AS_PLAIN_TEXT							= 'cppt'
+	COPY_AS_PLAIN_TEXT							= 'cppt',
+
+	EXPORT_COOKIES								= 'exck'
 };
 
 
@@ -412,6 +414,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(SYNC_IMPORT)));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Export profile" B_UTF8_ELLIPSIS),
 		new BMessage(SYNC_EXPORT)));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Export cookies" B_UTF8_ELLIPSIS),
+		new BMessage(EXPORT_COOKIES)));
 	menu->AddSeparatorItem();
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Downloads"),
 		new BMessage(SHOW_DOWNLOAD_WINDOW), 'D'));
@@ -967,6 +971,16 @@ BrowserWindow::MessageReceived(BMessage* message)
 			break;
 		}
 
+		case EXPORT_COOKIES:
+		{
+			BMessage saveMsg(B_SAVE_REQUESTED);
+			saveMsg.AddInt32("type", EXPORT_COOKIES);
+			fSavePanel->SetMessage(&saveMsg);
+			fSavePanel->SetSaveText("cookies.txt");
+			fSavePanel->Show();
+			break;
+		}
+
 		case EXPORT_HISTORY:
 		{
 			BMessage saveMsg(B_SAVE_REQUESTED);
@@ -1022,6 +1036,17 @@ BrowserWindow::MessageReceived(BMessage* message)
 					status_t status = BrowsingHistory::ExportHistory(path);
 					if (status != B_OK) {
 						BString errorMsg(B_TRANSLATE("Failed to export history"));
+						errorMsg << ": " << strerror(status);
+						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+							errorMsg.String(), B_TRANSLATE("OK"));
+						alert->Go();
+					}
+				} else if (type == EXPORT_COOKIES) {
+					BPath path(&ref);
+					path.Append(name);
+					status_t status = Sync::ExportCookies(path, fContext->GetCookieJar());
+					if (status != B_OK) {
+						BString errorMsg(B_TRANSLATE("Failed to export cookies"));
 						errorMsg << ": " << strerror(status);
 						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 							errorMsg.String(), B_TRANSLATE("OK"));
