@@ -43,6 +43,8 @@ private:
 	BMessageRunner* m_jitterRunner;
 	float m_lastJitterOffset;
 	int32 m_jitterCount;
+
+	void _TogglePasswordVisibility();
 };
 
 #endif // AuthenticationPanel_h
