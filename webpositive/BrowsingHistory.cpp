@@ -155,6 +155,24 @@ BrowsingHistoryItem::Invoked()
 BrowsingHistory
 BrowsingHistory::sDefaultInstance;
 static BLocker* sSaveLock = new BLocker("history save lock");
+static bool sIsShuttingDown = false;
+
+
+static void
+_SaveToDisk(BMessage* settingsArchive)
+{
+	// Implement logic similar to _OpenSettingsFile but standalone to avoid
+	// dependency on the singleton instance which might be destroyed.
+	BFile settingsFile;
+	BPath path;
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK
+		&& path.Append(kApplicationName) == B_OK
+		&& path.Append("BrowsingHistory") == B_OK) {
+		if (settingsFile.SetTo(path.Path(), B_CREATE_FILE | B_ERASE_FILE | B_WRITE_ONLY) == B_OK) {
+			settingsArchive->Flatten(&settingsFile);
+		}
+	}
+}
 
 
 BrowsingHistory::BrowsingHistory()
@@ -402,7 +420,10 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 	}
 
 	if (forceSync) {
-		_SaveHistoryThread(settingsArchive);
+		BAutolock _(sSaveLock);
+		sIsShuttingDown = true;
+		_SaveToDisk(settingsArchive);
+		delete settingsArchive;
 	} else {
 		thread_id thread = spawn_thread(_SaveHistoryThread,
 			"save history", B_LOW_PRIORITY, settingsArchive);
@@ -421,18 +442,12 @@ BrowsingHistory::_SaveHistoryThread(void* cookie)
 	BMessage* settingsArchive = (BMessage*)cookie;
 	BAutolock _(sSaveLock);
 
-	// Implement logic similar to _OpenSettingsFile but standalone to avoid
-	// dependency on the singleton instance which might be destroyed.
-	BFile settingsFile;
-	BPath path;
-	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK
-		&& path.Append(kApplicationName) == B_OK
-		&& path.Append("BrowsingHistory") == B_OK) {
-		if (settingsFile.SetTo(path.Path(), B_CREATE_FILE | B_ERASE_FILE | B_WRITE_ONLY) == B_OK) {
-			settingsArchive->Flatten(&settingsFile);
-		}
+	if (sIsShuttingDown) {
+		delete settingsArchive;
+		return B_OK;
 	}
 
+	_SaveToDisk(settingsArchive);
 	delete settingsArchive;
 	return B_OK;
 }
