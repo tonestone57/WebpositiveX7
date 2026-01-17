@@ -8,11 +8,12 @@
 
 #include "DateTime.h"
 #include <Handler.h>
-#include <List.h>
 #include <Locker.h>
 #include <String.h>
 
 #include <map>
+#include <set>
+#include <vector>
 
 class BFile;
 class BMessageRunner;
@@ -55,6 +56,12 @@ private:
 			uint32				fInvokationCount;
 };
 
+struct BrowsingHistoryItemPointerCompare {
+	bool operator()(const BrowsingHistoryItem* a, const BrowsingHistoryItem* b) const {
+		return *a < *b;
+	}
+};
+
 
 class BrowsingHistory : public BHandler, public BLocker {
 public:
@@ -88,10 +95,17 @@ private:
 			void				_SaveSettings(bool forceSync = false);
 			void				_ScheduleSave();
 	static	status_t			_SaveHistoryThread(void* cookie);
+			void				_UpdateCache() const;
 			bool				_OpenSettingsFile(BFile& file, uint32 mode);
 
 private:
-			BList				fHistoryItems;
+			typedef std::set<BrowsingHistoryItem*,
+				BrowsingHistoryItemPointerCompare> HistorySet;
+
+			HistorySet			fHistorySet;
+			mutable std::vector<BrowsingHistoryItem*> fHistoryItemsCache;
+			mutable bool		fCacheIsDirty;
+
 			std::map<BString, BrowsingHistoryItem*> fHistoryMap;
 			int32				fMaxHistoryItemAge;
 
@@ -103,4 +117,3 @@ private:
 
 
 #endif // BROWSING_HISTORY_H
-
