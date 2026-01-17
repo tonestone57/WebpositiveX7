@@ -2633,33 +2633,67 @@ BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon)
 }
 
 
-static void
-addItemToMenuOrSubmenu(BMenu* menu, BMenuItem* newItem)
-{
-	BString baseURLLabel = baseURL(BString(newItem->Label()));
-	for (int32 i = menu->CountItems() - 1; i >= 0; i--) {
-		BMenuItem* item = menu->ItemAt(i);
-		BString label = item->Label();
-		if (label.FindFirst(baseURLLabel) >= 0) {
-			if (item->Submenu()) {
-				// Submenu was already added in previous iteration.
-				item->Submenu()->AddItem(newItem);
-				return;
-			} else {
-				menu->RemoveItem(item);
-				BMenu* subMenu = new BMenu(baseURLLabel.String());
-				subMenu->AddItem(item);
-				subMenu->AddItem(newItem);
-				// Add common submenu for this base URL, clickable.
-				BMessage* message = new BMessage(GOTO_URL);
-				message->AddString("url", baseURLLabel.String());
-				menu->AddItem(new BMenuItem(subMenu, message), i);
-				return;
-			}
-		}
+class HistoryMenuBuilder {
+public:
+	HistoryMenuBuilder(BMenu* menu)
+		:
+		fMenu(menu)
+	{
 	}
-	menu->AddItem(newItem);
-}
+
+	void AddItem(BMenuItem* newItem)
+	{
+		BString baseURLLabel = baseURL(BString(newItem->Label()));
+
+		// Check if we already have a submenu for this base URL
+		std::map<BString, BMenu*>::iterator subMenuIt
+			= fSubMenus.find(baseURLLabel);
+		if (subMenuIt != fSubMenus.end()) {
+			subMenuIt->second->AddItem(newItem);
+			return;
+		}
+
+		// Check if we have a single item waiting to be promoted
+		std::map<BString, BMenuItem*>::iterator singleItemIt
+			= fSingleItems.find(baseURLLabel);
+		if (singleItemIt != fSingleItems.end()) {
+			BMenuItem* oldItem = singleItemIt->second;
+
+			// Remove old item from the main menu
+			int32 index = fMenu->IndexOf(oldItem);
+			fMenu->RemoveItem(oldItem);
+
+			// Create new submenu
+			BMenu* subMenu = new BMenu(baseURLLabel.String());
+			subMenu->AddItem(oldItem);
+			subMenu->AddItem(newItem);
+
+			// Add common submenu for this base URL, clickable.
+			BMessage* message = new BMessage(GOTO_URL);
+			message->AddString("url", baseURLLabel.String());
+
+			BMenuItem* subMenuItem = new BMenuItem(subMenu, message);
+			if (index >= 0)
+				fMenu->AddItem(subMenuItem, index);
+			else
+				fMenu->AddItem(subMenuItem);
+
+			// Update maps
+			fSingleItems.erase(singleItemIt);
+			fSubMenus[baseURLLabel] = subMenu;
+			return;
+		}
+
+		// Otherwise just add it
+		fMenu->AddItem(newItem);
+		fSingleItems[baseURLLabel] = newItem;
+	}
+
+private:
+	BMenu* fMenu;
+	std::map<BString, BMenu*> fSubMenus;
+	std::map<BString, BMenuItem*> fSingleItems;
+};
 
 
 static void
@@ -2733,6 +2767,14 @@ BrowserWindow::_UpdateHistoryMenu()
 		fiveDaysAgoStart.Date().LongDayName().String());
 	BMenu* earlierMenu = new BMenu(B_TRANSLATE("Earlier"));
 
+	HistoryMenuBuilder todayBuilder(todayMenu);
+	HistoryMenuBuilder yesterdayBuilder(yesterdayMenu);
+	HistoryMenuBuilder twoDaysAgoBuilder(twoDaysAgoMenu);
+	HistoryMenuBuilder threeDaysAgoBuilder(threeDaysAgoMenu);
+	HistoryMenuBuilder fourDaysAgoBuilder(fourDaysAgoMenu);
+	HistoryMenuBuilder fiveDaysAgoBuilder(fiveDaysAgoMenu);
+	HistoryMenuBuilder earlierBuilder(earlierMenu);
+
 	for (int32 i = 0; i < count; i++) {
 		BrowsingHistoryItem historyItem = history->HistoryItemAt(i);
 		BMessage* message = new BMessage(GOTO_URL);
@@ -2743,19 +2785,19 @@ BrowserWindow::_UpdateHistoryMenu()
 		menuItem = new BMenuItem(truncatedUrl, message);
 
 		if (historyItem.DateTime() < fiveDaysAgoStart)
-			addItemToMenuOrSubmenu(earlierMenu, menuItem);
+			earlierBuilder.AddItem(menuItem);
 		else if (historyItem.DateTime() < fourDaysAgoStart)
-			addItemToMenuOrSubmenu(fiveDaysAgoMenu, menuItem);
+			fiveDaysAgoBuilder.AddItem(menuItem);
 		else if (historyItem.DateTime() < threeDaysAgoStart)
-			addItemToMenuOrSubmenu(fourDaysAgoMenu, menuItem);
+			fourDaysAgoBuilder.AddItem(menuItem);
 		else if (historyItem.DateTime() < twoDaysAgoStart)
-			addItemToMenuOrSubmenu(threeDaysAgoMenu, menuItem);
+			threeDaysAgoBuilder.AddItem(menuItem);
 		else if (historyItem.DateTime() < oneDayAgoStart)
-			addItemToMenuOrSubmenu(twoDaysAgoMenu, menuItem);
+			twoDaysAgoBuilder.AddItem(menuItem);
 		else if (historyItem.DateTime() < todayStart)
-			addItemToMenuOrSubmenu(yesterdayMenu, menuItem);
+			yesterdayBuilder.AddItem(menuItem);
 		else
-			addItemToMenuOrSubmenu(todayMenu, menuItem);
+			todayBuilder.AddItem(menuItem);
 	}
 	history->Unlock();
 
