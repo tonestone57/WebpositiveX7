@@ -3317,14 +3317,22 @@ BrowserWindow::_VisitSearchEngine(const BString& search)
 inline bool
 BrowserWindow::_IsValidDomainChar(char ch)
 {
+	// Characters that are allowed in domain names (IDNA 2008 / LDH rule).
+	// We also allow characters that are valid in the authority part of a URL
+	// (userinfo, port, IPv6 literals) because this function is used to
+	// validate the entire authority string.
+	// We deliberately disallow underscore (_) and percent (%) to better
+	// distinguish search queries from URLs, as these are not valid in
+	// standard hostnames.
+
 	if ((unsigned char)ch > 0x7f)
 		return true;
 
 	if (isalnum(ch))
 		return true;
 
-	return ch == '-' || ch == '.' || ch == ':' || ch == '%'
-		|| ch == '[' || ch == ']' || ch == '@' || ch == '_';
+	return ch == '-' || ch == '.' || ch == ':'
+		|| ch == '[' || ch == ']' || ch == '@';
 }
 
 
