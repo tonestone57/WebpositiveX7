@@ -344,7 +344,10 @@ BrowserApp::MessageReceived(BMessage* message)
 		BString url;
 		if (message->FindString("url", &url) != B_OK)
 			break;
-		_CreateNewWindow(url);
+		bool privateWindow = false;
+		if (message->FindBool("private", &privateWindow) != B_OK)
+			privateWindow = false;
+		_CreateNewWindow(url, false, privateWindow);
 		break;
 	}
 	case RESTART_DOWNLOAD_IN_WINDOW: {
@@ -627,6 +630,10 @@ BrowserApp::_CreateNewPage(const BString& url, BrowserWindow* webWindow,
 	bool loadedInWindowOnCurrentWorkspace = false;
 	BrowserWindow* window = _FindWindowOnCurrentWorkspace();
 
+	// If the existing window is private, we probably shouldn't open standard links in it
+	// unless explicitly requested (which this method is for).
+	// But let's assume we reuse it.
+
 	if (window == NULL)
 		return _CreateNewWindow(url, fullscreen);
 
@@ -653,7 +660,7 @@ BrowserApp::_CreateNewPage(const BString& url, BrowserWindow* webWindow,
 
 
 BrowserWindow*
-BrowserApp::_CreateNewWindow(const BString& url, bool fullscreen)
+BrowserApp::_CreateNewWindow(const BString& url, bool fullscreen, bool privateWindow)
 {
 	// Offset the window frame unless this is the first window created in the
 	// session.
@@ -662,8 +669,25 @@ BrowserApp::_CreateNewWindow(const BString& url, bool fullscreen)
 	if (!BScreen().Frame().Contains(fLastWindowFrame))
 		fLastWindowFrame.OffsetTo(50, 50);
 
+	BPrivate::Network::BUrlContext* context = fContext;
+	if (privateWindow) {
+		// Private context: empty cookie jar (default), no persistence.
+		// Created with ref count 1.
+		context = new BPrivate::Network::BUrlContext();
+	}
+
 	BrowserWindow* window = new BrowserWindow(fLastWindowFrame, fSettings,
-		url, fContext);
+		url, context);
+
+	if (privateWindow) {
+		// BrowserWindow stores context in a BReference, which increments ref count.
+		// We release our initial reference so the window owns it.
+		context->Release();
+
+		// Set visual indicator
+		window->SetTitle(BString("(Private) ").Append(window->Title()));
+	}
+
 	if (fullscreen)
 		window->ToggleFullscreen();
 	window->Show();

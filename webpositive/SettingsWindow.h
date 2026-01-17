@@ -35,6 +35,7 @@ public:
 
 private:
 			BView*				_CreateGeneralPage(float spacing);
+			BView*				_CreatePrivacyPage(float spacing);
 			BView*				_CreateFontsPage(float spacing);
 			BView*				_CreateProxyPage(float spacing);
 			void				_SetupFontSelectionView(
@@ -102,6 +103,9 @@ private:
 			BCheckBox*			fUseProxyAuthCheckBox;
 			BTextControl*		fProxyUsernameControl;
 			BTextControl*		fProxyPasswordControl;
+
+			BCheckBox*			fHttpsOnlyCheckBox;
+			BCheckBox*			fBlockAdsCheckBox;
 
 			BButton*			fApplyButton;
 			BButton*			fCancelButton;

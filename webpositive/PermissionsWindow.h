@@ -6,15 +6,22 @@
 #define PERMISSIONS_WINDOW_H
 
 #include <Window.h>
+#include <NetworkCookieJar.h>
 
 class BListView;
 class BButton;
 class BCheckBox;
 class BTextControl;
 
+namespace BPrivate {
+namespace Network {
+	class BNetworkCookieJar;
+}
+}
+
 class PermissionsWindow : public BWindow {
 public:
-								PermissionsWindow(BRect frame);
+								PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCookieJar& jar);
 	virtual						~PermissionsWindow();
 
 	virtual	void				MessageReceived(BMessage* message);
@@ -24,8 +31,11 @@ private:
 			void				_LoadPermissions();
 			void				_SavePermissions();
 			void				_UpdateFields();
+			void				_ClearSiteData(const char* domain);
 
 private:
+			BPrivate::Network::BNetworkCookieJar& fCookieJar;
+
 			BListView*			fDomainList;
 			BCheckBox*			fJSEnabled;
 			BCheckBox*			fCookiesEnabled;
@@ -33,6 +43,7 @@ private:
 			BTextControl*		fAddDomainControl;
 			BButton*			fAddButton;
 			BButton*			fRemoveButton;
+			BButton*			fClearDataButton;
 };
 
 #endif // PERMISSIONS_WINDOW_H

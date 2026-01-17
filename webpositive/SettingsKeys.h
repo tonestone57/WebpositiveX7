@@ -42,6 +42,9 @@ extern const char* kSettingsKeyProxyPassword;
 
 extern const char* kSettingsShowBookmarkBar;
 
+extern const char* kSettingsKeyHttpsOnly;
+extern const char* kSettingsKeyBlockAds;
+
 struct SearchEngine {
 	const char* name;
 	const char* url;

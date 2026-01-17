@@ -378,6 +378,15 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(*newTabMessage), 'T');
 	menu->AddItem(newItem);
 	newItem->SetTarget(be_app);
+
+	BMessage* newPrivateWindowMessage = new BMessage(NEW_WINDOW);
+	newPrivateWindowMessage->AddString("url", "");
+	newPrivateWindowMessage->AddBool("private", true);
+	newItem = new BMenuItem(B_TRANSLATE("New private window"),
+		newPrivateWindowMessage, 'N', B_SHIFT_KEY);
+	menu->AddItem(newItem);
+	newItem->SetTarget(be_app);
+
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Open location"),
 		new BMessage(OPEN_LOCATION), 'L'));
 	menu->AddSeparatorItem();
@@ -1288,7 +1297,8 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case SHOW_PERMISSIONS_WINDOW:
 		{
 			// Open non-modal window. In a real app we'd track the instance to avoid duplicates.
-			PermissionsWindow* window = new PermissionsWindow(BRect(100, 100, 400, 400));
+			PermissionsWindow* window = new PermissionsWindow(BRect(100, 100, 400, 400),
+				fContext->GetCookieJar());
 			window->Show();
 			break;
 		}
@@ -1903,6 +1913,16 @@ BrowserWindow::CloseWindowRequested(BWebView* view)
 void
 BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 {
+	// HTTPS-Only Mode
+	if (fAppSettings->GetValue(kSettingsKeyHttpsOnly, false)) {
+		if (url.StartsWith("http://")) {
+			BString httpsUrl = url;
+			httpsUrl.ReplaceFirst("http://", "https://");
+			if (view) view->LoadURL(httpsUrl);
+			return; // Abort this load, we started a new one
+		}
+	}
+
 	// Apply per-site permissions
 	bool allowJS = true;
 	bool allowCookies = true;
@@ -2047,6 +2067,17 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			"  };"
 			"}"
 			"toggleReaderMode(true);";
+		view->WebPage()->ExecuteJavaScript(script);
+	}
+
+	// Ad Blocking
+	if (fAppSettings->GetValue(kSettingsKeyBlockAds, false) && view && view->WebPage()) {
+		BString script = "var style = document.createElement('style');"
+			"style.innerHTML = '"
+			".ads, .ad, .advertisement, [id^=\"google_ads\"], [id^=\"div-gpt-ad\"], "
+			".doubleclick, .ad-banner, .banner-ad, .sponsor "
+			"{ display: none !important; }';"
+			"document.head.appendChild(style);";
 		view->WebPage()->ExecuteJavaScript(script);
 	}
 
