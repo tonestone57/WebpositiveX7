@@ -563,10 +563,38 @@ BookmarkBar::FrameResized(float width, float height)
 	// Current items in bar (excluding overflow menu which is now gone)
 	int32 currentBarCount = CountItems();
 
-	while (currentBarCount > fitCount) {
-		BMenuItem* item = RemoveItem(currentBarCount - 1);
-		fOverflowMenu->AddItem(item, 0); // Add to front to preserve order (reversed removal)
-		currentBarCount--;
+	// Optimized move from Bar to Overflow
+	// We first collect the items to be moved (reversed order), then
+	// reconstruct the overflow menu to avoid O(N^2) insertions at index 0.
+	std::vector<BMenuItem*> newOverflowItems;
+	if (currentBarCount > fitCount) {
+		newOverflowItems.reserve(currentBarCount - fitCount);
+
+		while (currentBarCount > fitCount) {
+			newOverflowItems.push_back(RemoveItem(currentBarCount - 1));
+			currentBarCount--;
+		}
+	}
+
+	if (!newOverflowItems.empty()) {
+		std::vector<BMenuItem*> oldOverflowItems;
+		int32 overflowCount = fOverflowMenu->CountItems();
+		oldOverflowItems.reserve(overflowCount);
+
+		// Remove existing items from the end (efficient)
+		while (overflowCount > 0) {
+			oldOverflowItems.push_back(fOverflowMenu->RemoveItem(--overflowCount));
+		}
+
+		// Add new items (they were removed from end of bar, so reverse iterate to restore order)
+		for (int32 i = (int32)newOverflowItems.size() - 1; i >= 0; i--) {
+			fOverflowMenu->AddItem(newOverflowItems[i]);
+		}
+
+		// Add old items back (they were removed from end of overflow, so reverse iterate)
+		for (int32 i = (int32)oldOverflowItems.size() - 1; i >= 0; i--) {
+			fOverflowMenu->AddItem(oldOverflowItems[i]);
+		}
 	}
 
 	// Move fitting items from Overflow to Bar
