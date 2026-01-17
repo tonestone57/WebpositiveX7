@@ -460,6 +460,9 @@ BookmarkBar::FrameResized(float width, float height)
 		if (fOverflowMenu->CountItems() == 0) {
 			RemoveItem(fOverflowMenu);
 			fOverflowMenuAdded = false;
+		} else if (IndexOf(fOverflowMenu) == B_ERROR) {
+			AddItem(fOverflowMenu);
+			fOverflowMenuAdded = true;
 		}
 
 	} else {
@@ -533,11 +536,30 @@ BookmarkBar::_AddItem(ino_t inode, BEntry* entry, bool layout)
 		item = new IconMenuItem(name, message, &info, B_MINI_ICON);
 	}
 
-	int32 count = CountItems();
-	if (IndexOf(fOverflowMenu) != B_ERROR)
-		count--;
+	bool addedToOverflow = false;
+	// Optimize batch loading by adding directly to the overflow menu if we
+	// know the bar is full. This avoids the O(n^2) behavior of FrameResized
+	// moving items one by one to the overflow menu.
+	if (!layout && CountItems() > 0) {
+		BMenuItem* last = ItemAt(CountItems() - 1);
+		float maxRight = Bounds().Width();
+		if (IndexOf(fOverflowMenu) != B_ERROR || fOverflowMenu->CountItems() > 0)
+			maxRight -= 32;
 
-	BMenuBar::AddItem(item, count);
+		if (last->Frame().right > maxRight) {
+			fOverflowMenu->AddItem(item);
+			addedToOverflow = true;
+		}
+	}
+
+	if (!addedToOverflow) {
+		int32 count = CountItems();
+		if (IndexOf(fOverflowMenu) != B_ERROR)
+			count--;
+
+		BMenuBar::AddItem(item, count);
+	}
+
 	fItemsMap[inode] = item;
 
 	// Move the item to the "more" menu if it overflows.
