@@ -53,6 +53,11 @@ public:
     bool operator==(const char* str) const { return fString == (str ? str : ""); }
     bool operator==(const BString& other) const { return fString == other.fString; }
 
+    // Needed for std::map key
+    bool operator<(const BString& other) const {
+        return fString < other.fString;
+    }
+
     char operator[](int32 index) const { return fString[index]; }
 
     void SetByteAt(int32 index, char c) { fString[index] = c; }
@@ -67,6 +72,17 @@ public:
     BString& operator+=(const BString& str) { fString += str.fString; return *this; }
 
     void SetTo(const char* str) { fString = str; }
+
+    // Helper for Truncate
+    void Truncate(int32 newLength) {
+        if (newLength < fString.length()) fString.resize(newLength);
+    }
+
+    // ICompare (Case insensitive)
+    int ICompare(const char* str) const {
+        // Just do simple compare for mock
+        return fString.compare(str);
+    }
 };
 
 // Global operators for comparisons
