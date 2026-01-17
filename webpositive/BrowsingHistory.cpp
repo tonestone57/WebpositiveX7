@@ -110,7 +110,9 @@ BrowsingHistoryItem::operator<(const BrowsingHistoryItem& other) const
 	if (this == &other)
 		return false;
 
-	return fDateTime < other.fDateTime || fURL < other.fURL;
+	if (fDateTime != other.fDateTime)
+		return fDateTime < other.fDateTime;
+	return fURL < other.fURL;
 }
 
 
@@ -127,7 +129,9 @@ BrowsingHistoryItem::operator>(const BrowsingHistoryItem& other) const
 	if (this == &other)
 		return false;
 
-	return fDateTime > other.fDateTime || fURL > other.fURL;
+	if (fDateTime != other.fDateTime)
+		return fDateTime > other.fDateTime;
+	return fURL > other.fURL;
 }
 
 
@@ -318,12 +322,21 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 
 	int32 count = CountItems();
 	int32 insertionIndex = count;
-	for (int32 i = 0; i < count; i++) {
-		BrowsingHistoryItem* existingItem
-			= reinterpret_cast<BrowsingHistoryItem*>(
-			fHistoryItems.ItemAtFast(i));
-		if (item < *existingItem)
-			insertionIndex = i;
+
+	// Binary search for insertion index
+	int32 low = 0;
+	int32 high = count - 1;
+	while (low <= high) {
+		int32 mid = low + (high - low) / 2;
+		BrowsingHistoryItem* midItem = reinterpret_cast<BrowsingHistoryItem*>(
+			fHistoryItems.ItemAtFast(mid));
+
+		if (item < *midItem) {
+			insertionIndex = mid;
+			high = mid - 1;
+		} else {
+			low = mid + 1;
+		}
 	}
 	BrowsingHistoryItem* newItem = new(std::nothrow) BrowsingHistoryItem(item);
 	if (!newItem || !fHistoryItems.AddItem(newItem, insertionIndex)) {
