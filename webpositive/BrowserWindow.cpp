@@ -83,6 +83,7 @@
 #include "CredentialsStorage.h"
 #include "IconButton.h"
 #include "NavMenu.h"
+#include "PageUserData.h"
 #include "PermissionsWindow.h"
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
@@ -236,125 +237,6 @@ private:
 };
 
 
-class PageUserData : public BWebView::UserData {
-public:
-	PageUserData(BView* focusedView)
-		:
-		fFocusedView(focusedView),
-		fPageIcon(NULL),
-		fPageIconLarge(NULL),
-		fURLInputSelectionStart(-1),
-		fURLInputSelectionEnd(-1),
-		fIsLoading(false)
-	{
-	}
-
-	~PageUserData()
-	{
-		delete fPageIcon;
-		delete fPageIconLarge;
-	}
-
-	void SetFocusedView(BView* focusedView)
-	{
-		fFocusedView = focusedView;
-	}
-
-	BView* FocusedView() const
-	{
-		return fFocusedView;
-	}
-
-	void SetPageIcon(const BBitmap* icon)
-	{
-		delete fPageIcon;
-		fPageIcon = NULL;
-		delete fPageIconLarge;
-		fPageIconLarge = NULL;
-
-		if (icon == NULL)
-			return;
-
-		if (icon->Bounds().IntegerWidth() > 16) {
-			fPageIconLarge = new BBitmap(icon);
-			fPageIcon = new BBitmap(BRect(0, 0, 15, 15), B_RGBA32, true);
-			if (fPageIcon->IsValid()) {
-				BView* view = new BView(fPageIcon->Bounds(), "tmp",
-					B_FOLLOW_NONE, B_WILL_DRAW);
-				fPageIcon->AddChild(view);
-				fPageIcon->Lock();
-				view->SetHighColor(B_TRANSPARENT_32_BIT);
-				view->FillRect(view->Bounds());
-				view->SetDrawingMode(B_OP_ALPHA);
-				view->DrawBitmap(icon, fPageIcon->Bounds());
-				view->Sync();
-				fPageIcon->Unlock();
-				fPageIcon->RemoveChild(view);
-				delete view;
-			} else {
-				delete fPageIcon;
-				fPageIcon = new BBitmap(icon);
-			}
-		} else {
-			fPageIcon = new BBitmap(icon);
-		}
-	}
-
-	const BBitmap* PageIcon() const
-	{
-		return fPageIcon;
-	}
-
-	const BBitmap* PageIconLarge() const
-	{
-		return fPageIconLarge;
-	}
-
-	void SetURLInputContents(const char* text)
-	{
-		fURLInputContents = text;
-	}
-
-	const BString& URLInputContents() const
-	{
-		return fURLInputContents;
-	}
-
-	void SetURLInputSelection(int32 selectionStart, int32 selectionEnd)
-	{
-		fURLInputSelectionStart = selectionStart;
-		fURLInputSelectionEnd = selectionEnd;
-	}
-
-	int32 URLInputSelectionStart() const
-	{
-		return fURLInputSelectionStart;
-	}
-
-	int32 URLInputSelectionEnd() const
-	{
-		return fURLInputSelectionEnd;
-	}
-
-	void SetIsLoading(bool loading)
-	{
-		fIsLoading = loading;
-	}
-
-	bool IsLoading() const
-	{
-		return fIsLoading;
-	}
-
-private:
-	BView*		fFocusedView;
-	BBitmap*	fPageIcon;
-	BBitmap*	fPageIconLarge;
-	BString		fURLInputContents;
-	int32		fURLInputSelectionStart;
-	int32		fURLInputSelectionEnd;
-	bool		fIsLoading;
-};
 
 
 class CloseButton : public BButton {
@@ -2770,11 +2652,27 @@ BrowserWindow::_CreateBookmark(BMessage* message)
 			fileName = "";
 		}
 		const BBitmap* miniIcon = NULL;
-		const BBitmap* largeIcon = NULL;
 		originatorData.FindData("miniIcon", B_COLOR_8_BIT_TYPE,
 			reinterpret_cast<const void**>(&miniIcon), NULL);
-		originatorData.FindData("largeIcon", B_COLOR_8_BIT_TYPE,
-			reinterpret_cast<const void**>(&miniIcon), NULL);
+
+		BBitmap* largeIcon = NULL;
+		const void* largeIconData = NULL;
+		ssize_t largeIconSize = 0;
+		if (originatorData.FindData("largeIcon", B_RGBA32_TYPE,
+				&largeIconData, &largeIconSize) == B_OK) {
+			largeIcon = new(std::nothrow) BBitmap(BRect(0, 0, 31, 31),
+				B_RGBA32);
+			if (largeIcon != NULL) {
+				if (largeIcon->InitCheck() == B_OK
+					&& largeIcon->BitsLength() == largeIconSize) {
+					largeIcon->ImportBits(largeIconData, largeIconSize, 0, 0,
+						B_RGBA32);
+				} else {
+					delete largeIcon;
+					largeIcon = NULL;
+				}
+			}
+		}
 
 		if (validData == true) {
 			_CreateBookmark(BPath(&ref), BString(fileName), BString(title), BString(url),
@@ -2788,7 +2686,7 @@ BrowserWindow::_CreateBookmark(BMessage* message)
 			alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 			alert->Go();
 		}
-		return;
+		delete largeIcon;
 }
 
 
