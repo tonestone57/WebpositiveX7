@@ -110,8 +110,10 @@ BrowsingHistoryItem::operator<(const BrowsingHistoryItem& other) const
 	if (this == &other)
 		return false;
 
-	if (fDateTime != other.fDateTime)
-		return fDateTime < other.fDateTime;
+	if (fDateTime < other.fDateTime)
+		return true;
+	if (other.fDateTime < fDateTime)
+		return false;
 	return fURL < other.fURL;
 }
 
@@ -119,26 +121,21 @@ BrowsingHistoryItem::operator<(const BrowsingHistoryItem& other) const
 bool
 BrowsingHistoryItem::operator<=(const BrowsingHistoryItem& other) const
 {
-	return (*this == other) || (*this < other);
+	return !(other < *this);
 }
 
 
 bool
 BrowsingHistoryItem::operator>(const BrowsingHistoryItem& other) const
 {
-	if (this == &other)
-		return false;
-
-	if (fDateTime != other.fDateTime)
-		return fDateTime > other.fDateTime;
-	return fURL > other.fURL;
+	return other < *this;
 }
 
 
 bool
 BrowsingHistoryItem::operator>=(const BrowsingHistoryItem& other) const
 {
-	return (*this == other) || (*this > other);
+	return !(*this < other);
 }
 
 
