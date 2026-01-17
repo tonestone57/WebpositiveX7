@@ -89,6 +89,7 @@ LoadBookmarksThread(void* data)
 	BEntry bookmark;
 
 	std::vector<BookmarkItem*>* items = new std::vector<BookmarkItem*>();
+	items->reserve(20);
 
 	while (dir.GetNextEntry(&bookmark, false) == B_OK) {
 		node_ref ref;
@@ -105,6 +106,7 @@ LoadBookmarksThread(void* data)
 					message.AddPointer("list", items);
 					params->target.SendMessage(&message);
 					items = new std::vector<BookmarkItem*>();
+					items->reserve(20);
 				}
 			}
 		}
