@@ -181,6 +181,10 @@ SettingsWindow::MessageReceived(BMessage* message)
 			break;
 		case MSG_HANDLE_DOWNLOAD_FOLDER:
 			_HandleDownloadPanelResult(fOpenFilePanel, message);
+			fSettings->SetValue(kSettingsKeyDownloadPath,
+				fDownloadFolderControl->Text());
+			fSettings->Save();
+			_ValidateControlsEnabledStatus();
 			break;
 		case MSG_STANDARD_FONT_SIZE_SELECTED:
 		{
@@ -212,6 +216,8 @@ SettingsWindow::MessageReceived(BMessage* message)
 			if (message->FindString("searchstring", &searchString) == B_OK) {
 				fSearchPageControl->SetText(searchString);
 				fSearchPageControl->SetEnabled(false);
+				fSettings->SetValue(kSettingsKeySearchPageURL, searchString);
+				fSettings->Save();
 			} else
 				fSearchPageControl->SetEnabled(true);
 
