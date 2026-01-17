@@ -100,6 +100,7 @@ enum {
 	SHOW_SETTINGS_WINDOW			= 'sswd',
 	SHOW_CONSOLE_WINDOW				= 'scwd',
 	SHOW_COOKIE_WINDOW				= 'skwd',
+	SHOW_CERTIFICATE_WINDOW			= 'scrw',
 
 	SEARCH_TABS						= 'stbs',
 	TOGGLE_DARK_MODE				= 'tgdm',

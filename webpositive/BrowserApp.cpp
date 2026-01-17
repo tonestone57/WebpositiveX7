@@ -57,6 +57,7 @@
 #include "WebSettings.h"
 #include "WebView.h"
 #include "WebViewConstants.h"
+#include "CredentialsStorage.h"
 
 
 #undef B_TRANSLATION_CONTEXT
@@ -344,6 +345,24 @@ BrowserApp::ReadyToRun()
 void
 BrowserApp::MessageReceived(BMessage* message)
 {
+	if (message->what == B_GET_PROPERTY) {
+		BMessage specifier;
+		int32 index;
+		const char* property;
+		if (message->GetCurrentSpecifier(&index, &specifier) == B_OK &&
+			specifier.FindString("property", &property) == B_OK &&
+			strcmp(property, "Credentials") == 0) {
+
+			BMessage reply(B_REPLY);
+			// CredentialsStorage access is currently limited to internal use.
+			// Future work: Expose public iterator or export method in CredentialsStorage
+			// to fully support this scripting capability.
+			reply.AddInt32("error", B_ERROR);
+			message->SendReply(&reply);
+			return;
+		}
+	}
+
 	switch (message->what) {
 	case PRELOAD_BROWSING_HISTORY:
 		// Accessing the default instance will load the history from disk.
