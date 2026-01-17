@@ -3351,13 +3351,10 @@ BrowserWindow::_SmartURLHandler(const BString& url)
 }
 
 
-void
-BrowserWindow::_HandlePageSourceResult(const BMessage* message)
+static status_t
+PageSourceThread(void* data)
 {
-	// TODO: This should be done in an extra thread perhaps. Doing it in
-	// the application thread is not much better, since it actually draws
-	// the pages...
-
+	BMessage* message = static_cast<BMessage*>(data);
 	BPath pathToPageSource;
 
 	BString url;
@@ -3459,6 +3456,22 @@ BrowserWindow::_HandlePageSourceResult(const BMessage* message)
 		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 		alert->Go(NULL);
 	}
+
+	delete message;
+	return B_OK;
+}
+
+
+void
+BrowserWindow::_HandlePageSourceResult(const BMessage* message)
+{
+	BMessage* copy = new BMessage(*message);
+	thread_id thread = spawn_thread(PageSourceThread, "Page Source Saver",
+		B_NORMAL_PRIORITY, copy);
+	if (thread >= 0)
+		resume_thread(thread);
+	else
+		delete copy;
 }
 
 
