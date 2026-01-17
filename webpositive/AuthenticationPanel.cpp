@@ -81,21 +81,10 @@ AuthenticationPanel::MessageReceived(BMessage* message)
 	case kMsgPanelOK:
 		release_sem(m_exitSemaphore);
 		break;
-	case kHidePassword: {
-		// TODO: Toggling this is broken in BTextView. Workaround is to
-		// set the text and selection again.
-		BString text = m_passwordTextControl->Text();
-		int32 selectionStart;
-		int32 selectionEnd;
-		m_passwordTextControl->TextView()->GetSelection(&selectionStart,
-			&selectionEnd);
-		m_passwordTextControl->TextView()->HideTyping(
-			m_hidePasswordCheckBox->Value() == B_CONTROL_ON);
-		m_passwordTextControl->SetText(text.String());
-		m_passwordTextControl->TextView()->Select(selectionStart,
-			selectionEnd);
+	case kHidePassword:
+		_TogglePasswordVisibility();
 		break;
-	}
+
 	case kMsgJitter: {
 		UpdateIfNeeded();
 
@@ -136,6 +125,23 @@ AuthenticationPanel::MessageReceived(BMessage* message)
 	default:
 		BWindow::MessageReceived(message);
 	}
+}
+
+
+void
+AuthenticationPanel::_TogglePasswordVisibility()
+{
+	// TODO: Toggling this is broken in BTextView. Workaround is to
+	// set the text and selection again.
+	BString text = m_passwordTextControl->Text();
+	int32 selectionStart;
+	int32 selectionEnd;
+	m_passwordTextControl->TextView()->GetSelection(&selectionStart,
+		&selectionEnd);
+	m_passwordTextControl->TextView()->HideTyping(
+		m_hidePasswordCheckBox->Value() == B_CONTROL_ON);
+	m_passwordTextControl->SetText(text.String());
+	m_passwordTextControl->TextView()->Select(selectionStart, selectionEnd);
 }
 
 
