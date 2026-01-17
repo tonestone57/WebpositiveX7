@@ -28,6 +28,7 @@
 #include "BrowserWindow.h"
 #include "BrowsingHistory.h"
 #include "IconButton.h"
+#include "PageUserData.h"
 #include "IconUtils.h"
 #include "TextViewCompleter.h"
 #include "WebView.h"
@@ -589,8 +590,12 @@ public:
 			BBitmap miniIcon(BRect(0, 0, 15, 15), B_BITMAP_NO_SERVER_LINK,
 				B_CMAP8);
 			miniIcon.ImportBits(fIcon);
-			// TODO:  obtain and send the large icon in addition to the mini icon.
-			// Currently PageUserData does not provide a function that returns this.
+
+			const BBitmap* largeIcon = NULL;
+			PageUserData* userData = static_cast<PageUserData*>(
+				static_cast<BrowserWindow*>(Window())->CurrentWebView()->GetUserData());
+			if (userData != NULL)
+				largeIcon = userData->PageIconLarge();
 
 			BMessage drag(B_SIMPLE_DATA);
 			drag.AddInt32("be:actions", B_COPY_TARGET);
@@ -605,6 +610,10 @@ public:
 			if (fPageIconSet == true) {
 				// Don't bother sending the placeholder web icon, if that is all we have.
 				data.AddData("miniIcon", B_COLOR_8_BIT_TYPE, &miniIcon, sizeof(miniIcon));
+				if (largeIcon != NULL) {
+					data.AddData("largeIcon", B_RGBA32_TYPE, largeIcon->Bits(),
+						largeIcon->BitsLength());
+				}
 			}
 			drag.AddMessage("be:originator-data", &data);
 
