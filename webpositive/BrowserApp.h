@@ -72,7 +72,7 @@ private:
 									bool privateWindow = false);
 			BrowserWindow* 		_FindWindowOnCurrentWorkspace();
 			void				_CreateNewTab(BrowserWindow* window,
-									const BString& url, bool select);
+									const BString& url, bool select, bool lazy = false);
 			void				_ShowWindow(const BMessage* message,
 									BWindow* window);
 
