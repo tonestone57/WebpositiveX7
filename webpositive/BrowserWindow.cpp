@@ -777,6 +777,32 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	}
 	unmodified.MakeEmpty();
 
+	// Add zoom out shortcut
+	if (keymap.GetModifiedCharacters("-", 0, 0, unmodified) == B_OK) {
+		int32 count = unmodified.CountStrings();
+		for (int32 i = 0; i < count; i++) {
+			uint32 key = BUnicodeChar::FromUTF8(unmodified.StringAt(i));
+			if (!HasShortcut(key, B_COMMAND_KEY)) {
+				AddShortcut(key, B_COMMAND_KEY,
+					new BMessage(ZOOM_FACTOR_DECREASE));
+			}
+		}
+	}
+	unmodified.MakeEmpty();
+
+	// Add zoom reset shortcut
+	if (keymap.GetModifiedCharacters("0", 0, 0, unmodified) == B_OK) {
+		int32 count = unmodified.CountStrings();
+		for (int32 i = 0; i < count; i++) {
+			uint32 key = BUnicodeChar::FromUTF8(unmodified.StringAt(i));
+			if (!HasShortcut(key, B_COMMAND_KEY)) {
+				AddShortcut(key, B_COMMAND_KEY,
+					new BMessage(ZOOM_FACTOR_RESET));
+			}
+		}
+	}
+	unmodified.MakeEmpty();
+
 	BMessage memMsg(CHECK_MEMORY_PRESSURE);
 	fMemoryPressureRunner = new BMessageRunner(BMessenger(this), &memMsg, 30000000); // 30 seconds
 
@@ -1808,6 +1834,15 @@ BrowserWindow::MessageReceived(BMessage* message)
 				else
 					BWebPage::SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
 				_CheckMemoryPressure();
+			} else if (name == kSettingsKeyLoadImages
+				&& message->FindBool("value", &flag) == B_OK) {
+				// flag is "load images" (true = load, false = don't load)
+				// Menu item is "Disable images". So if flag is true, item should be unchecked.
+				fLoadImagesMenuItem->SetMarked(!flag);
+				if (CurrentWebView() && CurrentWebView()->WebPage()) {
+					BWebSettings* settings = CurrentWebView()->WebPage()->Settings();
+					if (settings) settings->SetLoadsImagesAutomatically(flag);
+				}
 			}
 			break;
 		}

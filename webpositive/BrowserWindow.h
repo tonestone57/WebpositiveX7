@@ -122,6 +122,8 @@ enum {
 	UNPIN_TAB						= 'uptb',
 	CLOSE_TAB						= 'cltb',
 	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb',
+	TOGGLE_LOAD_IMAGES				= 'tgli',
+	INSPECT_ELEMENT					= 'insp',
 
 	EXPORT_BOOKMARKS							= 'exbm',
 	IMPORT_BOOKMARKS							= 'imbm',
