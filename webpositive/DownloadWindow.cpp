@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #include <Alert.h>
+#include <Autolock.h>
 #include <Button.h>
 #include <Catalog.h>
 #include <ControlLook.h>
@@ -18,6 +19,7 @@
 #include <GroupLayout.h>
 #include <GroupLayoutBuilder.h>
 #include <Locale.h>
+#include <Locker.h>
 #include <MenuBar.h>
 #include <MenuItem.h>
 #include <MessageRunner.h>
@@ -196,7 +198,7 @@ DownloadWindow::~DownloadWindow()
 
 	// Only necessary to save the current progress of unfinished downloads:
 	if (fSettingsDirty)
-		_PerformSaveSettings();
+		_PerformSaveSettings(true);
 }
 
 
@@ -582,17 +584,39 @@ DownloadWindow::_ScheduleSaveSettings()
 }
 
 
+static BLocker sSaveLock("DownloadWindow Save Lock");
+
+
+static status_t
+_SaveSettingsThread(void* data)
+{
+	BMessage* message = (BMessage*)data;
+	BAutolock lock(sSaveLock);
+
+	BPath path;
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK
+		&& path.Append(kApplicationName) == B_OK
+		&& path.Append("Downloads") == B_OK) {
+
+		BFile file;
+		if (file.SetTo(path.Path(),
+				B_ERASE_FILE | B_CREATE_FILE | B_WRITE_ONLY) == B_OK) {
+			message->Flatten(&file);
+		}
+	}
+	delete message;
+	return B_OK;
+}
+
+
 void
-DownloadWindow::_PerformSaveSettings()
+DownloadWindow::_PerformSaveSettings(bool wait)
 {
 	delete fSaveSettingsRunner;
 	fSaveSettingsRunner = NULL;
 	fSettingsDirty = false;
 
-	BFile file;
-	if (!_OpenSettingsFile(file, B_ERASE_FILE | B_CREATE_FILE | B_WRITE_ONLY))
-		return;
-	BMessage message;
+	BMessage* message = new BMessage();
 	for (int32 i = fDownloadViewsLayout->CountItems() - 1;
 			BLayoutItem* item = fDownloadViewsLayout->ItemAt(i); i--) {
 		DownloadProgressView* view = dynamic_cast<DownloadProgressView*>(
@@ -602,9 +626,19 @@ DownloadWindow::_PerformSaveSettings()
 
 	BMessage downloadArchive;
 		if (view->SaveSettings(&downloadArchive) == B_OK)
-			message.AddMessage("download", &downloadArchive);
+			message->AddMessage("download", &downloadArchive);
 	}
-	message.Flatten(&file);
+
+	if (wait) {
+		_SaveSettingsThread(message);
+	} else {
+		thread_id thread = spawn_thread(_SaveSettingsThread,
+			"Save Downloads Settings", B_LOW_PRIORITY, message);
+		if (thread >= B_OK)
+			resume_thread(thread);
+		else
+			delete message;
+	}
 }
 
 
