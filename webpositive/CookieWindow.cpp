@@ -13,11 +13,14 @@
 #include <Catalog.h>
 #include <ColumnListView.h>
 #include <ColumnTypes.h>
+#include <FilePanel.h>
 #include <GroupLayoutBuilder.h>
 #include <NetworkCookieJar.h>
 #include <OutlineListView.h>
 #include <ScrollView.h>
 #include <StringView.h>
+
+#include "Sync.h"
 
 
 #undef B_TRANSLATION_CONTEXT
@@ -146,12 +149,10 @@ CookieWindow::CookieWindow(BRect frame,
 		.Add(fCookies)
 		.AddGroup(B_HORIZONTAL, B_USE_DEFAULT_SPACING)
 			.SetInsets(5, 5, 5, 5)
-#if 0
 			.Add(new BButton("import", B_TRANSLATE("Import" B_UTF8_ELLIPSIS),
-				NULL))
+				new BMessage(COOKIE_IMPORT)))
 			.Add(new BButton("export", B_TRANSLATE("Export" B_UTF8_ELLIPSIS),
-				NULL))
-#endif
+				new BMessage(COOKIE_EXPORT)))
 			.AddGlue()
 			.Add(new BButton("delete", B_TRANSLATE("Delete"),
 				new BMessage(COOKIE_DELETE))), 3);
@@ -182,6 +183,55 @@ CookieWindow::MessageReceived(BMessage* message)
 		case COOKIE_DELETE:
 			_DeleteCookies();
 			return;
+
+		case COOKIE_IMPORT:
+		{
+			BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
+				NULL, B_FILE_NODE, false, new BMessage(COOKIE_IMPORT));
+			panel->Show();
+			break;
+		}
+		case COOKIE_EXPORT:
+		{
+			BFilePanel* panel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this),
+				NULL, 0, false, new BMessage(COOKIE_EXPORT));
+			panel->Show();
+			break;
+		}
+		case B_SAVE_REQUESTED:
+		{
+			if (message->what == B_SAVE_REQUESTED) {
+				// Check which export
+				// Actually BFilePanel sends B_SAVE_REQUESTED to target.
+				// But we attached a message.
+				// Wait, BFilePanel(..., msg) -> msg is used for "selection" in OPEN_PANEL,
+				// but for SAVE_PANEL it sends B_SAVE_REQUESTED.
+				// We need to differentiate if we had multiple save panels.
+				// But here we can just assume it is cookie export if we are in CookieWindow.
+				// Or we can check the message? BFilePanel doesn't easily attach "userdata" to B_SAVE_REQUESTED.
+				// However, we only have one export in CookieWindow.
+				entry_ref ref;
+				BString name;
+				if (message->FindRef("directory", &ref) == B_OK
+					&& message->FindString("name", &name) == B_OK) {
+					BPath path(&ref);
+					path.Append(name);
+					Sync::ExportCookies(path, fCookieJar);
+				}
+			}
+			break;
+		}
+		case B_REFS_RECEIVED:
+		{
+			// Import
+			entry_ref ref;
+			if (message->FindRef("refs", &ref) == B_OK) {
+				BPath path(&ref);
+				Sync::ImportCookies(path, fCookieJar);
+				_BuildDomainList();
+			}
+			break;
+		}
 	}
 	BWindow::MessageReceived(message);
 }
