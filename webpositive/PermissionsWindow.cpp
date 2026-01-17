@@ -18,6 +18,7 @@
 #include <Path.h>
 
 #include "BrowserApp.h"
+#include "SitePermissionsManager.h"
 
 enum {
 	MSG_DOMAIN_SELECTED = 'mdsl',
@@ -220,6 +221,7 @@ PermissionsWindow::_SavePermissions()
 			settings.AddMessage("domain", &domainMsg);
 		}
 		settings.Save();
+		SitePermissionsManager::Instance()->Reload();
 	}
 }
 

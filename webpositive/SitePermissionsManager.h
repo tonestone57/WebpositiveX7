@@ -1,0 +1,35 @@
+/*
+ * Copyright 2023 Haiku, Inc. All rights reserved.
+ * Distributed under the terms of the MIT License.
+ */
+#ifndef SITE_PERMISSIONS_MANAGER_H
+#define SITE_PERMISSIONS_MANAGER_H
+
+#include <SupportDefs.h>
+#include <String.h>
+#include <Locker.h>
+#include <vector>
+
+class SitePermissionsManager {
+public:
+	static SitePermissionsManager* Instance();
+
+	bool CheckPermission(const char* url, bool& allowPopups);
+	void Reload();
+
+private:
+	SitePermissionsManager();
+	~SitePermissionsManager();
+
+	struct PermissionEntry {
+		BString domain;
+		bool js;
+		bool cookies;
+		bool popups;
+	};
+
+	std::vector<PermissionEntry> fPermissions;
+	BLocker fLock;
+};
+
+#endif // SITE_PERMISSIONS_MANAGER_H

@@ -38,6 +38,7 @@ local sources =
 	PermissionsWindow.cpp
 	SettingsKeys.cpp
 	SettingsWindow.cpp
+	SitePermissionsManager.cpp
 	TabSearchWindow.cpp
 	URLInputGroup.cpp
 ;
