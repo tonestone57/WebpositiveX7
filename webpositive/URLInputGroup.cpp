@@ -595,6 +595,7 @@ public:
 				B_CMAP8);
 			miniIcon.ImportBits(fIcon);
 
+			// Large icon now provided via PageUserData::PageIconLarge().
 			const BBitmap* largeIcon = NULL;
 			PageUserData* userData = static_cast<PageUserData*>(
 				static_cast<BrowserWindow*>(Window())->CurrentWebView()->GetUserData());
