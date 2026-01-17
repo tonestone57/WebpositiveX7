@@ -383,6 +383,7 @@ DownloadProgressView::MessageReceived(BMessage* message)
 				BNode node(&ref);
 
 				mode_t permissions;
+				// Check for executable permissions (user, group, or other)
 				if (node.GetPermissions(&permissions) == B_OK) {
 					if ((permissions & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0)
 						isExecutable = true;
@@ -391,6 +392,7 @@ DownloadProgressView::MessageReceived(BMessage* message)
 				if (!isExecutable) {
 					BNodeInfo nodeInfo(&node);
 					char mimeType[B_MIME_TYPE_LENGTH];
+					// Check for application MIME type
 					if (nodeInfo.GetType(mimeType) == B_OK) {
 						if (strcmp(mimeType, B_APP_MIME_TYPE) == 0)
 							isExecutable = true;
