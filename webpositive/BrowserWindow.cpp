@@ -2260,7 +2260,7 @@ BrowserWindow::MainDocumentError(const BString& failingURL,
 
 	BWebWindow::MainDocumentError(failingURL, localizedDescription, view);
 
-	// Remove the failing URL from the browsing history
+	// Remove the failing URL from the browsing history.
 	BrowsingHistory::DefaultInstance()->RemoveUrl(failingURL);
 }
 
