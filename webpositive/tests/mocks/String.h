@@ -24,6 +24,10 @@ public:
          return (pos == std::string::npos) ? B_ERROR : (int32)pos;
     }
 
+    // Add EndsWith
+    bool EndsWith(const BString& str) const {
+        if (str.Length() > Length()) return false;
+        return fString.compare(Length() - str.Length(), str.Length(), str.fString) == 0;
     // Case insensitive find
     int32 IFindFirst(const char* str) const {
         // Just forward to normal find for mock
@@ -68,6 +72,9 @@ public:
     char operator[](int32 index) const { return fString[index]; }
 
     void SetByteAt(int32 index, char c) { fString[index] = c; }
+
+    // ByteAt for convenience in tests (though real BString doesn't always have it, it might use [])
+    char ByteAt(int32 index) const { return fString[index]; }
 
     void Insert(const char* str, int32 pos) { fString.insert(pos, str); }
 

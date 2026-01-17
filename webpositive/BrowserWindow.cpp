@@ -2128,10 +2128,20 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 			BString host = checkUrl.Host();
 			for (int i = 0; kBlockedDomains[i]; i++) {
 				// Check if host matches exactly or ends with .domain
-				if (host == kBlockedDomains[i] || host.EndsWith(BString(".") << kBlockedDomains[i])) {
+				if (host == kBlockedDomains[i]) {
 					if (view)
 						view->LoadURL("about:blank");
 					return;
+				}
+
+				int32 hostLen = host.Length();
+				int32 domainLen = strlen(kBlockedDomains[i]);
+				if (hostLen >= domainLen + 1 && host.EndsWith(kBlockedDomains[i])) {
+					if (host.ByteAt(hostLen - domainLen - 1) == '.') {
+						if (view)
+							view->LoadURL("about:blank");
+						return;
+					}
 				}
 			}
 		}
