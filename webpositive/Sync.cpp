@@ -51,7 +51,9 @@ Sync::ImportProfile(const BPath& folder,
 	BookmarkManager::ImportBookmarks(bookmarksPath);
 	// We ignore errors here as some files might be missing
 
-	// BrowsingHistory import not implemented yet (was not requested, but would mirror export)
+	BPath historyPath(folder);
+	historyPath.Append("history.csv");
+	BrowsingHistory::ImportHistory(historyPath);
 
 	BPath cookiesPath(folder);
 	cookiesPath.Append("cookies.txt");

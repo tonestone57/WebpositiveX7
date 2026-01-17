@@ -46,8 +46,12 @@ public:
 
 			const BString&		URL() const { return fURL; }
 			const BDateTime&	DateTime() const { return fDateTime; }
+			void				SetDateTime(const BDateTime& dateTime) { fDateTime = dateTime; }
+
 			uint32				InvokationCount() const {
 									return fInvokationCount; }
+			void				SetInvokationCount(uint32 count) { fInvokationCount = count; }
+
 			void				Invoked();
 
 private:
@@ -68,6 +72,7 @@ public:
 	static	BrowsingHistory*	DefaultInstance();
 
 	static	status_t			ExportHistory(const BPath& path);
+	static	status_t			ImportHistory(const BPath& path);
 
 	virtual	void				MessageReceived(BMessage* message);
 

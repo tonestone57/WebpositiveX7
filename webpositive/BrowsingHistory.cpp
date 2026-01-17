@@ -195,6 +195,119 @@ BrowsingHistory::ExportHistory(const BPath& path)
 }
 
 
+/*static*/ status_t
+BrowsingHistory::ImportHistory(const BPath& path)
+{
+	BFile file(path.Path(), B_READ_ONLY);
+	status_t status = file.InitCheck();
+	if (status != B_OK)
+		return status;
+
+	off_t size;
+	file.GetSize(&size);
+	BString content;
+	char* buffer = content.LockBuffer(size);
+	file.Read(buffer, size);
+	content.UnlockBuffer(size);
+
+	int32 pos = 0;
+	// Skip header
+	int32 headerEnd = content.FindFirst("\n");
+	if (headerEnd >= 0)
+		pos = headerEnd + 1;
+
+	while (pos < content.Length()) {
+		int32 nextPos = pos;
+		bool inQuotes = false;
+		// Find end of line, respecting quotes
+		while (nextPos < content.Length()) {
+			char c = content.ByteAt(nextPos);
+			if (c == '"') {
+				inQuotes = !inQuotes;
+			} else if (c == '\n' && !inQuotes) {
+				break;
+			}
+			nextPos++;
+		}
+
+		BString line;
+		content.CopyInto(line, pos, nextPos - pos);
+		pos = nextPos + 1;
+
+		if (line.IsEmpty())
+			continue;
+
+		// Parse line
+		// URL,Date,Count
+		// URL can be quoted.
+
+		BString url;
+		BString dateStr;
+		BString countStr;
+
+		int32 linePos = 0;
+		// URL
+		if (line.ByteAt(0) == '"') {
+			// Quoted
+			linePos = 1;
+			while (linePos < line.Length()) {
+				int32 quote = line.FindFirst('"', linePos);
+				if (quote < 0) break; // Error
+				if (quote + 1 < line.Length() && line.ByteAt(quote + 1) == '"') {
+					// Escaped quote: append everything up to and including the first "
+					url.Append(line.String() + linePos, quote - linePos + 1);
+					// Skip the second "
+					linePos = quote + 2;
+				} else {
+					// End of field
+					url.Append(line.String() + linePos, quote - linePos);
+					linePos = quote + 1;
+					// Consume comma
+					if (linePos < line.Length() && line.ByteAt(linePos) == ',')
+						linePos++;
+					break;
+				}
+			}
+		} else {
+			int32 comma = line.FindFirst(',', linePos);
+			if (comma < 0) {
+				// Should not happen as we expect 3 fields
+				url = line;
+				linePos = line.Length();
+			} else {
+				line.CopyInto(url, linePos, comma - linePos);
+				linePos = comma + 1;
+			}
+		}
+
+		// Date
+		int32 comma = line.FindFirst(',', linePos);
+		if (comma < 0) continue; // Invalid
+		line.CopyInto(dateStr, linePos, comma - linePos);
+		linePos = comma + 1;
+
+		// Count
+		line.CopyInto(countStr, linePos, line.Length() - linePos);
+
+		struct tm timeinfo;
+		memset(&timeinfo, 0, sizeof(struct tm));
+		strptime(dateStr.String(), "%Y-%m-%d %H:%M:%S", &timeinfo);
+		time_t t = mktime(&timeinfo);
+		BDateTime dateTime;
+		dateTime.SetTime_t(t);
+
+		uint32 count = (uint32)atoi(countStr.String());
+
+		BrowsingHistoryItem item(url);
+		item.SetDateTime(dateTime);
+		item.SetInvokationCount(count);
+
+		DefaultInstance()->AddItem(item);
+	}
+	return B_OK;
+}
+
+
 // #pragma mark - BrowsingHistory
 
 
