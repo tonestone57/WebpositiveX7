@@ -29,6 +29,11 @@ public:
 	status_t AddInt32(const char* name, int32 val) { return B_OK; }
 	status_t FindInt32(const char* name, int32* val) const { return B_OK; }
 
+	status_t GetInfo(const char* name, type_code* typeFound, int32* countFound = NULL) const {
+		if (countFound) *countFound = 0;
+		return B_ERROR;
+	}
+
 	status_t Flatten(BFile* file) const { return B_OK; }
 	status_t Unflatten(BFile* file) { return B_OK; }
 	void MakeEmpty() {}

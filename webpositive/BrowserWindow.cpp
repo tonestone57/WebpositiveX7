@@ -31,6 +31,7 @@
 
 #include "BrowserWindow.h"
 
+#include <OS.h>
 #include <Alert.h>
 #include <Application.h>
 #include <Bitmap.h>
@@ -88,6 +89,7 @@
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
 #include "SitePermissionsManager.h"
+#include "Sync.h"
 #include "TabManager.h"
 #include "TabSearchWindow.h"
 #include "URLInputGroup.h"
@@ -327,9 +329,11 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fReaderMode(false),
 	fToolbarBottom(false),
 	fIsLoading(false),
+	fLowRAMMode(false),
 	fTabSearchWindow(NULL),
 	fLastHistoryGeneration(0),
-	fPermissionsWindow(NULL)
+	fPermissionsWindow(NULL),
+	fMemoryPressureRunner(NULL)
 {
 	fFormSafetyHelper = new FormSafetyHelper(this);
 
@@ -345,6 +349,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		fAutoHideBookmarkBar);
 	fToolbarBottom = fAppSettings->GetValue(kSettingsKeyToolbarBottom,
 		fToolbarBottom);
+	fLowRAMMode = fAppSettings->GetValue(kSettingsKeyLowRAMMode, false);
 
 	fNewWindowPolicy = fAppSettings->GetValue(kSettingsKeyNewWindowPolicy,
 		(uint32)OpenStartPage);
@@ -397,6 +402,16 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(CLOSE_TAB), 'W'));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Save page as" B_UTF8_ELLIPSIS),
 		new BMessage(SAVE_PAGE), 'S'));
+	menu->AddSeparatorItem();
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Import bookmarks" B_UTF8_ELLIPSIS),
+		new BMessage(IMPORT_BOOKMARKS)));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Export bookmarks" B_UTF8_ELLIPSIS),
+		new BMessage(EXPORT_BOOKMARKS)));
+	menu->AddSeparatorItem();
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Import profile" B_UTF8_ELLIPSIS),
+		new BMessage(SYNC_IMPORT)));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Export profile" B_UTF8_ELLIPSIS),
+		new BMessage(SYNC_EXPORT)));
 	menu->AddSeparatorItem();
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Downloads"),
 		new BMessage(SHOW_DOWNLOAD_WINDOW), 'D'));
@@ -519,6 +534,9 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fHistoryMenu->AddItem(fRecentlyClosedMenu = new BMenu(
 		B_TRANSLATE("Recently closed tabs")));
 	fRecentlyClosedMenu->SetEnabled(false);
+	fHistoryMenu->AddSeparatorItem();
+	fHistoryMenu->AddItem(new BMenuItem(B_TRANSLATE("Export history" B_UTF8_ELLIPSIS),
+		new BMessage(EXPORT_HISTORY)));
 	fHistoryMenu->AddSeparatorItem();
 	fHistoryMenuFixedItemCount = fHistoryMenu->CountItems();
 	mainMenu->AddItem(fHistoryMenu);
@@ -746,6 +764,9 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	}
 	unmodified.MakeEmpty();
 
+	BMessage memMsg(CHECK_MEMORY_PRESSURE);
+	fMemoryPressureRunner = new BMessageRunner(BMessenger(this), &memMsg, 30000000); // 30 seconds
+
 	be_app->PostMessage(WINDOW_OPENED);
 }
 
@@ -755,6 +776,7 @@ BrowserWindow::~BrowserWindow()
 	fAppSettings->RemoveListener(BMessenger(this));
 	delete fTabManager;
 	delete fPulseRunner;
+	delete fMemoryPressureRunner;
 	delete fSavePanel;
 	delete fFormSafetyHelper;
 	if (fPermissionsWindow) {
@@ -919,8 +941,56 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case SAVE_PAGE:
 		{
+			BMessage saveMsg(B_SAVE_REQUESTED);
+			saveMsg.AddInt32("type", SAVE_PAGE);
+			fSavePanel->SetMessage(&saveMsg);
 			fSavePanel->SetSaveText(CurrentWebView()->MainFrameTitle());
 			fSavePanel->Show();
+			break;
+		}
+
+		case EXPORT_BOOKMARKS:
+		{
+			BMessage saveMsg(B_SAVE_REQUESTED);
+			saveMsg.AddInt32("type", EXPORT_BOOKMARKS);
+			fSavePanel->SetMessage(&saveMsg);
+			fSavePanel->SetSaveText("bookmarks.html");
+			fSavePanel->Show();
+			break;
+		}
+
+		case IMPORT_BOOKMARKS:
+		{
+			BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
+				NULL, B_FILE_NODE, false, new BMessage(IMPORT_BOOKMARKS));
+			panel->Show();
+			break;
+		}
+
+		case EXPORT_HISTORY:
+		{
+			BMessage saveMsg(B_SAVE_REQUESTED);
+			saveMsg.AddInt32("type", EXPORT_HISTORY);
+			fSavePanel->SetMessage(&saveMsg);
+			fSavePanel->SetSaveText("history.csv");
+			fSavePanel->Show();
+			break;
+		}
+
+		case SYNC_EXPORT:
+		{
+			BFilePanel* panel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this),
+				NULL, B_DIRECTORY_NODE, false, new BMessage(SYNC_EXPORT));
+			panel->SetSaveText("WebPositiveProfile");
+			panel->Show();
+			break;
+		}
+
+		case SYNC_IMPORT:
+		{
+			BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
+				NULL, B_DIRECTORY_NODE, false, new BMessage(SYNC_IMPORT));
+			panel->Show();
 			break;
 		}
 
@@ -928,15 +998,81 @@ BrowserWindow::MessageReceived(BMessage* message)
 		{
 			entry_ref ref;
 			BString name;
+			int32 type = SAVE_PAGE;
+			message->FindInt32("type", &type);
 
 			if (message->FindRef("directory", &ref) == B_OK
 				&& message->FindString("name", &name) == B_OK) {
 				BDirectory dir(&ref);
-				BFile output(&dir, name,
-					B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
-				CurrentWebView()->WebPage()->GetContentsAsMHTML(output);
-			}
 
+				if (type == EXPORT_BOOKMARKS) {
+					BPath path(&ref);
+					path.Append(name);
+					status_t status = BookmarkManager::ExportBookmarks(path);
+					if (status != B_OK) {
+						BString errorMsg(B_TRANSLATE("Failed to export bookmarks"));
+						errorMsg << ": " << strerror(status);
+						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+							errorMsg.String(), B_TRANSLATE("OK"));
+						alert->Go();
+					}
+				} else if (type == EXPORT_HISTORY) {
+					BPath path(&ref);
+					path.Append(name);
+					status_t status = BrowsingHistory::ExportHistory(path);
+					if (status != B_OK) {
+						BString errorMsg(B_TRANSLATE("Failed to export history"));
+						errorMsg << ": " << strerror(status);
+						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+							errorMsg.String(), B_TRANSLATE("OK"));
+						alert->Go();
+					}
+				} else if (type == SAVE_PAGE) {
+					BFile output(&dir, name,
+						B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+					CurrentWebView()->WebPage()->GetContentsAsMHTML(output);
+				}
+			}
+			break;
+		}
+
+		case SYNC_EXPORT:
+		{
+			// BFilePanel for directory selection might send this if we set the message
+			entry_ref ref;
+			BString name;
+			if (message->FindRef("directory", &ref) == B_OK
+				&& message->FindString("name", &name) == B_OK) {
+				BPath path(&ref);
+				path.Append(name);
+				status_t status = Sync::ExportProfile(path, fContext->GetCookieJar());
+				if (status != B_OK) {
+					BString errorMsg(B_TRANSLATE("Failed to export profile"));
+					errorMsg << ": " << strerror(status);
+					BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+						errorMsg.String(), B_TRANSLATE("OK"));
+					alert->Go();
+				}
+			}
+			break;
+		}
+
+		case SYNC_IMPORT:
+		{
+			entry_ref ref;
+			if (message->FindRef("refs", &ref) == B_OK) {
+				BPath path(&ref);
+				status_t status = Sync::ImportProfile(path, fContext->GetCookieJar());
+				if (status != B_OK) {
+					BString errorMsg(B_TRANSLATE("Failed to import profile"));
+					errorMsg << ": " << strerror(status);
+					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+						errorMsg.String(), B_TRANSLATE("OK"));
+					alert->Go();
+				}
+				// Refresh cookies?
+				// Refresh bookmarks?
+			}
 			break;
 		}
 
@@ -994,6 +1130,24 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case SHOW_BOOKMARKS:
 			BookmarkManager::ShowBookmarks();
 			break;
+
+		case IMPORT_BOOKMARKS:
+		{
+			// Handle Import from FilePanel selection
+			entry_ref ref;
+			if (message->FindRef("refs", &ref) == B_OK) {
+				BPath path(&ref);
+				status_t status = BookmarkManager::ImportBookmarks(path);
+				if (status != B_OK) {
+					BString errorMsg(B_TRANSLATE("Failed to import bookmarks"));
+					errorMsg << ": " << strerror(status);
+					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+						errorMsg.String(), B_TRANSLATE("OK"));
+					alert->Go();
+				}
+			}
+			break;
+		}
 
 		case B_REFS_RECEIVED:
 		{
@@ -1538,6 +1692,10 @@ BrowserWindow::MessageReceived(BMessage* message)
 			} else if (name == kSettingsShowBookmarkBar
 				&& message->FindBool("value", &flag) == B_OK) {
 				_ShowBookmarkBar(flag);
+			} else if (name == kSettingsKeyLowRAMMode
+				&& message->FindBool("value", &flag) == B_OK) {
+				fLowRAMMode = flag;
+				_CheckMemoryPressure();
 			}
 			break;
 		}
@@ -1577,6 +1735,10 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case CHECK_FORM_DIRTY_TIMEOUT:
 			fFormSafetyHelper->MessageReceived(message);
+			break;
+
+		case CHECK_MEMORY_PRESSURE:
+			_CheckMemoryPressure();
 			break;
 
 		case B_COPY_TARGET:
@@ -1845,6 +2007,20 @@ BrowserWindow::SetCurrentWebView(BWebView* webView)
 
 		// Trigger update of the interface to the new page, by requesting
 		// to resend all notifications.
+		if (userData != NULL) {
+			if (userData->IsLazy()) {
+				userData->SetIsLazy(false);
+				BString url = userData->PendingURL();
+				if (url.Length() > 0)
+					webView->LoadURL(url);
+			} else if (userData->IsDiscarded()) {
+				userData->SetIsDiscarded(false);
+				BString url = userData->PendingURL();
+				if (url.Length() > 0)
+					webView->LoadURL(url);
+			}
+		}
+
 		webView->WebPage()->ResendNotifications();
 	} else
 		_UpdateTitle("");
@@ -1864,7 +2040,7 @@ BrowserWindow::IsBlankTab() const
 
 void
 BrowserWindow::CreateNewTab(const BString& _url, bool select,
-	BWebView* webView)
+	BWebView* webView, bool lazy)
 {
 	bool applyNewPagePolicy = webView == NULL;
 	// Executed in app thread (new BWebPage needs to be created in app thread).
@@ -1879,8 +2055,19 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 	if (applyNewPagePolicy && url.Length() == 0)
 		url = _NewTabURL(isNewWindow);
 
-	if (url.Length() > 0)
-		webView->LoadURL(url.String());
+	if (url.Length() > 0) {
+		if (lazy) {
+			_SetPageIcon(webView, NULL); // Ensure userData exists
+			PageUserData* userData = static_cast<PageUserData*>(webView->GetUserData());
+			if (userData) {
+				userData->SetIsLazy(true);
+				userData->SetPendingURL(url);
+			}
+			// Don't load URL
+		} else {
+			webView->LoadURL(url.String());
+		}
+	}
 
 	if (select) {
 		fTabManager->SelectTab(fTabManager->CountTabs() - 1);
@@ -2022,10 +2209,20 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 			BString host = checkUrl.Host();
 			for (int i = 0; kBlockedDomains[i]; i++) {
 				// Check if host matches exactly or ends with .domain
-				if (host == kBlockedDomains[i] || host.EndsWith(BString(".") << kBlockedDomains[i])) {
+				if (host == kBlockedDomains[i]) {
 					if (view)
 						view->LoadURL("about:blank");
 					return;
+				}
+
+				int32 hostLen = host.Length();
+				int32 domainLen = strlen(kBlockedDomains[i]);
+				if (hostLen >= domainLen + 1 && host.EndsWith(kBlockedDomains[i])) {
+					if (host.ByteAt(hostLen - domainLen - 1) == '.') {
+						if (view)
+							view->LoadURL("about:blank");
+						return;
+					}
 				}
 			}
 		}
@@ -2746,33 +2943,67 @@ BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon)
 }
 
 
-static void
-addItemToMenuOrSubmenu(BMenu* menu, BMenuItem* newItem)
-{
-	BString baseURLLabel = baseURL(BString(newItem->Label()));
-	for (int32 i = menu->CountItems() - 1; i >= 0; i--) {
-		BMenuItem* item = menu->ItemAt(i);
-		BString label = item->Label();
-		if (label.FindFirst(baseURLLabel) >= 0) {
-			if (item->Submenu()) {
-				// Submenu was already added in previous iteration.
-				item->Submenu()->AddItem(newItem);
-				return;
-			} else {
-				menu->RemoveItem(item);
-				BMenu* subMenu = new BMenu(baseURLLabel.String());
-				subMenu->AddItem(item);
-				subMenu->AddItem(newItem);
-				// Add common submenu for this base URL, clickable.
-				BMessage* message = new BMessage(GOTO_URL);
-				message->AddString("url", baseURLLabel.String());
-				menu->AddItem(new BMenuItem(subMenu, message), i);
-				return;
-			}
-		}
+class HistoryMenuBuilder {
+public:
+	HistoryMenuBuilder(BMenu* menu)
+		:
+		fMenu(menu)
+	{
 	}
-	menu->AddItem(newItem);
-}
+
+	void AddItem(BMenuItem* newItem)
+	{
+		BString baseURLLabel = baseURL(BString(newItem->Label()));
+
+		// Check if we already have a submenu for this base URL
+		std::map<BString, BMenu*>::iterator subMenuIt
+			= fSubMenus.find(baseURLLabel);
+		if (subMenuIt != fSubMenus.end()) {
+			subMenuIt->second->AddItem(newItem);
+			return;
+		}
+
+		// Check if we have a single item waiting to be promoted
+		std::map<BString, BMenuItem*>::iterator singleItemIt
+			= fSingleItems.find(baseURLLabel);
+		if (singleItemIt != fSingleItems.end()) {
+			BMenuItem* oldItem = singleItemIt->second;
+
+			// Remove old item from the main menu
+			int32 index = fMenu->IndexOf(oldItem);
+			fMenu->RemoveItem(oldItem);
+
+			// Create new submenu
+			BMenu* subMenu = new BMenu(baseURLLabel.String());
+			subMenu->AddItem(oldItem);
+			subMenu->AddItem(newItem);
+
+			// Add common submenu for this base URL, clickable.
+			BMessage* message = new BMessage(GOTO_URL);
+			message->AddString("url", baseURLLabel.String());
+
+			BMenuItem* subMenuItem = new BMenuItem(subMenu, message);
+			if (index >= 0)
+				fMenu->AddItem(subMenuItem, index);
+			else
+				fMenu->AddItem(subMenuItem);
+
+			// Update maps
+			fSingleItems.erase(singleItemIt);
+			fSubMenus[baseURLLabel] = subMenu;
+			return;
+		}
+
+		// Otherwise just add it
+		fMenu->AddItem(newItem);
+		fSingleItems[baseURLLabel] = newItem;
+	}
+
+private:
+	BMenu* fMenu;
+	std::map<BString, BMenu*> fSubMenus;
+	std::map<BString, BMenuItem*> fSingleItems;
+};
 
 
 static void
@@ -2846,6 +3077,14 @@ BrowserWindow::_UpdateHistoryMenu()
 		fiveDaysAgoStart.Date().LongDayName().String());
 	BMenu* earlierMenu = new BMenu(B_TRANSLATE("Earlier"));
 
+	HistoryMenuBuilder todayBuilder(todayMenu);
+	HistoryMenuBuilder yesterdayBuilder(yesterdayMenu);
+	HistoryMenuBuilder twoDaysAgoBuilder(twoDaysAgoMenu);
+	HistoryMenuBuilder threeDaysAgoBuilder(threeDaysAgoMenu);
+	HistoryMenuBuilder fourDaysAgoBuilder(fourDaysAgoMenu);
+	HistoryMenuBuilder fiveDaysAgoBuilder(fiveDaysAgoMenu);
+	HistoryMenuBuilder earlierBuilder(earlierMenu);
+
 	for (int32 i = 0; i < count; i++) {
 		BrowsingHistoryItem historyItem = history->HistoryItemAt(i);
 		BMessage* message = new BMessage(GOTO_URL);
@@ -2856,19 +3095,19 @@ BrowserWindow::_UpdateHistoryMenu()
 		menuItem = new BMenuItem(truncatedUrl, message);
 
 		if (historyItem.DateTime() < fiveDaysAgoStart)
-			addItemToMenuOrSubmenu(earlierMenu, menuItem);
+			earlierBuilder.AddItem(menuItem);
 		else if (historyItem.DateTime() < fourDaysAgoStart)
-			addItemToMenuOrSubmenu(fiveDaysAgoMenu, menuItem);
+			fiveDaysAgoBuilder.AddItem(menuItem);
 		else if (historyItem.DateTime() < threeDaysAgoStart)
-			addItemToMenuOrSubmenu(fourDaysAgoMenu, menuItem);
+			fourDaysAgoBuilder.AddItem(menuItem);
 		else if (historyItem.DateTime() < twoDaysAgoStart)
-			addItemToMenuOrSubmenu(threeDaysAgoMenu, menuItem);
+			threeDaysAgoBuilder.AddItem(menuItem);
 		else if (historyItem.DateTime() < oneDayAgoStart)
-			addItemToMenuOrSubmenu(twoDaysAgoMenu, menuItem);
+			twoDaysAgoBuilder.AddItem(menuItem);
 		else if (historyItem.DateTime() < todayStart)
-			addItemToMenuOrSubmenu(yesterdayMenu, menuItem);
+			yesterdayBuilder.AddItem(menuItem);
 		else
-			addItemToMenuOrSubmenu(todayMenu, menuItem);
+			todayBuilder.AddItem(menuItem);
 	}
 	history->Unlock();
 
@@ -3198,6 +3437,50 @@ BrowserWindow::_UpdateRecentlyClosedMenu()
 		}
 
 		fRecentlyClosedMenu->SetEnabled(hasClosedTabs);
+	}
+}
+
+
+void
+BrowserWindow::_CheckMemoryPressure()
+{
+	if (fLowRAMMode) {
+		_DiscardBackgroundTabs();
+		return;
+	}
+
+	system_info info;
+	if (get_system_info(&info) == B_OK) {
+		uint64 usedPages = info.used_pages;
+		uint64 maxPages = info.max_pages;
+		// If more than 90% memory used
+		if (usedPages > (uint64)(maxPages * 0.9)) {
+			_DiscardBackgroundTabs();
+		}
+	}
+}
+
+
+void
+BrowserWindow::_DiscardBackgroundTabs()
+{
+	BWebView* current = CurrentWebView();
+	int32 count = fTabManager->CountTabs();
+	for (int32 i = 0; i < count; i++) {
+		BView* view = fTabManager->ViewForTab(i);
+		BWebView* webView = dynamic_cast<BWebView*>(view);
+		if (webView && webView != current) {
+			PageUserData* userData = static_cast<PageUserData*>(webView->GetUserData());
+			if (userData && !userData->IsDiscarded() && !userData->IsLazy() && !userData->IsLoading()) {
+				// Save URL
+				BString url = webView->MainFrameURL();
+				if (url.Length() > 0 && url != "about:blank") {
+					userData->SetPendingURL(url);
+					userData->SetIsDiscarded(true);
+					webView->LoadURL("about:blank");
+				}
+			}
+		}
 	}
 }
 

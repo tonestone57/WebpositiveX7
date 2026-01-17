@@ -14,6 +14,8 @@
 #include <Roster.h>
 #include <stdio.h>
 
+#include <vector>
+
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "WebPositive Window"
 
@@ -330,4 +332,206 @@ BookmarkManager::AddBookmarkURLsRecursively(BDirectory& directory,
 			}
 		}
 	}
+}
+
+/*static*/ status_t
+BookmarkManager::ExportBookmarks(const BPath& path)
+{
+	BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+	status_t status = file.InitCheck();
+	if (status != B_OK)
+		return status;
+
+	BString header = "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n"
+		"<!-- This is an automatically generated file.\n"
+		"     It will be read and overwritten.\n"
+		"     DO NOT EDIT! -->\n"
+		"<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\">\n"
+		"<TITLE>Bookmarks</TITLE>\n"
+		"<H1>Bookmarks</H1>\n"
+		"<DL><p>\n";
+	file.Write(header.String(), header.Length());
+
+	BPath bookmarkPath;
+	status = GetBookmarkPath(bookmarkPath);
+	if (status != B_OK)
+		return status;
+
+	BDirectory dir(bookmarkPath.Path());
+	_ExportBookmarksRecursively(dir, file, 1);
+
+	BString footer = "</DL><p>\n";
+	file.Write(footer.String(), footer.Length());
+	return B_OK;
+}
+
+/*static*/ status_t
+BookmarkManager::_ExportBookmarksRecursively(BDirectory& directory, BFile& file,
+	int32 indentLevel)
+{
+	BEntry entry;
+	directory.Rewind();
+	while (directory.GetNextEntry(&entry) == B_OK) {
+		char name[B_FILE_NAME_LENGTH];
+		if (entry.GetName(name) != B_OK)
+			continue;
+
+		BString indent;
+		for (int32 i = 0; i < indentLevel; i++)
+			indent << "    ";
+
+		if (entry.IsDirectory()) {
+			BString folderName(name);
+			folderName.ReplaceAll("&", "&amp;");
+			folderName.ReplaceAll("<", "&lt;");
+			folderName.ReplaceAll(">", "&gt;");
+
+			BString line;
+			line << indent << "<DT><H3>" << folderName << "</H3>\n";
+			line << indent << "<DL><p>\n";
+			file.Write(line.String(), line.Length());
+
+			BDirectory subDirectory(&entry);
+			_ExportBookmarksRecursively(subDirectory, file, indentLevel + 1);
+
+			line = "";
+			line << indent << "</DL><p>\n";
+			file.Write(line.String(), line.Length());
+		} else {
+			BFile bookmarkFile(&entry, B_READ_ONLY);
+			BString url;
+			if (ReadURLAttr(bookmarkFile, url)) {
+				BString title;
+				if (bookmarkFile.ReadAttrString("META:title", &title) != B_OK)
+					title = name;
+
+				title.ReplaceAll("&", "&amp;");
+				title.ReplaceAll("<", "&lt;");
+				title.ReplaceAll(">", "&gt;");
+
+				BString line;
+				line << indent << "<DT><A HREF=\"" << url << "\">" << title << "</A>\n";
+				file.Write(line.String(), line.Length());
+			}
+		}
+	}
+	return B_OK;
+}
+
+/*static*/ status_t
+BookmarkManager::ImportBookmarks(const BPath& path)
+{
+	BFile file(path.Path(), B_READ_ONLY);
+	status_t status = file.InitCheck();
+	if (status != B_OK)
+		return status;
+
+	off_t size;
+	file.GetSize(&size);
+	BString content;
+	char* buffer = content.LockBuffer(size);
+	file.Read(buffer, size);
+	content.UnlockBuffer(size);
+
+	BPath bookmarkPath;
+	status = GetBookmarkPath(bookmarkPath);
+	if (status != B_OK)
+		return status;
+
+	std::vector<BPath> dirStack;
+	dirStack.push_back(bookmarkPath);
+
+	BString pendingFolderName;
+
+	int32 pos = 0;
+	while (pos < content.Length()) {
+		int32 tagStart = content.FindFirst("<", pos);
+		if (tagStart < 0) break;
+		int32 tagEnd = content.FindFirst(">", tagStart);
+		if (tagEnd < 0) break;
+
+		BString tag = content.String() + tagStart + 1;
+		tag.Truncate(tagEnd - tagStart - 1);
+		BString tagUpper = tag;
+		tagUpper.ToUpper();
+
+		if (tagUpper.StartsWith("DT")) {
+			// Found DT, look for H3 or A in next tag
+			int32 nextTagStart = content.FindFirst("<", tagEnd);
+			if (nextTagStart > 0) {
+				int32 nextTagEnd = content.FindFirst(">", nextTagStart);
+				if (nextTagEnd > 0) {
+					BString nextTag = content.String() + nextTagStart + 1;
+					nextTag.Truncate(nextTagEnd - nextTagStart - 1);
+					BString nextTagUpper = nextTag;
+					nextTagUpper.ToUpper();
+
+					if (nextTagUpper.StartsWith("H3")) {
+						// Folder name
+						BString endTag = "</H3>";
+						// Note: This is case sensitive search, but should be fine for now
+						// or we can use IFindFirst if available (not in Haiku public API?)
+						// We'll search for </H3> or </h3>
+						int32 closeH3 = content.FindFirst(endTag, nextTagEnd);
+						if (closeH3 < 0) closeH3 = content.FindFirst("</h3>", nextTagEnd);
+
+						if (closeH3 > 0) {
+							BString folderName;
+							content.CopyInto(folderName, nextTagEnd + 1, closeH3 - nextTagEnd - 1);
+
+							folderName.ReplaceAll("&lt;", "<");
+							folderName.ReplaceAll("&gt;", ">");
+							folderName.ReplaceAll("&amp;", "&");
+
+							pendingFolderName = folderName;
+							pos = closeH3 + 5;
+							continue;
+						}
+					} else if (nextTagUpper.StartsWith("A")) {
+						// Bookmark
+						BString tagContent = nextTag;
+						int32 hrefPos = tagContent.IFindFirst("HREF=\"");
+						if (hrefPos >= 0) {
+							int32 hrefEnd = tagContent.FindFirst("\"", hrefPos + 6);
+							if (hrefEnd > 0) {
+								BString url;
+								tagContent.CopyInto(url, hrefPos + 6, hrefEnd - hrefPos - 6);
+
+								int32 closeA = content.FindFirst("</A>", nextTagEnd);
+								if (closeA < 0) closeA = content.FindFirst("</a>", nextTagEnd);
+
+								if (closeA > 0) {
+									BString title;
+									content.CopyInto(title, nextTagEnd + 1, closeA - nextTagEnd - 1);
+
+									title.ReplaceAll("&lt;", "<");
+									title.ReplaceAll("&gt;", ">");
+									title.ReplaceAll("&amp;", "&");
+
+									_CreateBookmark(dirStack.back(), title, title, url, NULL, NULL);
+									pos = closeA + 4;
+									continue;
+								}
+							}
+						}
+					}
+				}
+			}
+		} else if (tagUpper.StartsWith("DL")) {
+			if (!pendingFolderName.IsEmpty()) {
+				BPath currentPath = dirStack.back();
+				currentPath.Append(pendingFolderName);
+				create_directory(currentPath.Path(), 0777);
+				dirStack.push_back(currentPath);
+				pendingFolderName = "";
+			}
+		} else if (tagUpper.StartsWith("/DL")) {
+			if (dirStack.size() > 1)
+				dirStack.pop_back();
+		}
+
+		pos = tagEnd + 1;
+	}
+
+	return B_OK;
 }

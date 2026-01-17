@@ -77,6 +77,7 @@ enum {
 	MSG_HTTPS_ONLY_CHANGED						= 'honly',
 	MSG_BLOCK_ADS_CHANGED						= 'blads',
 	MSG_LOAD_IMAGES_CHANGED						= 'ldimg',
+	MSG_LOW_RAM_MODE_CHANGED					= 'lram',
 
 	MSG_CHOOSE_DOWNLOAD_FOLDER					= 'swop',
 	MSG_HANDLE_DOWNLOAD_FOLDER					= 'oprs',
@@ -315,6 +316,7 @@ SettingsWindow::MessageReceived(BMessage* message)
 		case MSG_HTTPS_ONLY_CHANGED:
 		case MSG_BLOCK_ADS_CHANGED:
 		case MSG_LOAD_IMAGES_CHANGED:
+		case MSG_LOW_RAM_MODE_CHANGED:
 			// These settings cannot change live, as we don't want partial
 			// input to be applied.
 			_ValidateControlsEnabledStatus();
@@ -506,6 +508,11 @@ SettingsWindow::_CreateGeneralPage(float spacing)
 		new BMessage(MSG_SHOW_HOME_BUTTON_CHANGED));
 	fShowHomeButton->SetValue(B_CONTROL_ON);
 
+	fLowRAMModeCheckBox = new BCheckBox("low ram mode",
+		B_TRANSLATE("Low RAM mode (freeze background tabs)"),
+		new BMessage(MSG_LOW_RAM_MODE_CHANGED));
+	fLowRAMModeCheckBox->SetValue(B_CONTROL_OFF);
+
 	BView* view = BGroupLayoutBuilder(B_VERTICAL, 0)
 		.Add(BGridLayoutBuilder(spacing / 2, spacing / 2)
 			.Add(fStartPageControl->CreateLabelLayoutItem(), 0, 0)
@@ -537,6 +544,7 @@ SettingsWindow::_CreateGeneralPage(float spacing)
 		.Add(fAutoHideInterfaceInFullscreenMode)
 		.Add(fAutoHidePointer)
 		.Add(fShowHomeButton)
+		.Add(fLowRAMModeCheckBox)
 		.Add(BSpaceLayoutItem::CreateVerticalStrut(spacing))
 
 		.AddGroup(B_HORIZONTAL)
@@ -718,6 +726,9 @@ SettingsWindow::_CanApplySettings() const
 	canApply = canApply || ((fShowHomeButton->Value() == B_CONTROL_ON)
 		!= fSettings->GetValue(kSettingsKeyShowHomeButton, true));
 
+	canApply = canApply || ((fLowRAMModeCheckBox->Value() == B_CONTROL_ON)
+		!= fSettings->GetValue(kSettingsKeyLowRAMMode, false));
+
 	canApply = canApply || (fDaysInHistory->Value()
 		!= BrowsingHistory::DefaultInstance()->MaxHistoryItemAge());
 
@@ -803,6 +814,8 @@ SettingsWindow::_ApplySettings()
 		fAutoHidePointer->Value() == B_CONTROL_ON);
 	fSettings->SetValue(kSettingsKeyShowHomeButton,
 		fShowHomeButton->Value() == B_CONTROL_ON);
+	fSettings->SetValue(kSettingsKeyLowRAMMode,
+		fLowRAMModeCheckBox->Value() == B_CONTROL_ON);
 
 	// New page policies
 	fSettings->SetValue(kSettingsKeyStartUpPolicy, _StartUpPolicy());
@@ -868,6 +881,8 @@ SettingsWindow::_RevertSettings()
 		fSettings->GetValue(kSettingsKeyAutoHidePointer, false));
 	fShowHomeButton->SetValue(
 		fSettings->GetValue(kSettingsKeyShowHomeButton, true));
+	fLowRAMModeCheckBox->SetValue(
+		fSettings->GetValue(kSettingsKeyLowRAMMode, false));
 
 	fDaysInHistory->SetValue(
 		BrowsingHistory::DefaultInstance()->MaxHistoryItemAge());

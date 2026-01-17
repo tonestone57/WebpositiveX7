@@ -34,6 +34,8 @@ public:
 		return fYear == other.fYear && fMonth == other.fMonth && fDay == other.fDay;
 	}
 
+    BString LongDayName() const { return "Monday"; }
+
 private:
 	int fYear;
 	int fMonth;
@@ -73,7 +75,11 @@ public:
 	void SetTime(const BTime& time) { fTime = time; }
 
 	BDate Date() const { return fDate; }
+	BDate& Date() { return fDate; } // Return ref for non-const
 	BTime Time() const { return fTime; }
+
+    // Add Time_t
+    time_t Time_t() const { return 0; }
 
 	bool operator<(const BDateTime& other) const {
 		if (fDate < other.fDate) return true;

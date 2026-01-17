@@ -42,7 +42,7 @@ void
 SitePermissionsManager::Reload()
 {
 	BAutolock lock(fLock);
-	fPermissions.clear();
+	fPermissionMap.clear();
 
 	BPath path;
 	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
@@ -55,6 +55,7 @@ SitePermissionsManager::Reload()
 		while (settings.FindMessage("domain", i++, &domainMsg) == B_OK) {
 			BString name;
 			if (domainMsg.FindString("name", &name) == B_OK) {
+				name.ToLower();
 				PermissionEntry entry;
 				entry.domain = name;
 				// Defaults based on logic found in PermissionsWindow.cpp/BrowserWindow.cpp
@@ -65,7 +66,7 @@ SitePermissionsManager::Reload()
 				if (domainMsg.FindFloat("zoom", &entry.zoom) != B_OK) entry.zoom = 1.0;
 				if (domainMsg.FindBool("forceDesktop", &entry.forceDesktop) != B_OK) entry.forceDesktop = false;
 
-				fPermissions.push_back(entry);
+				fPermissionMap[name] = entry;
 			}
 		}
 	}
@@ -77,6 +78,7 @@ SitePermissionsManager::CheckPermission(const char* url, bool& allowJS, bool& al
 {
 	BUrl bUrl(url);
 	BString host = bUrl.Host();
+	host.ToLower();
 	bool found = false;
 	allowJS = true;
 	allowCookies = true;
@@ -88,6 +90,11 @@ SitePermissionsManager::CheckPermission(const char* url, bool& allowJS, bool& al
 	for (size_t i = 0; i < fPermissions.size(); i++) {
 		const PermissionEntry& entry = fPermissions[i];
 		if (host == entry.domain || host.EndsWith(BString(".") << entry.domain)) {
+	BString currentHost = host;
+	while (currentHost.Length() > 0) {
+		std::map<BString, PermissionEntry>::iterator it = fPermissionMap.find(currentHost);
+		if (it != fPermissionMap.end()) {
+			const PermissionEntry& entry = it->second;
 			found = true;
 			allowJS = entry.js;
 			allowCookies = entry.cookies;
@@ -96,6 +103,11 @@ SitePermissionsManager::CheckPermission(const char* url, bool& allowJS, bool& al
 			forceDesktop = entry.forceDesktop;
 			break;
 		}
+
+		int dotIndex = currentHost.FindFirst('.');
+		if (dotIndex < 0)
+			break;
+		currentHost.Remove(0, dotIndex + 1);
 	}
 
 	return found;
