@@ -322,6 +322,10 @@ void
 DownloadProgressView::AttachedToWindow()
 {
 	if (fDownload) {
+		// Redirect download notifications (B_DOWNLOAD_STARTED, B_DOWNLOAD_PROGRESS,
+		// B_DOWNLOAD_REMOVED) to the window to handle them centrally.
+		// The window will forward B_DOWNLOAD_STARTED and B_DOWNLOAD_PROGRESS back
+		// to this view, but handles B_DOWNLOAD_REMOVED directly.
 		fDownload->SetProgressListener(BMessenger(Window()));
 		// Will start node monitor upon receiving the B_DOWNLOAD_STARTED
 		// message.
