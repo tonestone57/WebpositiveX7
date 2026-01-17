@@ -475,6 +475,11 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fReaderModeMenuItem->SetMarked(fReaderMode);
 	menu->AddItem(fReaderModeMenuItem);
 
+	fToolbarBottomMenuItem = new BMenuItem(B_TRANSLATE("Toolbar on bottom"),
+		new BMessage(TOGGLE_TOOLBAR_BOTTOM));
+	fToolbarBottomMenuItem->SetMarked(fToolbarBottom);
+	menu->AddItem(fToolbarBottomMenuItem);
+
 	menu->AddSeparatorItem();
 	fFullscreenItem = new BMenuItem(B_TRANSLATE("Full screen"),
 		new BMessage(TOGGLE_FULLSCREEN), B_RETURN);
@@ -1124,9 +1129,15 @@ BrowserWindow::MessageReceived(BMessage* message)
 		{
 			rgb_color color;
 			if (message->FindColor("color", &color) == B_OK) {
-				BWebView* currentWebView = CurrentWebView();
-				if (currentWebView) {
-					int32 tabIndex = fTabManager->TabForView(currentWebView);
+				BWebView* webView = NULL;
+				int32 tabIndex = -1;
+				if (message->FindInt32("tab index", &tabIndex) == B_OK)
+					webView = dynamic_cast<BWebView*>(fTabManager->ViewForTab(tabIndex));
+				else
+					webView = CurrentWebView();
+
+				if (webView) {
+					tabIndex = fTabManager->TabForView(webView);
 					if (tabIndex >= 0) {
 						TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
 						if (tab) {
