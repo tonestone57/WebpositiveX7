@@ -34,7 +34,8 @@ public:
 
 private:
 			void				_BuildDomainList();
-			BStringItem*		_AddDomain(BString domain, bool fake);
+			BStringItem*		_AddDomain(BString domain, bool fake,
+									std::map<BString, BStringItem*>& domainMap);
 			void				_ShowCookiesForDomain(BString domain);
 			void				_DeleteCookies();
 
