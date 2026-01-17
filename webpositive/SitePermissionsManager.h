@@ -9,7 +9,6 @@
 #include <String.h>
 #include <Locker.h>
 #include <map>
-#include <vector>
 
 class SitePermissionsManager {
 public:
@@ -35,7 +34,6 @@ private:
 	SitePermissionsManager();
 	~SitePermissionsManager();
 
-	std::vector<PermissionEntry> fPermissions;
 	std::map<BString, PermissionEntry> fPermissionMap;
 	BLocker fLock;
 };
