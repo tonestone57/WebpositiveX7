@@ -11,6 +11,8 @@
 
 #include <new>
 
+#include "BrowserWindow.h" // For message constants
+
 #include <Application.h>
 #include <AbstractLayoutItem.h>
 #include <Bitmap.h>
@@ -567,6 +569,65 @@ WebTabView::MouseDown(BPoint where, uint32 buttons)
 	if (buttons & B_TERTIARY_MOUSE_BUTTON) {
 		// Immediately close tab
 		fController->CloseTab(ContainerView()->IndexOf(this));
+		return;
+	}
+
+	if (buttons & B_SECONDARY_MOUSE_BUTTON) {
+		BPopUpMenu* menu = new BPopUpMenu("tab context");
+		BMessage* msg;
+
+		// New Tab
+		msg = new BMessage(NEW_TAB);
+		msg->AddString("url", "");
+		msg->AddBool("select", true);
+		menu->AddItem(new BMenuItem(B_TRANSLATE("New tab"), msg));
+
+		// Reload
+		msg = new BMessage(RELOAD);
+		msg->AddInt32("tab index", ContainerView()->IndexOf(this));
+		menu->AddItem(new BMenuItem(B_TRANSLATE("Reload"), msg));
+
+		menu->AddSeparatorItem();
+
+		// Pin/Unpin
+		if (IsPinned()) {
+			msg = new BMessage(UNPIN_TAB);
+			msg->AddInt32("tab index", ContainerView()->IndexOf(this));
+			menu->AddItem(new BMenuItem(B_TRANSLATE("Unpin tab"), msg));
+		} else {
+			msg = new BMessage(PIN_TAB);
+			msg->AddInt32("tab index", ContainerView()->IndexOf(this));
+			menu->AddItem(new BMenuItem(B_TRANSLATE("Pin tab"), msg));
+		}
+
+		// Group Color
+		BMenu* colorMenu = new BMenu(B_TRANSLATE("Set tab color"));
+		const char* kColorNames[] = {"None", "Red", "Green", "Blue", "Yellow"};
+		rgb_color kColors[] = {
+			ui_color(B_PANEL_BACKGROUND_COLOR),
+			{255, 100, 100, 255},
+			{100, 255, 100, 255},
+			{100, 100, 255, 255},
+			{255, 255, 100, 255}
+		};
+
+		for (size_t i = 0; i < sizeof(kColorNames)/sizeof(char*); i++) {
+			msg = new BMessage(SET_TAB_COLOR);
+			msg->AddColor("color", kColors[i]);
+			msg->AddInt32("tab index", ContainerView()->IndexOf(this));
+			colorMenu->AddItem(new BMenuItem(kColorNames[i], msg));
+		}
+		menu->AddItem(colorMenu);
+
+		menu->AddSeparatorItem();
+
+		// Close Tab
+		msg = new BMessage(CLOSE_TAB);
+		msg->AddInt32("tab index", ContainerView()->IndexOf(this));
+		menu->AddItem(new BMenuItem(B_TRANSLATE("Close tab"), msg));
+
+		menu->SetTargetForItems(Window()); // Send to BrowserWindow
+		menu->Go(ConvertToScreen(where), true, true, true);
 		return;
 	}
 

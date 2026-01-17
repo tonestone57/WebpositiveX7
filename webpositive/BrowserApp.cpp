@@ -322,6 +322,10 @@ BrowserApp::ReadyToRun()
 		_CreateNewWindow("", fullscreen);
 
 	PostMessage(PRELOAD_BROWSING_HISTORY);
+
+	BMessage autoSaveMessage(AUTO_SAVE_SESSION);
+	fAutoSaver = new BMessageRunner(be_app_messenger, &autoSaveMessage,
+		60000000); // 60 seconds
 }
 
 
