@@ -182,15 +182,6 @@ static const int32 kModifiers = B_SHIFT_KEY | B_COMMAND_KEY
 	| B_CONTROL_KEY | B_OPTION_KEY | B_MENU_KEY;
 
 
-static const char* kHandledProtocols[] = {
-	"http",
-	"https",
-	"file",
-	"about",
-	"data",
-	"gopher"
-};
-
 static const char* kBookmarkBarSubdir = "Bookmark bar";
 
 static BLayoutItem*
@@ -923,11 +914,27 @@ BrowserWindow::MessageReceived(BMessage* message)
 		}
 
 		case CREATE_BOOKMARK:
-			_CreateBookmark();
+		{
+			BString fileName;
+			BString title(CurrentWebView()->MainFrameTitle());
+			BString url(CurrentWebView()->MainFrameURL());
+
+			BBitmap* miniIcon = NULL;
+			const BBitmap* largeIcon = NULL;
+			PageUserData* userData = static_cast<PageUserData*>(CurrentWebView()->GetUserData());
+			if (userData != NULL && userData->PageIcon() != NULL) {
+				miniIcon = new BBitmap(BRect(0, 0, 15, 15), B_BITMAP_NO_SERVER_LINK, B_CMAP8);
+				miniIcon->ImportBits(userData->PageIcon()->Bits(), userData->PageIcon()->BitsLength(), userData->PageIcon()->BytesPerRow(), 0, userData->PageIcon()->ColorSpace());
+				largeIcon = userData->PageIconLarge();
+			}
+
+			BookmarkManager::CreateBookmark(fileName, title, url, miniIcon, largeIcon);
+			delete miniIcon;
 			break;
+		}
 
 		case SHOW_BOOKMARKS:
-			_ShowBookmarks();
+			BookmarkManager::ShowBookmarks();
 			break;
 
 		case B_REFS_RECEIVED:
@@ -944,12 +951,12 @@ BrowserWindow::MessageReceived(BMessage* message)
 				uint32 addedSubCount = 0;
 				if (entry.IsDirectory()) {
 					BDirectory directory(&entry);
-					_AddBookmarkURLsRecursively(directory, message,
+					BookmarkManager::AddBookmarkURLsRecursively(directory, message,
 						addedSubCount);
 				} else {
 					BFile file(&ref, B_READ_ONLY);
 					BString url;
-					if (_ReadURLAttr(file, url)) {
+					if (BookmarkManager::ReadURLAttr(file, url)) {
 						message->AddString("url", url.String());
 						addedSubCount++;
 					}
@@ -992,13 +999,13 @@ BrowserWindow::MessageReceived(BMessage* message)
 				// Something that can be made into a bookmark (e.g. the page icon)
 				// was dragged and dropped on the bookmark bar.
 				BPath path;
-				if (_BookmarkPath(path) == B_OK && path.Append(kBookmarkBarSubdir) == B_OK) {
+				if (BookmarkManager::GetBookmarkPath(path) == B_OK && path.Append(kBookmarkBarSubdir) == B_OK) {
 					entry_ref ref;
 					if (BEntry(path.Path()).GetRef(&ref) == B_OK) {
 						message->AddRef("directory", &ref);
 							// Add under the same name that Tracker would use, if
 							// the ref had been added by dragging and dropping to Tracker.
-						_CreateBookmark(message);
+						BookmarkManager::CreateBookmarkFromMessage(message);
 					}
 				}
 				break;
@@ -1465,7 +1472,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 			if (filetype != NULL && strcmp(filetype, "application/x-vnd.Be-bookmark") == 0) {
 				// Tracker replied after the user dragged and dropped something
 				// that can be bookmarked (e.g. the page icon) to a Tracker window.
-				_CreateBookmark(message);
+				BookmarkManager::CreateBookmarkFromMessage(message);
 				break;
 			} else {
 				BWebWindow::MessageReceived(message);
@@ -2545,334 +2552,6 @@ BrowserWindow::_TabChanged(int32 index)
 }
 
 
-status_t
-BrowserWindow::_BookmarkPath(BPath& path) const
-{
-	status_t ret = find_directory(B_USER_SETTINGS_DIRECTORY, &path);
-	if (ret != B_OK)
-		return ret;
-
-	ret = path.Append(kApplicationName);
-	if (ret != B_OK)
-		return ret;
-
-	ret = path.Append("Bookmarks");
-	if (ret != B_OK)
-		return ret;
-
-	return create_directory(path.Path(), 0777);
-}
-
-/*! If fileName is an empty BString, a valid file name will be derived from title.
-	miniIcon and largeIcon may be NULL.
-*/
-void
-BrowserWindow::_CreateBookmark(const BPath& path, BString fileName, const BString& title,
-	const BString& url, const BBitmap* miniIcon, const BBitmap* largeIcon)
-{
-	// Determine the file name if one was not provided
-	bool presetFileName = true;
-	if (fileName.IsEmpty() == true) {
-		presetFileName = false;
-		fileName = title;
-		if (fileName.Length() == 0) {
-			fileName = url;
-			int32 leafPos = fileName.FindLast('/');
-			if (leafPos >= 0)
-				fileName.Remove(0, leafPos + 1);
-		}
-		fileName.ReplaceAll('/', '-');
-		fileName.Truncate(B_FILE_NAME_LENGTH - 1);
-	}
-
-	BPath entryPath(path);
-	status_t status = entryPath.Append(fileName);
-	BEntry entry;
-	if (status == B_OK)
-		status = entry.SetTo(entryPath.Path(), true);
-
-	// There are several reasons why an entry matching the path argument could already exist.
-	if (status == B_OK && entry.Exists() == true) {
-		off_t size;
-		entry.GetSize(&size);
-		char attrName[B_ATTR_NAME_LENGTH];
-		BNode node(&entry);
-		status_t attrStatus = node.GetNextAttrName(attrName);
-		if (strcmp(attrName, "_trk/pinfo_le") == 0)
-			attrStatus = node.GetNextAttrName(attrName);
-
-		if (presetFileName == true && size == 0 && attrStatus == B_ENTRY_NOT_FOUND) {
-			// Tracker's drag-and-drop routine created an empty entry for us to fill in.
-			// Go ahead and write to the existing entry.
-		} else {
-			BDirectory directory(path.Path());
-			if (_CheckBookmarkExists(directory, fileName, url) == true) {
-				// The existing entry is a bookmark with the same URL.  No further action needed.
-				return;
-			} else {
-				// Find a unique name for the bookmark.
-				int32 tries = 1;
-				while (entry.Exists()) {
-					fileName << " " << tries++;
-					entryPath = path;
-					status = entryPath.Append(fileName);
-					if (status == B_OK)
-						status = entry.SetTo(entryPath.Path(), true);
-					if (status != B_OK)
-						break;
-				}
-			}
-		}
-	}
-
-	BFile bookmarkFile;
-	if (status == B_OK) {
-		status = bookmarkFile.SetTo(&entry,
-			B_CREATE_FILE | B_ERASE_FILE | B_WRITE_ONLY);
-	}
-
-	// Write bookmark meta data
-	if (status == B_OK)
-		status = bookmarkFile.WriteAttrString("META:url", &url);
-	if (status == B_OK) {
-		bookmarkFile.WriteAttrString("META:title", &title);
-	}
-
-	BNodeInfo nodeInfo(&bookmarkFile);
-	if (status == B_OK) {
-		status = nodeInfo.SetType("application/x-vnd.Be-bookmark");
-		// Replace the standard Be-bookmark file icons with the argument icons,
-		// if any were provided.
-		if (status == B_OK) {
-			status_t ret = B_OK;
-			if (miniIcon != NULL) {
-				ret = nodeInfo.SetIcon(miniIcon, B_MINI_ICON);
-				if (ret != B_OK) {
-					fprintf(stderr, "Failed to store mini icon for bookmark: "
-						"%s\n", strerror(ret));
-				}
-			}
-			if (largeIcon != NULL && ret == B_OK)
-				ret = nodeInfo.SetIcon(largeIcon, B_LARGE_ICON);
-			else if (largeIcon == NULL && miniIcon != NULL && ret == B_OK) {
-				// If largeIcon is not available but miniIcon is, use a magnified miniIcon instead.
-				BBitmap substituteLargeIcon(BRect(0, 0, 31, 31), B_BITMAP_NO_SERVER_LINK,
-					B_CMAP8);
-				const uint8* src = (const uint8*)miniIcon->Bits();
-				uint32 srcBPR = miniIcon->BytesPerRow();
-				uint8* dst = (uint8*)substituteLargeIcon.Bits();
-				uint32 dstBPR = substituteLargeIcon.BytesPerRow();
-				for (uint32 y = 0; y < 16; y++) {
-					const uint8* s = src;
-					uint8* d = dst;
-					for (uint32 x = 0; x < 16; x++) {
-						*d++ = *s;
-						*d++ = *s++;
-					}
-					dst += dstBPR;
-					s = src;
-					for (uint32 x = 0; x < 16; x++) {
-						*d++ = *s;
-						*d++ = *s++;
-					}
-					dst += dstBPR;
-					src += srcBPR;
-				}
-				ret = nodeInfo.SetIcon(&substituteLargeIcon, B_LARGE_ICON);
-			} else
-				ret = B_OK;
-			if (ret != B_OK) {
-				fprintf(stderr, "Failed to store large icon for bookmark: "
-					"%s\n", strerror(ret));
-			}
-		}
-	}
-
-	if (status != B_OK) {
-		BString message(B_TRANSLATE_COMMENT("There was an error creating the "
-			"bookmark file.\n\nError: %error", "Don't translate variable "
-			"%error"));
-		message.ReplaceFirst("%error", strerror(status));
-		BAlert* alert = new BAlert(B_TRANSLATE("Bookmark error"),
-			message.String(), B_TRANSLATE("OK"), NULL, NULL,
-			B_WIDTH_AS_USUAL, B_STOP_ALERT);
-		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
-		alert->Go();
-		return;
-	}
-}
-
-
-void
-BrowserWindow::_CreateBookmark(BMessage* message)
-{
-		entry_ref ref;
-		BMessage originatorData;
-		const char* url;
-		const char* title;
-		bool validData = (message->FindRef("directory", &ref) == B_OK
-			&& message->FindMessage("be:originator-data", &originatorData) == B_OK
-			&& originatorData.FindString("url", &url) == B_OK
-			&& originatorData.FindString("title", &title) == B_OK);
-
-		// Optional data
-		const char* fileName;
-		if (message->FindString("name", &fileName) != B_OK) {
-			// This string is only present if the message originated from Tracker (drag and drop).
-			fileName = "";
-		}
-		const BBitmap* miniIcon = NULL;
-		originatorData.FindData("miniIcon", B_COLOR_8_BIT_TYPE,
-			reinterpret_cast<const void**>(&miniIcon), NULL);
-
-		BBitmap* largeIcon = NULL;
-		const void* largeIconData = NULL;
-		ssize_t largeIconSize = 0;
-		if (originatorData.FindData("largeIcon", B_RGBA32_TYPE,
-				&largeIconData, &largeIconSize) == B_OK) {
-			largeIcon = new(std::nothrow) BBitmap(BRect(0, 0, 31, 31),
-				B_RGBA32);
-			if (largeIcon != NULL) {
-				if (largeIcon->InitCheck() == B_OK
-					&& largeIcon->BitsLength() == largeIconSize) {
-					largeIcon->ImportBits(largeIconData, largeIconSize, 0, 0,
-						B_RGBA32);
-				} else {
-					delete largeIcon;
-					largeIcon = NULL;
-				}
-			}
-		}
-
-		if (validData == true) {
-			_CreateBookmark(BPath(&ref), BString(fileName), BString(title), BString(url),
-				miniIcon, largeIcon);
-		} else {
-			BString message(B_TRANSLATE("There was an error setting up "
-				"the bookmark."));
-			BAlert* alert = new BAlert(B_TRANSLATE("Bookmark error"),
-				message.String(), B_TRANSLATE("OK"), NULL, NULL,
-				B_WIDTH_AS_USUAL, B_STOP_ALERT);
-			alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
-			alert->Go();
-		}
-		delete largeIcon;
-}
-
-
-void
-BrowserWindow::_CreateBookmark()
-{
-	BString fileName;
-		// A name will be derived from the title later.
-	BString title(CurrentWebView()->MainFrameTitle());
-	BString url(CurrentWebView()->MainFrameURL());
-	BPath path;
-	status_t status = _BookmarkPath(path);
-
-	BBitmap* miniIcon = NULL;
-	const BBitmap* largeIcon = NULL;
-	PageUserData* userData = static_cast<PageUserData*>(CurrentWebView()->GetUserData());
-	if (userData != NULL && userData->PageIcon() != NULL) {
-		miniIcon = new BBitmap(BRect(0, 0, 15, 15), B_BITMAP_NO_SERVER_LINK, B_CMAP8);
-		miniIcon->ImportBits(userData->PageIcon());
-		largeIcon = userData->PageIconLarge();
-	}
-
-	if (status == B_OK)
-		_CreateBookmark(path, fileName, title, url, miniIcon, largeIcon);
-	else {
-		BString message(B_TRANSLATE_COMMENT("There was an error retrieving "
-			"the bookmark folder.\n\nError: %error", "Don't translate the "
-			"variable %error"));
-		message.ReplaceFirst("%error", strerror(status));
-		BAlert* alert = new BAlert(B_TRANSLATE("Bookmark error"),
-			message.String(), B_TRANSLATE("OK"), NULL, NULL,
-			B_WIDTH_AS_USUAL, B_STOP_ALERT);
-		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
-		alert->Go();
-	}
-	delete miniIcon;
-}
-
-
-void
-BrowserWindow::_ShowBookmarks()
-{
-	BPath path;
-	entry_ref ref;
-	status_t status = _BookmarkPath(path);
-	if (status == B_OK)
-		status = get_ref_for_path(path.Path(), &ref);
-	if (status == B_OK)
-		status = be_roster->Launch(&ref);
-
-	if (status != B_OK && status != B_ALREADY_RUNNING) {
-		BString message(B_TRANSLATE_COMMENT("There was an error trying to "
-			"show the Bookmarks folder.\n\nError: %error",
-			"Don't translate variable %error"));
-		message.ReplaceFirst("%error", strerror(status));
-		BAlert* alert = new BAlert(B_TRANSLATE("Bookmark error"),
-			message.String(), B_TRANSLATE("OK"), NULL, NULL,
-			B_WIDTH_AS_USUAL, B_STOP_ALERT);
-		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
-		alert->Go();
-		return;
-	}
-}
-
-
-bool BrowserWindow::_CheckBookmarkExists(BDirectory& directory,
-	const BString& bookmarkName, const BString& url) const
-{
-	BEntry entry;
-	while (directory.GetNextEntry(&entry) == B_OK) {
-		char entryName[B_FILE_NAME_LENGTH];
-		if (entry.GetName(entryName) != B_OK || bookmarkName != entryName)
-			continue;
-		BString storedURL;
-		BFile file(&entry, B_READ_ONLY);
-		if (_ReadURLAttr(file, storedURL)) {
-			// Just bail if the bookmark already exists
-			if (storedURL == url)
-				return true;
-		}
-	}
-	return false;
-}
-
-
-bool
-BrowserWindow::_ReadURLAttr(BFile& bookmarkFile, BString& url) const
-{
-	return bookmarkFile.InitCheck() == B_OK
-		&& bookmarkFile.ReadAttrString("META:url", &url) == B_OK;
-}
-
-
-void
-BrowserWindow::_AddBookmarkURLsRecursively(BDirectory& directory,
-	BMessage* message, uint32& addedCount) const
-{
-	BEntry entry;
-	while (directory.GetNextEntry(&entry) == B_OK) {
-		if (entry.IsDirectory()) {
-			BDirectory subBirectory(&entry);
-			// At least preserve the entry file handle when recursing into
-			// sub-folders... eventually we will run out, though, with very
-			// deep hierarchy.
-			entry.Unset();
-			_AddBookmarkURLsRecursively(subBirectory, message, addedCount);
-		} else {
-			BString storedURL;
-			BFile file(&entry, B_READ_ONLY);
-			if (_ReadURLAttr(file, storedURL)) {
-				message->AddString("url", storedURL.String());
-				addedCount++;
-			}
-		}
-	}
-}
 
 
 void
@@ -3246,81 +2925,11 @@ BrowserWindow::_NewTabURL(bool isNewWindow) const
 }
 
 
-BString
-BrowserWindow::_EncodeURIComponent(const BString& search)
-{
-	// We have to take care of some of the escaping before we hand over the
-	// search string to WebKit, if we want queries like "4+3" to not be
-	// searched as "4 3".
-	const BString escCharList = " $&`:<>[]{}\"+#%@/;=?\\^|~\',";
-	BString result = search;
-	char hexcode[4];
-
-	for (int32 i = 0; i < result.Length(); i++) {
-		if (escCharList.FindFirst(result[i]) != B_ERROR) {
-			sprintf(hexcode, "%02X", (unsigned int)result[i]);
-			result.SetByteAt(i, '%');
-			result.Insert(hexcode, i + 1);
-			i += 2;
-		}
-	}
-
-	return result;
-}
-
-
 void
 BrowserWindow::_VisitURL(const BString& url)
 {
 	// fURLInputGroup->TextView()->SetText(url);
 	CurrentWebView()->LoadURL(url.String());
-}
-
-
-void
-BrowserWindow::_VisitSearchEngine(const BString& search)
-{
-	BString searchQuery = search;
-
-	BString searchPrefix;
-	search.CopyCharsInto(searchPrefix, 0, 2);
-
-	// Default search URL
-	BString engine(fSearchPageURL);
-
-	// Check if the string starts with one of the search engine shortcuts
-	for (int i = 0; kSearchEngines[i].url != NULL; i++) {
-		if (kSearchEngines[i].shortcut == searchPrefix) {
-			engine = kSearchEngines[i].url;
-			searchQuery.Remove(0, 2);
-			break;
-		}
-	}
-
-	engine.ReplaceAll("%s", _EncodeURIComponent(searchQuery));
-	_VisitURL(engine);
-}
-
-
-inline bool
-BrowserWindow::_IsValidDomainChar(char ch)
-{
-	// Characters that are allowed in domain names (IDNA 2008 / LDH rule).
-	// We also allow characters that are valid in the authority part of a URL
-	// (userinfo, port, IPv6 literals) because this function is used to
-	// validate the entire authority string.
-	// We deliberately disallow underscore (_) and percent (%) to better
-	// distinguish search queries from URLs, as these are not valid in
-	// standard hostnames.
-
-	if ((unsigned char)ch > 0x7f)
-		return true;
-
-	if (isalnum(ch))
-		return true;
-
-	return ch == '-' || ch == '.' || ch == ':'
-		|| ch == '[' || ch == ']' || ch == '@';
 }
 
 
@@ -3334,89 +2943,18 @@ BrowserWindow::_IsValidDomainChar(char ch)
 void
 BrowserWindow::_SmartURLHandler(const BString& url)
 {
-	// First test if the URL has a protocol field
-	int32 at = url.FindFirst(":");
+	BString outURL;
+	URLHandler::Action action = URLHandler::CheckURL(url, outURL, fSearchPageURL);
 
-	if (at != B_ERROR) {
-		// There is a protocol, let's see if we can handle it
-		BString proto;
-		url.CopyInto(proto, 0, at);
-
-		bool handled = false;
-
-		// First try the built-in supported ones
-		for (unsigned int i = 0; i < sizeof(kHandledProtocols) / sizeof(char*);
-				i++) {
-			handled = (proto == kHandledProtocols[i]);
-			if (handled)
-				break;
-		}
-
-		if (handled) {
-			// This is the easy case, a complete and well-formed URL, we can
-			// navigate to it without further efforts.
-			_VisitURL(url);
-			return;
-		} else {
-			// There is what looks like a protocol, but one we don't know.
-			// Ask the BRoster if there is a matching filetype and app which
-			// can handle it.
-			BString temp;
-			temp = "application/x-vnd.Be.URL.";
-			temp += proto;
-
-			const char* argv[] = { url.String(), NULL };
-
-			if (be_roster->Launch(temp.String(), 1, argv) == B_OK)
-				return;
-		}
-	}
-
-	// There is no protocol or only an unsupported one. So let's try harder to
-	// guess what the request is.
-
-	// "localhost" is a special case, it is a valid domain name but has no dots.
-	// Handle it separately.
-	if (url == "localhost")
-		_VisitURL("http://localhost/");
-	else {
-		// Also handle URLs starting with "localhost" followed by a path.
-		const char* localhostPrefix = "localhost/";
-
-		if (url.Compare(localhostPrefix, strlen(localhostPrefix)) == 0)
-			_VisitURL(url);
-		else {
-			// In all other cases we try to detect a valid domain name. There
-			// must be at least one dot and no spaces until the first / in the
-			// URL.
-			bool isURL = false;
-
-			for (int32 i = 0; i < url.Length(); i++) {
-				if (url[i] == '.')
-					isURL = true;
-				else if (url[i] == '/' || url[i] == '?' || url[i] == '#')
-					break;
-				else if (!_IsValidDomainChar(url[i])) {
-					isURL = false;
-
-					break;
-				}
-			}
-
-			if (isURL) {
-				// This is apparently an URL missing the protocol part. In that
-				// case we default to http.
-				BString prefixed = "http://";
-				prefixed << url;
-				_VisitURL(prefixed);
-				return;
-			} else {
-				// We couldn't find anything that looks like an URL. Let's
-				// assume what we have is a search request and go to the search
-				// engine.
-				_VisitSearchEngine(url);
-			}
-		}
+	switch (action) {
+		case URLHandler::LOAD_URL:
+			_VisitURL(outURL);
+			break;
+		case URLHandler::LAUNCH_APP:
+			// Handled in CheckURL
+			break;
+		case URLHandler::DO_NOTHING:
+			break;
 	}
 }
 
