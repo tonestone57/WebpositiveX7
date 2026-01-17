@@ -102,6 +102,7 @@ enum {
 	SHOW_CONSOLE_WINDOW				= 'scwd',
 	SHOW_NETWORK_WINDOW				= 'snwd',
 	SHOW_COOKIE_WINDOW				= 'skwd',
+	SHOW_CERTIFICATE_WINDOW			= 'scrw',
 
 	SEARCH_TABS						= 'stbs',
 	TOGGLE_DARK_MODE				= 'tgdm',

@@ -424,6 +424,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(SHOW_PERMISSIONS_WINDOW)));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Cookie manager"),
 		new BMessage(SHOW_COOKIE_WINDOW)));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Certificate info"),
+		new BMessage(SHOW_CERTIFICATE_WINDOW)));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Script console"),
 		new BMessage(SHOW_CONSOLE_WINDOW)));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Network inspector"),
@@ -1555,6 +1557,29 @@ BrowserWindow::MessageReceived(BMessage* message)
 			be_app->PostMessage(message);
 			break;
 
+		case SHOW_CERTIFICATE_WINDOW:
+		{
+			BString info;
+			info << "Page Security Information:\n\n";
+
+			BWebView* view = CurrentWebView();
+			if (view) {
+				BString url = view->MainFrameURL();
+				info << "URL: " << url << "\n";
+				if (url.StartsWith("https://")) {
+					info << "Connection is encrypted (HTTPS).\n\n";
+					info << "Note: Full certificate details are not yet available via the API.";
+				} else {
+					info << "Connection is NOT encrypted.";
+				}
+			} else {
+				info << "No page loaded.";
+			}
+			BAlert* alert = new BAlert("Security Info", info.String(), "OK");
+			alert->Go();
+			break;
+		}
+
 		case SHOW_PERMISSIONS_WINDOW:
 		{
 			if (fPermissionsWindow) {
@@ -1761,6 +1786,16 @@ BrowserWindow::MessageReceived(BMessage* message)
 		{
 			BString text;
 			if (message->FindString("string", &text) == B_OK) {
+				const char* kOpenPrivatePrefix = "OPEN_IN_PRIVATE_WINDOW:";
+				if (text.StartsWith(kOpenPrivatePrefix)) {
+					BString url = text;
+					url.RemoveFirst(kOpenPrivatePrefix);
+					BMessage* newPrivateWindowMessage = new BMessage(NEW_WINDOW);
+					newPrivateWindowMessage->AddString("url", url);
+					newPrivateWindowMessage->AddBool("private", true);
+					be_app->PostMessage(newPrivateWindowMessage);
+					break;
+				}
 				if (text.StartsWith("INSPECT_DOM_START:")) {
 					fInspectDomBuffer = "";
 					fInspectDomExpectedChunks = atoi(text.String() + strlen("INSPECT_DOM_START:"));
@@ -2557,6 +2592,22 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			".doubleclick, .ad-banner, .banner-ad, .sponsor "
 			"{ display: none !important; }';"
 			"document.head.appendChild(style);";
+		view->WebPage()->ExecuteJavaScript(script);
+	}
+
+	// Inject JS for "Open Link in Private Window"
+	if (view && view->WebPage()) {
+		BString script =
+			"document.addEventListener('click', function(e) {"
+			"  if (e.shiftKey && (e.metaKey || e.ctrlKey)) {"
+			"    var link = e.target.closest('a');"
+			"    if (link) {"
+			"      e.preventDefault();"
+			"      e.stopPropagation();"
+			"      console.log('OPEN_IN_PRIVATE_WINDOW:' + link.href);"
+			"    }"
+			"  }"
+			"}, true);";
 		view->WebPage()->ExecuteJavaScript(script);
 	}
 
