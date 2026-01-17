@@ -12,6 +12,7 @@
 #include <Application.h>
 #include <Bitmap.h>
 #include <Button.h>
+#include <CheckBox.h>
 #include <Catalog.h>
 #include <Clipboard.h>
 #include <Directory.h>
@@ -20,6 +21,7 @@
 #include <Entry.h>
 #include <FindDirectory.h>
 #include <GroupLayoutBuilder.h>
+#include <LayoutBuilder.h>
 #include <Locale.h>
 #include <MenuItem.h>
 #include <Node.h>
@@ -32,7 +34,9 @@
 #include <StatusBar.h>
 #include <StorageDefs.h>
 #include <StringView.h>
+#include <TextControl.h>
 #include <TimeFormat.h>
+#include <Window.h>
 
 #include "BrowserWindow.h"
 #include "WebDownload.h"
@@ -50,6 +54,7 @@ enum {
 	REMOVE_DOWNLOAD			= 'rmdn',
 	COPY_URL_TO_CLIPBOARD	= 'curl',
 	OPEN_CONTAINING_FOLDER	= 'opfd',
+	MIME_TYPE_SET			= 'mtsn',
 };
 
 const bigtime_t kMaxUpdateInterval = 100000LL;
@@ -61,6 +66,54 @@ bigtime_t DownloadProgressView::sLastEstimatedFinishSpeedToggleTime = -1;
 bool DownloadProgressView::sShowSpeed = true;
 static const time_t kSecondsPerDay = 24 * 60 * 60;
 static const time_t kSecondsPerHour = 60 * 60;
+
+
+class TextEntryWindow : public BWindow {
+public:
+	TextEntryWindow(const char* title, const char* label, const char* initialText, BMessage* message, BHandler* target)
+		:
+		BWindow(BRect(0, 0, 300, 100), title, B_MODAL_WINDOW,
+			B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS | B_CLOSE_ON_ESCAPE),
+		fTarget(target),
+		fMessage(message)
+	{
+		fTextControl = new BTextControl("text", label, initialText, NULL);
+		BButton* cancelButton = new BButton("cancel", B_TRANSLATE("Cancel"), new BMessage(B_QUIT_REQUESTED));
+		BButton* okButton = new BButton("ok", B_TRANSLATE("OK"), new BMessage('ok'));
+		okButton->MakeDefault(true);
+
+		BLayoutBuilder::Group<>(this, B_VERTICAL)
+			.SetInsets(B_USE_WINDOW_SPACING)
+			.Add(fTextControl)
+			.AddGroup(B_HORIZONTAL)
+				.AddGlue()
+				.Add(cancelButton)
+				.Add(okButton)
+			.End();
+
+		CenterOnScreen();
+	}
+
+	virtual void MessageReceived(BMessage* message)
+	{
+		switch (message->what) {
+			case 'ok':
+				if (fMessage) {
+					fMessage->AddString("text", fTextControl->Text());
+					BMessenger(fTarget).SendMessage(fMessage);
+				}
+				Quit();
+				break;
+			default:
+				BWindow::MessageReceived(message);
+		}
+	}
+
+private:
+	BHandler* fTarget;
+	BMessage* fMessage;
+	BTextControl* fTextControl;
+};
 
 
 class IconView : public BView {
@@ -202,6 +255,10 @@ DownloadProgressView::DownloadProgressView(const BMessage* archive)
 		fPath.SetTo(string);
 	if (archive->FindString("url", &string) == B_OK)
 		fURL = string;
+
+	fFinishTime = 0;
+	if (archive->FindInt64("finish_time", (int64*)&fFinishTime) != B_OK)
+		fFinishTime = 0;
 }
 
 
@@ -217,6 +274,9 @@ DownloadProgressView::Init(BMessage* archive)
 	fCurrentBytesPerSecondSlot = 0;
 	fLastSpeedReferenceSize = 0;
 	fEstimatedFinishReferenceSize = 0;
+
+	if (!archive)
+		fFinishTime = 0;
 
 	fProcessStartTime = fLastSpeedReferenceTime
 		= fEstimatedFinishReferenceTime	= system_time();
@@ -253,6 +313,17 @@ DownloadProgressView::Init(BMessage* archive)
 			new BMessage(OPEN_DOWNLOAD));
 		fTopButton->SetEnabled(fDownload == NULL);
 	}
+
+	if (fDownload) {
+		fPauseButton = new SmallButton(B_TRANSLATE("Pause"),
+			new BMessage(PAUSE_DOWNLOAD));
+	} else {
+		fPauseButton = new SmallButton(B_TRANSLATE("Pause"),
+			new BMessage(PAUSE_DOWNLOAD));
+		fPauseButton->SetEnabled(false);
+		fPauseButton->Hide();
+	}
+
 	if (fDownload) {
 		fBottomButton = new SmallButton(B_TRANSLATE("Cancel"),
 			new BMessage(CANCEL_DOWNLOAD));
@@ -261,6 +332,17 @@ DownloadProgressView::Init(BMessage* archive)
 			new BMessage(REMOVE_DOWNLOAD));
 		fBottomButton->SetEnabled(fDownload == NULL);
 	}
+
+	fOpenWhenDoneCheckBox = new BCheckBox("open when done",
+		B_TRANSLATE("Open when done"), new BMessage(TOGGLE_OPEN_WHEN_DONE));
+	bool openWhenDone = false;
+	if (archive)
+		archive->FindBool("open_when_done", &openWhenDone);
+	fOpenWhenDoneCheckBox->SetValue(openWhenDone);
+
+	// Hide checkbox if finished
+	if (!fDownload)
+		fOpenWhenDoneCheckBox->Hide();
 
 	fInfoView = new BStringView("info view", "");
 	fInfoView->SetViewColor(ViewColor());
@@ -277,7 +359,10 @@ DownloadProgressView::Init(BMessage* archive)
 	layout->AddView(fIconView);
 	BView* verticalGroup = BGroupLayoutBuilder(B_VERTICAL, 3)
 		.Add(fStatusBar)
-		.Add(fInfoView)
+		.Add(BGroupLayoutBuilder(B_HORIZONTAL, 5)
+			.Add(fInfoView)
+			.Add(fOpenWhenDoneCheckBox)
+		)
 		.TopView()
 	;
 	verticalGroup->SetViewColor(ViewColor());
@@ -285,7 +370,10 @@ DownloadProgressView::Init(BMessage* archive)
 
 	verticalGroup = BGroupLayoutBuilder(B_VERTICAL, 3)
 		.Add(fTopButton)
-		.Add(fBottomButton)
+		.Add(BGroupLayoutBuilder(B_HORIZONTAL, 3)
+			.Add(fPauseButton)
+			.Add(fBottomButton)
+		)
 		.TopView()
 	;
 	verticalGroup->SetViewColor(ViewColor());
@@ -297,6 +385,10 @@ DownloadProgressView::Init(BMessage* archive)
 	font.SetSize(max_c(8.0f, fontSize));
 	fInfoView->SetFont(&font, B_FONT_SIZE);
 	fInfoView->SetExplicitMaxSize(BSize(B_SIZE_UNLIMITED, B_SIZE_UNSET));
+
+	// Force update status text to show finished time if applicable
+	if (!fDownload && fStatusBar->CurrentValue() == 100.0)
+		_UpdateStatusText();
 
 	return true;
 }
@@ -312,6 +404,10 @@ DownloadProgressView::SaveSettings(BMessage* archive)
 		ret = archive->AddString("url", fURL.String());
 	if (ret == B_OK)
 		ret = archive->AddFloat("value", fStatusBar->CurrentValue());
+	if (ret == B_OK)
+		ret = archive->AddInt64("finish_time", (int64)fFinishTime);
+	if (ret == B_OK)
+		ret = archive->AddBool("open_when_done", fOpenWhenDoneCheckBox->Value());
 	if (ret == B_OK)
 		ret = fIconView->SaveSettings(archive);
 	return ret;
@@ -337,6 +433,8 @@ DownloadProgressView::AttachedToWindow()
 
 	fTopButton->SetTarget(this);
 	fBottomButton->SetTarget(this);
+	fPauseButton->SetTarget(this);
+	fOpenWhenDoneCheckBox->SetTarget(this);
 }
 
 
@@ -450,6 +548,50 @@ DownloadProgressView::MessageReceived(BMessage* message)
 			CancelDownload();
 			break;
 
+		case PAUSE_DOWNLOAD:
+			if (fDownload) {
+				fDownload->Pause();
+				fPauseButton->SetLabel(B_TRANSLATE("Resume"));
+				fPauseButton->SetMessage(new BMessage(RESUME_DOWNLOAD));
+				fStatusBar->SetBarColor(ui_color(B_WARNING_COLOR));
+			}
+			break;
+
+		case RESUME_DOWNLOAD:
+			if (fDownload) {
+				fDownload->Resume();
+				fPauseButton->SetLabel(B_TRANSLATE("Pause"));
+				fPauseButton->SetMessage(new BMessage(PAUSE_DOWNLOAD));
+				fStatusBar->SetBarColor(ui_color(B_SUCCESS_COLOR));
+			}
+			break;
+
+		case SET_MIME_TYPE:
+		{
+			TextEntryWindow* window = new TextEntryWindow(
+				B_TRANSLATE("Set MIME type"),
+				B_TRANSLATE("MIME type:"),
+				"", // Initial text (empty or current type)
+				new BMessage(MIME_TYPE_SET),
+				this);
+			window->Show();
+			break;
+		}
+
+		case MIME_TYPE_SET:
+		{
+			BString mimeType;
+			if (message->FindString("text", &mimeType) == B_OK && mimeType.Length() > 0) {
+				BEntry entry(fPath.Path());
+				if (entry.Exists()) {
+					BNode node(&entry);
+					BNodeInfo info(&node);
+					info.SetType(mimeType.String());
+				}
+			}
+			break;
+		}
+
 		case REMOVE_DOWNLOAD:
 		{
 			Window()->PostMessage(SAVE_SETTINGS);
@@ -458,6 +600,11 @@ DownloadProgressView::MessageReceived(BMessage* message)
 			// TOAST!
 			return;
 		}
+
+		case TOGGLE_OPEN_WHEN_DONE:
+			// Just to ensure we save settings later? State is in checkbox.
+			break;
+
 		case B_NODE_MONITOR:
 		{
 			int32 opCode;
@@ -589,6 +736,9 @@ DownloadProgressView::ShowContextMenu(BPoint screenWhere)
 		new BMessage(OPEN_CONTAINING_FOLDER));
 	contextMenu->AddItem(openFolder);
 
+	contextMenu->AddItem(new BMenuItem(B_TRANSLATE("Set MIME type..."),
+		new BMessage(SET_MIME_TYPE)));
+
 	contextMenu->SetTargetForItems(this);
 	contextMenu->Go(screenWhere, true, true, true);
 }
@@ -634,8 +784,14 @@ DownloadProgressView::DownloadFinished()
 	fBottomButton->SetLabel(B_TRANSLATE("Remove"));
 	fBottomButton->SetMessage(new BMessage(REMOVE_DOWNLOAD));
 	fBottomButton->SetEnabled(true);
+	fPauseButton->SetEnabled(false);
+	fPauseButton->Hide();
+	fOpenWhenDoneCheckBox->Hide();
+
 	fInfoView->SetText("");
 	fStatusBar->SetBarColor(ui_color(B_SUCCESS_COLOR));
+
+	fFinishTime = real_time_clock();
 
 	BNotification success(B_INFORMATION_NOTIFICATION);
 	success.SetGroup(B_TRANSLATE("WebPositive"));
@@ -648,6 +804,10 @@ DownloadProgressView::DownloadFinished()
 	success.SetIcon(fIconView->Bitmap());
 	success.Send();
 
+	if (fOpenWhenDoneCheckBox->Value())
+		PostMessage(OPEN_DOWNLOAD);
+
+	_UpdateStatusText();
 }
 
 
@@ -679,6 +839,9 @@ DownloadProgressView::CancelDownload()
 	fBottomButton->SetLabel(B_TRANSLATE("Remove"));
 	fBottomButton->SetMessage(new BMessage(REMOVE_DOWNLOAD));
 	fBottomButton->SetEnabled(true);
+	fPauseButton->SetEnabled(false);
+	fPauseButton->Hide();
+	fOpenWhenDoneCheckBox->Hide();
 	fInfoView->SetText("");
 
 	fPath.Unset();
@@ -781,6 +944,15 @@ DownloadProgressView::_UpdateStatusText()
 {
 	fInfoView->SetText("");
 	BString buffer;
+
+	if (IsFinished() && fFinishTime > 0) {
+		BString timeText;
+		BDateTimeFormat().Format(timeText, fFinishTime, B_MEDIUM_DATE_FORMAT, B_MEDIUM_TIME_FORMAT);
+		buffer.SetToFormat("Finished: %s", timeText.String());
+		fInfoView->SetText(buffer.String());
+		return;
+	}
+
 	if (sShowSpeed && fBytesPerSecond != 0.0) {
 		// Draw speed info
 		char sizeBuffer[128];
