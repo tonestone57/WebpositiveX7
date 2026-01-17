@@ -440,7 +440,7 @@ DownloadProgressView::MessageReceived(BMessage* message)
 			// FIXME this has of course the huge downside of leaving the new
 			// window open with a blank page. I can't think of a better
 			// solution right now...
-			BMessage* request = new BMessage(NEW_WINDOW);
+			BMessage* request = new BMessage(RESTART_DOWNLOAD_IN_WINDOW);
 			request->AddString("url", fURL);
 			be_app->PostMessage(request);
 			break;
