@@ -185,6 +185,19 @@ CredentialsStorage::GetCredentials(const HashString& key)
 }
 
 
+void
+CredentialsStorage::RemoveCredentials(const HashString& key)
+{
+	BAutolock _(this);
+
+	if (fCredentialMap.ContainsKey(key)) {
+		fCredentialMap.Remove(key);
+		if (fPersistent)
+			_SaveSettings();
+	}
+}
+
+
 // #pragma mark - private
 
 

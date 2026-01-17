@@ -74,6 +74,9 @@ enum {
 	MSG_PROXY_USERNAME_CHANGED					= 'psuc',
 	MSG_PROXY_PASSWORD_CHANGED					= 'pswc',
 
+	MSG_HTTPS_ONLY_CHANGED						= 'honly',
+	MSG_BLOCK_ADS_CHANGED						= 'blads',
+
 	MSG_CHOOSE_DOWNLOAD_FOLDER					= 'swop',
 	MSG_HANDLE_DOWNLOAD_FOLDER					= 'oprs',
 };
@@ -114,6 +117,7 @@ SettingsWindow::SettingsWindow(BRect frame, SettingsMessage* settings)
 			.Add(fApplyButton);
 
 	tabView->AddTab(_CreateGeneralPage(spacing));
+	tabView->AddTab(_CreatePrivacyPage(spacing));
 	tabView->AddTab(_CreateFontsPage(spacing));
 	tabView->AddTab(_CreateProxyPage(spacing));
 
@@ -307,6 +311,8 @@ SettingsWindow::MessageReceived(BMessage* message)
 		case MSG_PROXY_PORT_CHANGED:
 		case MSG_PROXY_USERNAME_CHANGED:
 		case MSG_PROXY_PASSWORD_CHANGED:
+		case MSG_HTTPS_ONLY_CHANGED:
+		case MSG_BLOCK_ADS_CHANGED:
 			// These settings cannot change live, as we don't want partial
 			// input to be applied.
 			_ValidateControlsEnabledStatus();
@@ -339,6 +345,29 @@ SettingsWindow::Show()
 
 
 // #pragma mark - private
+
+
+BView*
+SettingsWindow::_CreatePrivacyPage(float spacing)
+{
+	fHttpsOnlyCheckBox = new BCheckBox("https only",
+		B_TRANSLATE("Enable HTTPS-only mode"),
+		new BMessage(MSG_HTTPS_ONLY_CHANGED));
+	fBlockAdsCheckBox = new BCheckBox("block ads",
+		B_TRANSLATE("Block ads (basic CSS hiding)"),
+		new BMessage(MSG_BLOCK_ADS_CHANGED));
+
+	BView* view = BGroupLayoutBuilder(B_VERTICAL, 0)
+		.Add(fHttpsOnlyCheckBox)
+		.Add(fBlockAdsCheckBox)
+		.AddGlue()
+		.SetInsets(B_USE_WINDOW_SPACING, B_USE_WINDOW_SPACING,
+			B_USE_WINDOW_SPACING, B_USE_DEFAULT_SPACING)
+		.TopView();
+
+	view->SetName(B_TRANSLATE("Privacy"));
+	return view;
+}
 
 
 BView*
@@ -739,6 +768,12 @@ SettingsWindow::_CanApplySettings() const
 	canApply = canApply || (strcmp(fProxyPasswordControl->Text(),
 		fSettings->GetValue(kSettingsKeyProxyPassword, "")) != 0);
 
+	// Privacy settings
+	canApply = canApply || ((fHttpsOnlyCheckBox->Value() == B_CONTROL_ON)
+		!= fSettings->GetValue(kSettingsKeyHttpsOnly, false));
+	canApply = canApply || ((fBlockAdsCheckBox->Value() == B_CONTROL_ON)
+		!= fSettings->GetValue(kSettingsKeyBlockAds, false));
+
 	return canApply;
 }
 
@@ -768,6 +803,11 @@ SettingsWindow::_ApplySettings()
 
 	_UpdateFontSettings();
 	_UpdateProxySettings();
+
+	fSettings->SetValue(kSettingsKeyHttpsOnly,
+		fHttpsOnlyCheckBox->Value() == B_CONTROL_ON);
+	fSettings->SetValue(kSettingsKeyBlockAds,
+		fBlockAdsCheckBox->Value() == B_CONTROL_ON);
 
 	fSettings->Save();
 
@@ -902,6 +942,12 @@ SettingsWindow::_RevertSettings()
 		""));
 	fProxyPasswordControl->SetText(fSettings->GetValue(kSettingsKeyProxyPassword,
 		""));
+
+	// Privacy settings
+	fHttpsOnlyCheckBox->SetValue(fSettings->GetValue(kSettingsKeyHttpsOnly,
+		false));
+	fBlockAdsCheckBox->SetValue(fSettings->GetValue(kSettingsKeyBlockAds,
+		false));
 
 	_ValidateControlsEnabledStatus();
 }

@@ -54,6 +54,7 @@ public:
 			status_t			PutCredentials(const HashString& key,
 									const Credentials& credentials);
 			Credentials			GetCredentials(const HashString& key);
+			void				RemoveCredentials(const HashString& key);
 
 private:
 								CredentialsStorage(bool persistent);
