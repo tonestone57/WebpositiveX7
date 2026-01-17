@@ -22,6 +22,9 @@ public:
 
 	virtual void MessageReceived(BMessage *message);
 
+	virtual void FrameMoved(BPoint origin);
+	virtual void FrameResized(float width, float height);
+
 	bool getAuthentication(const BString& text, const BString& previousUser,
 		const BString& previousPass, bool previousRememberCredentials,
 		bool badPassword, BString& user, BString& pass,
@@ -39,6 +42,7 @@ private:
 	bool m_cancelled;
 
 	sem_id m_exitSemaphore;
+	sem_id m_updateSemaphore;
 
 	BMessageRunner* m_jitterRunner;
 	float m_lastJitterOffset;

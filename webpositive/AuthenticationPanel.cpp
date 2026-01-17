@@ -52,6 +52,7 @@ AuthenticationPanel::AuthenticationPanel(BRect parentFrame)
 		new BMessage(B_QUIT_REQUESTED))),
 	m_cancelled(false),
 	m_exitSemaphore(create_sem(0, "Authentication Panel")),
+	m_updateSemaphore(create_sem(0, "Authentication Panel Update")),
 	m_jitterRunner(NULL),
 	m_jitterCount(0)
 {
@@ -62,6 +63,23 @@ AuthenticationPanel::~AuthenticationPanel()
 {
 	delete m_jitterRunner;
 	delete_sem(m_exitSemaphore);
+	delete_sem(m_updateSemaphore);
+}
+
+
+void
+AuthenticationPanel::FrameMoved(BPoint origin)
+{
+	BWindow::FrameMoved(origin);
+	release_sem(m_updateSemaphore);
+}
+
+
+void
+AuthenticationPanel::FrameResized(float width, float height)
+{
+	BWindow::FrameResized(width, height);
+	release_sem(m_updateSemaphore);
 }
 
 
@@ -213,19 +231,42 @@ bool AuthenticationPanel::getAuthentication(const BString& text,
 	BWindow* window = dynamic_cast<BWindow*>
 		(BLooper::LooperForThread(find_thread(NULL)));
 	if (window) {
-		status_t err;
-		for (;;) {
-			do {
-				err = acquire_sem_etc(m_exitSemaphore, 1, B_RELATIVE_TIMEOUT,
-					50000);
-				// We've (probably) had our time slice taken away from us
-			} while (err == B_INTERRUPTED);
+		object_wait_info info[2];
 
-			if (err != B_TIMED_OUT) {
-				// Semaphore was finally released or nuked.
+		for (;;) {
+			info[0].object = m_exitSemaphore;
+			info[0].type = B_OBJECT_TYPE_SEMAPHORE;
+			info[0].events = B_EVENT_ACQUIRE_SEMAPHORE;
+
+			info[1].object = m_updateSemaphore;
+			info[1].type = B_OBJECT_TYPE_SEMAPHORE;
+			info[1].events = B_EVENT_ACQUIRE_SEMAPHORE;
+
+			ssize_t count = wait_for_objects_etc(info, 2, B_RELATIVE_TIMEOUT,
+				200000);
+
+			if (count < 0) {
+				if (count == B_INTERRUPTED)
+					continue;
+				if (count == B_TIMED_OUT || count == B_WOULD_BLOCK) {
+					// Time out, background update
+					window->UpdateIfNeeded();
+					continue;
+				}
+				// Other error
 				break;
 			}
-			window->UpdateIfNeeded();
+
+			if (info[0].events & B_EVENT_ACQUIRE_SEMAPHORE) {
+				// Exit semaphore
+				break;
+			}
+
+			if (info[1].events & B_EVENT_ACQUIRE_SEMAPHORE) {
+				// Update semaphore (we moved/resized)
+				// Consume the semaphore (it was acquired)
+				window->UpdateIfNeeded();
+			}
 		}
 	} else {
 		// No window to update, so just hang out until we're done.
