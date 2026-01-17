@@ -2277,8 +2277,23 @@ BrowserWindow::SetToolBarsVisible(bool flag, BWebView* view)
 	else
 		fVisibleInterfaceElements &= ~INTERFACE_ELEMENT_NAVIGATION;
 
-	if (fInterfaceVisible)
+	if (fInterfaceVisible) {
 		fNavigationGroup->SetVisible(flag);
+
+		if (fBookmarkBar != NULL) {
+			if (flag) {
+				if (fAppSettings->GetValue(kSettingsShowBookmarkBar, true)) {
+					fBookmarkBar->Show();
+					fBookmarkBarMenuItem->SetMarked(true);
+				}
+			} else {
+				if (!fBookmarkBar->IsHidden()) {
+					fBookmarkBar->Hide();
+					fBookmarkBarMenuItem->SetMarked(false);
+				}
+			}
+		}
+	}
 }
 
 
