@@ -344,7 +344,7 @@ BrowserApp::ReadyToRun()
 				BString url;
 				archivedWindow.FindString("tab", 0, &url);
 				BrowserWindow* window = new(std::nothrow) BrowserWindow(frame, fSettings, url,
-					fContext, INTERFACE_ELEMENT_ALL, NULL, workspaces);
+					fContext, INTERFACE_ELEMENT_ALL, NULL, workspaces, false);
 
 				if (window != NULL) {
 					window->Show();
@@ -746,7 +746,8 @@ BrowserApp::_CreateNewWindow(const BString& url, bool fullscreen, bool privateWi
 	}
 
 	BrowserWindow* window = new BrowserWindow(fLastWindowFrame, fSettings,
-		url, context);
+		url, context, INTERFACE_ELEMENT_ALL, NULL, B_CURRENT_WORKSPACE,
+		privateWindow);
 
 	if (privateWindow) {
 		// BrowserWindow stores context in a BReference, which increments ref count.
