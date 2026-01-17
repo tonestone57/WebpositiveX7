@@ -83,6 +83,7 @@
 #include "CredentialsStorage.h"
 #include "IconButton.h"
 #include "NavMenu.h"
+#include "PageUserData.h"
 #include "PermissionsWindow.h"
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
@@ -236,125 +237,6 @@ private:
 };
 
 
-class PageUserData : public BWebView::UserData {
-public:
-	PageUserData(BView* focusedView)
-		:
-		fFocusedView(focusedView),
-		fPageIcon(NULL),
-		fPageIconLarge(NULL),
-		fURLInputSelectionStart(-1),
-		fURLInputSelectionEnd(-1),
-		fIsLoading(false)
-	{
-	}
-
-	~PageUserData()
-	{
-		delete fPageIcon;
-		delete fPageIconLarge;
-	}
-
-	void SetFocusedView(BView* focusedView)
-	{
-		fFocusedView = focusedView;
-	}
-
-	BView* FocusedView() const
-	{
-		return fFocusedView;
-	}
-
-	void SetPageIcon(const BBitmap* icon)
-	{
-		delete fPageIcon;
-		fPageIcon = NULL;
-		delete fPageIconLarge;
-		fPageIconLarge = NULL;
-
-		if (icon == NULL)
-			return;
-
-		if (icon->Bounds().IntegerWidth() > 16) {
-			fPageIconLarge = new BBitmap(icon);
-			fPageIcon = new BBitmap(BRect(0, 0, 15, 15), B_RGBA32, true);
-			if (fPageIcon->IsValid()) {
-				BView* view = new BView(fPageIcon->Bounds(), "tmp",
-					B_FOLLOW_NONE, B_WILL_DRAW);
-				fPageIcon->AddChild(view);
-				fPageIcon->Lock();
-				view->SetHighColor(B_TRANSPARENT_32_BIT);
-				view->FillRect(view->Bounds());
-				view->SetDrawingMode(B_OP_ALPHA);
-				view->DrawBitmap(icon, fPageIcon->Bounds());
-				view->Sync();
-				fPageIcon->Unlock();
-				fPageIcon->RemoveChild(view);
-				delete view;
-			} else {
-				delete fPageIcon;
-				fPageIcon = new BBitmap(icon);
-			}
-		} else {
-			fPageIcon = new BBitmap(icon);
-		}
-	}
-
-	const BBitmap* PageIcon() const
-	{
-		return fPageIcon;
-	}
-
-	const BBitmap* PageIconLarge() const
-	{
-		return fPageIconLarge;
-	}
-
-	void SetURLInputContents(const char* text)
-	{
-		fURLInputContents = text;
-	}
-
-	const BString& URLInputContents() const
-	{
-		return fURLInputContents;
-	}
-
-	void SetURLInputSelection(int32 selectionStart, int32 selectionEnd)
-	{
-		fURLInputSelectionStart = selectionStart;
-		fURLInputSelectionEnd = selectionEnd;
-	}
-
-	int32 URLInputSelectionStart() const
-	{
-		return fURLInputSelectionStart;
-	}
-
-	int32 URLInputSelectionEnd() const
-	{
-		return fURLInputSelectionEnd;
-	}
-
-	void SetIsLoading(bool loading)
-	{
-		fIsLoading = loading;
-	}
-
-	bool IsLoading() const
-	{
-		return fIsLoading;
-	}
-
-private:
-	BView*		fFocusedView;
-	BBitmap*	fPageIcon;
-	BBitmap*	fPageIconLarge;
-	BString		fURLInputContents;
-	int32		fURLInputSelectionStart;
-	int32		fURLInputSelectionEnd;
-	bool		fIsLoading;
-};
 
 
 class CloseButton : public BButton {
@@ -463,7 +345,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fFormCheckPending(false),
 	fTabsToCheck(0),
 	fDirtyTabs(0),
-	fFormCheckTimeoutRunner(NULL)
+	fFormCheckTimeoutRunner(NULL),
+	fLastHistoryGeneration(0)
 {
 	// Begin listening to settings changes and read some current values.
 	fAppSettings->AddListener(BMessenger(this));
@@ -2466,15 +2349,33 @@ BrowserWindow::AuthenticationChallenge(BString message, BString& inOutUser,
 	CredentialsStorage* sessionStorage
 		= CredentialsStorage::SessionInstance();
 
-	// TODO: Using the message as key here is not so smart.
-	BString keyString(message);
+	// Build a stronger and more specific key for credential storage.
+	BString keyString;
+
 	if (view != NULL) {
 		BUrl url(view->MainFrameURL());
-		if (url.IsValid())
-			keyString.Prepend(BString().SetToFormat("%s:", url.Host().String()));
+		if (url.IsValid()) {
+			// protocol://host:port
+			BString proto(url.Protocol());
+			BString host(url.Host());
+			int32 port = url.Port();
+
+			if (port >= 0) {
+				keyString.SetToFormat("%s://%s:%" B_PRId32 ":",
+					proto.String(), host.String(), port);
+			} else {
+				keyString.SetToFormat("%s://%s:",
+					proto.String(), host.String());
+			}
+		}
 	}
+
+	// Append the realm/message last
+	keyString << message;
+
 	HashString key(keyString);
 
+	// Try the new specific key first
 	if (failureCount == 0) {
 		if (persistentStorage->Contains(key)) {
 			Credentials credentials = persistentStorage->GetCredentials(key);
@@ -2487,7 +2388,33 @@ BrowserWindow::AuthenticationChallenge(BString message, BString& inOutUser,
 			inOutPassword = credentials.Password();
 			return true;
 		}
+
+		// Backward compatibility: Try the old less specific key
+		BString legacyKeyString(message);
+		if (view != NULL) {
+			BUrl url(view->MainFrameURL());
+			if (url.IsValid())
+				legacyKeyString.Prepend(BString().SetToFormat("%s:", url.Host().String()));
+		}
+		HashString legacyKey(legacyKeyString);
+
+		if (persistentStorage->Contains(legacyKey)) {
+			Credentials credentials = persistentStorage->GetCredentials(legacyKey);
+			inOutUser = credentials.Username();
+			inOutPassword = credentials.Password();
+			// Auto-migrate to new key
+			persistentStorage->PutCredentials(key, credentials);
+			return true;
+		} else if (sessionStorage->Contains(legacyKey)) {
+			Credentials credentials = sessionStorage->GetCredentials(legacyKey);
+			inOutUser = credentials.Username();
+			inOutPassword = credentials.Password();
+			// Auto-migrate to new key
+			sessionStorage->PutCredentials(key, credentials);
+			return true;
+		}
 	}
+
 	// Switch to the page for which this authentication is required.
 	if (!_ShowPage(view))
 		return false;
@@ -2769,11 +2696,27 @@ BrowserWindow::_CreateBookmark(BMessage* message)
 			fileName = "";
 		}
 		const BBitmap* miniIcon = NULL;
-		const BBitmap* largeIcon = NULL;
 		originatorData.FindData("miniIcon", B_COLOR_8_BIT_TYPE,
 			reinterpret_cast<const void**>(&miniIcon), NULL);
-		originatorData.FindData("largeIcon", B_COLOR_8_BIT_TYPE,
-			reinterpret_cast<const void**>(&miniIcon), NULL);
+
+		BBitmap* largeIcon = NULL;
+		const void* largeIconData = NULL;
+		ssize_t largeIconSize = 0;
+		if (originatorData.FindData("largeIcon", B_RGBA32_TYPE,
+				&largeIconData, &largeIconSize) == B_OK) {
+			largeIcon = new(std::nothrow) BBitmap(BRect(0, 0, 31, 31),
+				B_RGBA32);
+			if (largeIcon != NULL) {
+				if (largeIcon->InitCheck() == B_OK
+					&& largeIcon->BitsLength() == largeIconSize) {
+					largeIcon->ImportBits(largeIconData, largeIconSize, 0, 0,
+						B_RGBA32);
+				} else {
+					delete largeIcon;
+					largeIcon = NULL;
+				}
+			}
+		}
 
 		if (validData == true) {
 			_CreateBookmark(BPath(&ref), BString(fileName), BString(title), BString(url),
@@ -2787,7 +2730,7 @@ BrowserWindow::_CreateBookmark(BMessage* message)
 			alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 			alert->Go();
 		}
-		return;
+		delete largeIcon;
 }
 
 
@@ -2967,13 +2910,25 @@ addOrDeleteMenu(BMenu* menu, BMenu* toMenu)
 void
 BrowserWindow::_UpdateHistoryMenu()
 {
-	BMenuItem* menuItem;
-	while ((menuItem = fHistoryMenu->RemoveItem(fHistoryMenuFixedItemCount)))
-		delete menuItem;
-
 	BrowsingHistory* history = BrowsingHistory::DefaultInstance();
 	if (!history->Lock())
 		return;
+
+	BDateTime todayStart = BDateTime::CurrentDateTime(B_LOCAL_TIME);
+	todayStart.SetTime(BTime(0, 0, 0));
+
+	if (history->Generation() == fLastHistoryGeneration
+		&& todayStart.Date() == fLastHistoryMenuDate.Date()) {
+		history->Unlock();
+		return;
+	}
+
+	fLastHistoryGeneration = history->Generation();
+	fLastHistoryMenuDate = todayStart;
+
+	BMenuItem* menuItem;
+	while ((menuItem = fHistoryMenu->RemoveItem(fHistoryMenuFixedItemCount)))
+		delete menuItem;
 
 	int32 count = history->CountItems();
 	BMenuItem* clearHistoryItem = new BMenuItem(B_TRANSLATE("Clear history"),
@@ -2985,9 +2940,6 @@ BrowserWindow::_UpdateHistoryMenu()
 		return;
 	}
 	fHistoryMenu->AddSeparatorItem();
-
-	BDateTime todayStart = BDateTime::CurrentDateTime(B_LOCAL_TIME);
-	todayStart.SetTime(BTime(0, 0, 0));
 
 	BDateTime oneDayAgoStart = todayStart;
 	oneDayAgoStart.Date().AddDays(-1);

@@ -122,6 +122,7 @@ bool
 BrowsingHistoryItem::operator<=(const BrowsingHistoryItem& other) const
 {
 	return !(*this > other);
+	return !(other < *this);
 }
 
 
@@ -183,7 +184,8 @@ BrowsingHistory::BrowsingHistory()
 	fHistoryItems(64),
 	fMaxHistoryItemAge(7),
 	fSettingsLoaded(false),
-	fSaveRunner(NULL)
+	fSaveRunner(NULL),
+	fGeneration(0)
 {
 }
 
@@ -301,6 +303,7 @@ BrowsingHistory::_Clear()
 	}
 	fHistoryItems.MakeEmpty();
 	fHistoryMap.clear();
+	fGeneration++;
 }
 
 
@@ -354,6 +357,8 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 		_ScheduleSave();
 	}
 
+	fGeneration++;
+
 	return true;
 }
 
@@ -372,6 +377,8 @@ BrowsingHistory::_RemoveUrl(const BString& url)
 	delete item;
 
 	_ScheduleSave();
+	fGeneration++;
+
 	return true;
 }
 

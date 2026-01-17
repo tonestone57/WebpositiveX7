@@ -493,60 +493,88 @@ BookmarkBar::FrameResized(float width, float height)
 {
 	int32 count = CountItems();
 
-	// Account for the "more" menu, in terms of item count and space occupied
-	int32 overflowMenuWidth = 0;
-	if (IndexOf(fOverflowMenu) != B_ERROR) {
+	// Collect all items (bar + overflow) into a single logical list for sizing
+	// Note: We don't use a vector of BMenuItem* to avoid allocations if possible,
+	// but direct access logic is complex due to two sources.
+	// Since this is UI code on resize, a vector of pointers is cheap enough.
+	std::vector<BMenuItem*> allItems;
+
+	bool overflowMenuAttached = (IndexOf(fOverflowMenu) != B_ERROR);
+	if (overflowMenuAttached)
 		count--;
-		// Ignore the width of the "more" menu if it would disappear after
-		// removing a bookmark from it.
-		if (fOverflowMenu->CountItems() > 1)
-			overflowMenuWidth = 32;
-	}
 
-	int32 i = 0;
-	float rightmost = 0.f;
-	while (i < count) {
-		BMenuItem* item = ItemAt(i);
-		BRect frame = item->Frame();
-		if (frame.right > width - overflowMenuWidth)
+	for (int32 k = 0; k < count; k++)
+		allItems.push_back(ItemAt(k));
+	for (int32 k = 0; k < fOverflowMenu->CountItems(); k++)
+		allItems.push_back(fOverflowMenu->ItemAt(k));
+
+	// Calculate how many items fit
+	int32 fitCount = 0;
+	int32 overflowMenuWidth = 0;
+	float currentX = 0;
+	bool needsOverflow = false;
+
+	// First pass: try to fit everything without overflow menu
+	for (size_t k = 0; k < allItems.size(); k++) {
+		float itemWidth = allItems[k]->Frame().Width();
+		// Assuming standard padding/margins are included in Frame() or negligible for logic check,
+		// but actual placement by BMenuBar might differ slightly.
+		// We use the accumulated width logic similar to original code's reliance on 'rightmost'.
+		// However, without 'rightmost' from actual layout, we sum widths.
+		// Original code: rightmost = Frame().right. This includes previous items + this item.
+		// So summing widths is the correct approximation if margins are consistent.
+
+		if (currentX + itemWidth > width) {
+			needsOverflow = true;
 			break;
-		rightmost = frame.right;
-		i++;
+		}
+		currentX += itemWidth;
+		fitCount++;
 	}
 
-	if (i == count) {
-		// See if we can move some items from the "more" menu in the remaining
-		// space.
-		BMenuItem* extraItem = fOverflowMenu->ItemAt(0);
-		while (extraItem != NULL) {
-			BRect frame = extraItem->Frame();
-			if (frame.Width() + rightmost > width - overflowMenuWidth)
+	if (needsOverflow) {
+		// Second pass: fit with overflow menu space reserved
+		overflowMenuWidth = 32;
+		currentX = 0;
+		fitCount = 0;
+		for (size_t k = 0; k < allItems.size(); k++) {
+			float itemWidth = allItems[k]->Frame().Width();
+			if (currentX + itemWidth > width - overflowMenuWidth) {
 				break;
-			AddItem(fOverflowMenu->RemoveItem((int32)0), i);
-			i++;
-
-			rightmost = ItemAt(i)->Frame().right;
-			if (fOverflowMenu->CountItems() <= 1)
-				overflowMenuWidth = 0;
-			extraItem = fOverflowMenu->ItemAt(0);
+			}
+			currentX += itemWidth;
+			fitCount++;
 		}
-		if (fOverflowMenu->CountItems() == 0) {
-			RemoveItem(fOverflowMenu);
-			fOverflowMenuAdded = false;
-		} else if (IndexOf(fOverflowMenu) == B_ERROR) {
-			AddItem(fOverflowMenu);
-			fOverflowMenuAdded = true;
-		}
-
 	} else {
-		// Remove any overflowing item and move them to the "more" menu.
-		// Counting backwards avoids complications when indices shift
-		// after an item is removed, and keeps bookmarks in the same order,
-		// provided they are added at index 0 of the "more" menu.
-		for (int j = count - 1; j >= i; j--)
-			fOverflowMenu->AddItem(RemoveItem(j), 0);
+		fitCount = (int32)allItems.size();
+	}
 
-		if (IndexOf(fOverflowMenu) == B_ERROR) {
+	// Apply changes efficiently to minimize relayouts
+	if (overflowMenuAttached) {
+		RemoveItem(fOverflowMenu);
+		fOverflowMenuAdded = false;
+	}
+
+	// Move excess items from Bar to Overflow
+	// Current items in bar (excluding overflow menu which is now gone)
+	int32 currentBarCount = CountItems();
+
+	while (currentBarCount > fitCount) {
+		BMenuItem* item = RemoveItem(currentBarCount - 1);
+		fOverflowMenu->AddItem(item, 0); // Add to front to preserve order (reversed removal)
+		currentBarCount--;
+	}
+
+	// Move fitting items from Overflow to Bar
+	while (currentBarCount < fitCount && fOverflowMenu->CountItems() > 0) {
+		BMenuItem* item = fOverflowMenu->RemoveItem((int32)0);
+		AddItem(item); // Add to end
+		currentBarCount++;
+	}
+
+	// Re-add overflow menu if needed
+	if (needsOverflow || fOverflowMenu->CountItems() > 0) {
+		if (fOverflowMenu->CountItems() > 0) {
 			AddItem(fOverflowMenu);
 			fOverflowMenuAdded = true;
 		}
