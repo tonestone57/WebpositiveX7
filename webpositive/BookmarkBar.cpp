@@ -53,6 +53,8 @@ LoadBookmarksThread(void* data)
 	BEntry bookmark;
 
 	BMessage message(kMsgInitialBookmarksLoaded);
+	int32 count = 0;
+	const int32 kBatchSize = 20;
 
 	while (dir.GetNextEntry(&bookmark, false) == B_OK) {
 		node_ref ref;
@@ -61,11 +63,21 @@ LoadBookmarksThread(void* data)
 			if (bookmark.GetRef(&entryRef) == B_OK) {
 				message.AddRef("refs", &entryRef);
 				message.AddInt64("inodes", (int64)ref.node);
+				count++;
 			}
+		}
+
+		if (count >= kBatchSize) {
+			params->target.SendMessage(&message);
+			message.MakeEmpty();
+			// MakeEmpty does not change 'what'
+			count = 0;
 		}
 	}
 
-	params->target.SendMessage(&message);
+	if (!message.IsEmpty())
+		params->target.SendMessage(&message);
+
 	delete params;
 	return B_OK;
 }
@@ -160,16 +172,6 @@ BookmarkBar::AttachedToWindow()
 		resume_thread(loader);
 	} else {
 		delete params;
-		// Fallback to synchronous loading
-		BDirectory dir(&fNodeRef);
-		BEntry bookmark;
-		while (dir.GetNextEntry(&bookmark, false) == B_OK) {
-			node_ref ref;
-			if (bookmark.GetNodeRef(&ref) == B_OK)
-				_AddItem(ref.node, &bookmark, false);
-		}
-		BRect rect = Bounds();
-		FrameResized(rect.Width(), rect.Height());
 	}
 }
 
