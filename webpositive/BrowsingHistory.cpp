@@ -8,6 +8,7 @@
 
 #include <new>
 #include <stdio.h>
+#include <vector>
 
 #include <Autolock.h>
 #include <Entry.h>
@@ -158,6 +159,12 @@ BrowsingHistory
 BrowsingHistory::sDefaultInstance;
 static BLocker* sSaveLock = new BLocker("history save lock");
 static bool sIsShuttingDown = false;
+
+
+struct SaveContext {
+	std::vector<BrowsingHistoryItem> items;
+	int32 maxAge;
+};
 
 
 static void
@@ -418,37 +425,53 @@ BrowsingHistory::_LoadSettings()
 void
 BrowsingHistory::_SaveSettings(bool forceSync)
 {
-	BMessage* settingsArchive = new(std::nothrow) BMessage();
-	if (settingsArchive == NULL)
-		return;
-
-	settingsArchive->AddInt32("max history item age", fMaxHistoryItemAge);
-	BMessage historyItemArchive;
-	int32 count = CountItems();
-	for (int32 i = 0; i < count; i++) {
-		const BrowsingHistoryItem* item = HistoryItemAt(i);
-		if (!item || item->Archive(&historyItemArchive) != B_OK)
-			break;
-		if (settingsArchive->AddMessage("history item",
-				&historyItemArchive) != B_OK) {
-			break;
-		}
-		historyItemArchive.MakeEmpty();
-	}
-
 	if (forceSync) {
+		BMessage settingsArchive;
+		settingsArchive.AddInt32("max history item age", fMaxHistoryItemAge);
+		BMessage historyItemArchive;
+		int32 count = CountItems();
+		for (int32 i = 0; i < count; i++) {
+			const BrowsingHistoryItem* item = HistoryItemAt(i);
+			if (!item || item->Archive(&historyItemArchive) != B_OK)
+				break;
+			if (settingsArchive.AddMessage("history item",
+					&historyItemArchive) != B_OK) {
+				break;
+			}
+			historyItemArchive.MakeEmpty();
+		}
+
 		BAutolock _(sSaveLock);
 		sIsShuttingDown = true;
-		_SaveToDisk(settingsArchive);
-		delete settingsArchive;
-	} else {
-		thread_id thread = spawn_thread(_SaveHistoryThread,
-			"save history", B_LOW_PRIORITY, settingsArchive);
-		if (thread >= 0) {
-			resume_thread(thread);
-		} else {
-			_SaveHistoryThread(settingsArchive);
+		_SaveToDisk(&settingsArchive);
+		return;
+	}
+
+	SaveContext* context = new(std::nothrow) SaveContext();
+	if (context == NULL)
+		return;
+
+	context->maxAge = fMaxHistoryItemAge;
+	int32 count = CountItems();
+
+	try {
+		context->items.reserve(count);
+		for (int32 i = 0; i < count; i++) {
+			const BrowsingHistoryItem* item = HistoryItemAt(i);
+			if (item)
+				context->items.push_back(*item);
 		}
+	} catch (...) {
+		delete context;
+		return;
+	}
+
+	thread_id thread = spawn_thread(_SaveHistoryThread,
+		"save history", B_LOW_PRIORITY, context);
+	if (thread >= 0) {
+		resume_thread(thread);
+	} else {
+		_SaveHistoryThread(context);
 	}
 }
 
@@ -456,16 +479,30 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 /*static*/ status_t
 BrowsingHistory::_SaveHistoryThread(void* cookie)
 {
-	BMessage* settingsArchive = (BMessage*)cookie;
+	SaveContext* context = (SaveContext*)cookie;
+
+	BMessage settingsArchive;
+	settingsArchive.AddInt32("max history item age", context->maxAge);
+	BMessage historyItemArchive;
+	for (size_t i = 0; i < context->items.size(); i++) {
+		if (context->items[i].Archive(&historyItemArchive) != B_OK)
+			break;
+		if (settingsArchive.AddMessage("history item",
+				&historyItemArchive) != B_OK) {
+			break;
+		}
+		historyItemArchive.MakeEmpty();
+	}
+
 	BAutolock _(sSaveLock);
 
 	if (sIsShuttingDown) {
-		delete settingsArchive;
+		delete context;
 		return B_OK;
 	}
 
-	_SaveToDisk(settingsArchive);
-	delete settingsArchive;
+	_SaveToDisk(&settingsArchive);
+	delete context;
 	return B_OK;
 }
 
