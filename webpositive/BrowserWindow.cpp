@@ -2016,8 +2016,7 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 		"Don't translate variable %url."));
 	status.ReplaceFirst("%url", url);
 	view->WebPage()->SetStatusMessage(status);
-	if (!fLoadingProgressBar->IsHidden())
-		fLoadingProgressBar->Hide();
+	_EnsureProgressBarHidden();
 }
 
 
@@ -2092,8 +2091,7 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 		"finished. Don't translate variable %url."));
 	status.ReplaceFirst("%url", url);
 	view->WebPage()->SetStatusMessage(status);
-	if (!fLoadingProgressBar->IsHidden())
-		fLoadingProgressBar->Hide();
+	_EnsureProgressBarHidden();
 
 	NavigationCapabilitiesChanged(fBackButton->IsEnabled(),
 		fForwardButton->IsEnabled(), false, view);
@@ -3179,7 +3177,7 @@ BrowserWindow::_ShowInterface(bool show)
 		fStatusGroup->SetVisible(false);
 	}
 
-	_ForceHideProgressBar();
+	_EnsureProgressBarHidden();
 }
 
 
@@ -3195,16 +3193,16 @@ BrowserWindow::_ShowProgressBar(bool show)
 		if (!fInterfaceVisible)
 			fStatusGroup->SetVisible(false);
 
-		_ForceHideProgressBar();
+		_EnsureProgressBarHidden();
 	}
 }
 
 
 void
-BrowserWindow::_ForceHideProgressBar()
+BrowserWindow::_EnsureProgressBarHidden()
 {
-	// TODO: This is also used in _ShowInterface. Without it the status bar
-	// doesn't always hide again. It may be an Interface Kit bug.
+	// This loop is a workaround for an Interface Kit bug where the status bar
+	// doesn't always hide immediately when Hide() is called.
 	int32 maxTries = 10;
 	while (!fLoadingProgressBar->IsHidden() && maxTries-- > 0)
 		fLoadingProgressBar->Hide();
