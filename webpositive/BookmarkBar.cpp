@@ -26,6 +26,7 @@
 #include "NavMenu.h"
 
 #include <stdio.h>
+#include <vector>
 
 
 #define B_TRANSLATION_CONTEXT "BookmarkBar"
@@ -44,6 +45,41 @@ struct LoaderParams {
 	BMessenger target;
 };
 
+struct BookmarkItem {
+	ino_t inode;
+	BMenuItem* item;
+};
+
+
+static BMenuItem*
+CreateBookmarkItem(BEntry* entry, BHandler* handler)
+{
+	char name[B_FILE_NAME_LENGTH];
+	entry->GetName(name);
+
+	entry_ref ref;
+	entry->GetRef(&ref);
+
+	// In case it's a symlink, follow link to get the right icon,
+	// but add the symlink's entry_ref for the IconMenuItem so it gets renamed/deleted/etc.
+	BEntry followedLink(&ref, true); // traverse link
+
+	if (followedLink.IsDirectory()) {
+		BNavMenu* menu = new BNavMenu(name, B_REFS_RECEIVED, handler);
+		menu->SetNavDir(&ref);
+		BMessage* message = new BMessage(kFolderMsg);
+		message->AddRef("refs", &ref);
+		return new IconMenuItem(menu, message, "application/x-vnd.Be-directory", B_MINI_ICON);
+
+	} else {
+		BNode node(&followedLink);
+		BNodeInfo info(&node);
+		BMessage* message = new BMessage(B_REFS_RECEIVED);
+		message->AddRef("refs", &ref);
+		return new IconMenuItem(name, message, &info, B_MINI_ICON);
+	}
+}
+
 
 static status_t
 LoadBookmarksThread(void* data)
@@ -52,19 +88,23 @@ LoadBookmarksThread(void* data)
 	BDirectory dir(&params->dirRef);
 	BEntry bookmark;
 
-	BMessage message(kMsgInitialBookmarksLoaded);
+	std::vector<BookmarkItem*>* items = new std::vector<BookmarkItem*>();
 
 	while (dir.GetNextEntry(&bookmark, false) == B_OK) {
 		node_ref ref;
 		if (bookmark.GetNodeRef(&ref) == B_OK) {
-			entry_ref entryRef;
-			if (bookmark.GetRef(&entryRef) == B_OK) {
-				message.AddRef("refs", &entryRef);
-				message.AddInt64("inodes", (int64)ref.node);
+			BMenuItem* item = CreateBookmarkItem(&bookmark, NULL);
+			if (item) {
+				BookmarkItem* bookmarkItem = new BookmarkItem;
+				bookmarkItem->inode = ref.node;
+				bookmarkItem->item = item;
+				items->push_back(bookmarkItem);
 			}
 		}
 	}
 
+	BMessage message(kMsgInitialBookmarksLoaded);
+	message.AddPointer("list", items);
 	params->target.SendMessage(&message);
 	delete params;
 	return B_OK;
@@ -180,23 +220,54 @@ BookmarkBar::MessageReceived(BMessage* message)
 	switch (message->what) {
 		case kMsgInitialBookmarksLoaded:
 		{
-			entry_ref ref;
-			int32 i = 0;
-			bool addedAny = false;
-			while (message->FindRef("refs", i, &ref) == B_OK) {
-				int64 inodeVal;
-				if (message->FindInt64("inodes", i, &inodeVal) == B_OK) {
-					BEntry entry(&ref);
-					if (entry.InitCheck() == B_OK) {
-						_AddItem((ino_t)inodeVal, &entry, false);
+			std::vector<BookmarkItem*>* list;
+			if (message->FindPointer("list", (void**)&list) == B_OK) {
+				bool addedAny = false;
+				for (size_t i = 0; i < list->size(); i++) {
+					BookmarkItem* data = (*list)[i];
+					if (fItemsMap.find(data->inode) == fItemsMap.end()) {
+						IconMenuItem* item = (IconMenuItem*)data->item;
+
+						// Fix target if it was NULL (from thread)
+						if (BMenu* submenu = item->Submenu())
+							submenu->SetTargetForItems(Window());
+
+						bool addedToOverflow = false;
+						// Optimize batch loading by adding directly to the overflow menu if we
+						// know the bar is full.
+						if (CountItems() > 0) {
+							BMenuItem* last = ItemAt(CountItems() - 1);
+							float maxRight = Bounds().Width();
+							if (IndexOf(fOverflowMenu) != B_ERROR || fOverflowMenu->CountItems() > 0)
+								maxRight -= 32;
+
+							if (last->Frame().right > maxRight) {
+								fOverflowMenu->AddItem(item);
+								addedToOverflow = true;
+							}
+						}
+
+						if (!addedToOverflow) {
+							int32 count = CountItems();
+							if (IndexOf(fOverflowMenu) != B_ERROR)
+								count--;
+
+							BMenuBar::AddItem(item, count);
+						}
+
+						fItemsMap[data->inode] = item;
 						addedAny = true;
+					} else {
+						delete data->item;
 					}
+					delete data;
 				}
-				i++;
-			}
-			if (addedAny) {
-				BRect rect = Bounds();
-				FrameResized(rect.Width(), rect.Height());
+				delete list;
+
+				if (addedAny) {
+					BRect rect = Bounds();
+					FrameResized(rect.Width(), rect.Height());
+				}
 			}
 			break;
 		}
@@ -505,36 +576,12 @@ BookmarkBar::MinSize()
 void
 BookmarkBar::_AddItem(ino_t inode, BEntry* entry, bool layout)
 {
-	char name[B_FILE_NAME_LENGTH];
-	entry->GetName(name);
-
-	// make sure the item doesn't already exists
 	if (fItemsMap[inode] != NULL)
 		return;
 
-	entry_ref ref;
-	entry->GetRef(&ref);
-
-	// In case it's a symlink, follow link to get the right icon,
-	// but add the symlink's entry_ref for the IconMenuItem so it gets renamed/deleted/etc.
-	BEntry followedLink(&ref, true); // traverse link
-
-	IconMenuItem* item = NULL;
-
-	if (followedLink.IsDirectory()) {
-		BNavMenu* menu = new BNavMenu(name, B_REFS_RECEIVED, Window());
-		menu->SetNavDir(&ref);
-		BMessage* message = new BMessage(kFolderMsg);
-		message->AddRef("refs", &ref);
-		item = new IconMenuItem(menu, message, "application/x-vnd.Be-directory", B_MINI_ICON);
-
-	} else {
-		BNode node(&followedLink);
-		BNodeInfo info(&node);
-		BMessage* message = new BMessage(B_REFS_RECEIVED);
-		message->AddRef("refs", &ref);
-		item = new IconMenuItem(name, message, &info, B_MINI_ICON);
-	}
+	BMenuItem* item = CreateBookmarkItem(entry, Window());
+	if (item == NULL)
+		return;
 
 	bool addedToOverflow = false;
 	// Optimize batch loading by adding directly to the overflow menu if we
@@ -560,7 +607,7 @@ BookmarkBar::_AddItem(ino_t inode, BEntry* entry, bool layout)
 		BMenuBar::AddItem(item, count);
 	}
 
-	fItemsMap[inode] = item;
+	fItemsMap[inode] = (IconMenuItem*)item;
 
 	// Move the item to the "more" menu if it overflows.
 	if (layout) {
