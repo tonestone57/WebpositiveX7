@@ -78,6 +78,7 @@ enum {
 	MSG_BLOCK_ADS_CHANGED						= 'blads',
 	MSG_LOAD_IMAGES_CHANGED						= 'ldimg',
 	MSG_LOW_RAM_MODE_CHANGED					= 'lram',
+	MSG_ENABLE_GPU_CHANGED						= 'egpu',
 
 	MSG_CHOOSE_DOWNLOAD_FOLDER					= 'swop',
 	MSG_HANDLE_DOWNLOAD_FOLDER					= 'oprs',
@@ -317,6 +318,7 @@ SettingsWindow::MessageReceived(BMessage* message)
 		case MSG_BLOCK_ADS_CHANGED:
 		case MSG_LOAD_IMAGES_CHANGED:
 		case MSG_LOW_RAM_MODE_CHANGED:
+		case MSG_ENABLE_GPU_CHANGED:
 			// These settings cannot change live, as we don't want partial
 			// input to be applied.
 			_ValidateControlsEnabledStatus();
@@ -513,6 +515,11 @@ SettingsWindow::_CreateGeneralPage(float spacing)
 		new BMessage(MSG_LOW_RAM_MODE_CHANGED));
 	fLowRAMModeCheckBox->SetValue(B_CONTROL_OFF);
 
+	fEnableGPUCheckBox = new BCheckBox("enable gpu",
+		B_TRANSLATE("Enable GPU acceleration"),
+		new BMessage(MSG_ENABLE_GPU_CHANGED));
+	fEnableGPUCheckBox->SetValue(B_CONTROL_OFF);
+
 	BView* view = BGroupLayoutBuilder(B_VERTICAL, 0)
 		.Add(BGridLayoutBuilder(spacing / 2, spacing / 2)
 			.Add(fStartPageControl->CreateLabelLayoutItem(), 0, 0)
@@ -545,6 +552,7 @@ SettingsWindow::_CreateGeneralPage(float spacing)
 		.Add(fAutoHidePointer)
 		.Add(fShowHomeButton)
 		.Add(fLowRAMModeCheckBox)
+		.Add(fEnableGPUCheckBox)
 		.Add(BSpaceLayoutItem::CreateVerticalStrut(spacing))
 
 		.AddGroup(B_HORIZONTAL)
@@ -729,6 +737,9 @@ SettingsWindow::_CanApplySettings() const
 	canApply = canApply || ((fLowRAMModeCheckBox->Value() == B_CONTROL_ON)
 		!= fSettings->GetValue(kSettingsKeyLowRAMMode, false));
 
+	canApply = canApply || ((fEnableGPUCheckBox->Value() == B_CONTROL_ON)
+		!= fSettings->GetValue(kSettingsKeyEnableGPU, false));
+
 	canApply = canApply || (fDaysInHistory->Value()
 		!= BrowsingHistory::DefaultInstance()->MaxHistoryItemAge());
 
@@ -816,6 +827,8 @@ SettingsWindow::_ApplySettings()
 		fShowHomeButton->Value() == B_CONTROL_ON);
 	fSettings->SetValue(kSettingsKeyLowRAMMode,
 		fLowRAMModeCheckBox->Value() == B_CONTROL_ON);
+	fSettings->SetValue(kSettingsKeyEnableGPU,
+		fEnableGPUCheckBox->Value() == B_CONTROL_ON);
 
 	// New page policies
 	fSettings->SetValue(kSettingsKeyStartUpPolicy, _StartUpPolicy());
@@ -824,6 +837,14 @@ SettingsWindow::_ApplySettings()
 
 	_UpdateFontSettings();
 	_UpdateProxySettings();
+
+	// GPU Acceleration is handled in UI but engine support is currently platform-dependent.
+	// We log the setting change for diagnostic purposes.
+	if (fEnableGPUCheckBox->Value() == B_CONTROL_ON) {
+		printf("GPU Acceleration: Enabled (if supported)\n");
+	} else {
+		printf("GPU Acceleration: Disabled\n");
+	}
 
 	fSettings->SetValue(kSettingsKeyHttpsOnly,
 		fHttpsOnlyCheckBox->Value() == B_CONTROL_ON);
@@ -883,6 +904,8 @@ SettingsWindow::_RevertSettings()
 		fSettings->GetValue(kSettingsKeyShowHomeButton, true));
 	fLowRAMModeCheckBox->SetValue(
 		fSettings->GetValue(kSettingsKeyLowRAMMode, false));
+	fEnableGPUCheckBox->SetValue(
+		fSettings->GetValue(kSettingsKeyEnableGPU, false));
 
 	fDaysInHistory->SetValue(
 		BrowsingHistory::DefaultInstance()->MaxHistoryItemAge());

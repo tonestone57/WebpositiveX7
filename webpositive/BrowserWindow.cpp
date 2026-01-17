@@ -1695,6 +1695,10 @@ BrowserWindow::MessageReceived(BMessage* message)
 			} else if (name == kSettingsKeyLowRAMMode
 				&& message->FindBool("value", &flag) == B_OK) {
 				fLowRAMMode = flag;
+				if (fLowRAMMode)
+					BWebPage::SetCacheModel(B_WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
+				else
+					BWebPage::SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
 				_CheckMemoryPressure();
 			}
 			break;
@@ -2320,6 +2324,13 @@ BrowserWindow::LoadCommitted(const BString& url, BWebView* view)
 	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
 	if (userData != NULL)
 		userData->SetIsLoading(true);
+
+	if (fLowRAMMode && view && view->WebPage()) {
+		BString script = "var style = document.createElement('style');"
+			"style.innerHTML = '* { animation: none !important; transition: none !important; }';"
+			"document.head.appendChild(style);";
+		view->WebPage()->ExecuteJavaScript(script);
+	}
 
 	if (view != CurrentWebView())
 		return;

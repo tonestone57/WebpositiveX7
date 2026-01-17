@@ -47,6 +47,7 @@ const char* kSettingsKeyHttpsOnly = "https only mode";
 const char* kSettingsKeyBlockAds = "block ads";
 const char* kSettingsKeyLoadImages = "load images";
 const char* kSettingsKeyLowRAMMode = "low ram mode";
+const char* kSettingsKeyEnableGPU = "enable gpu";
 
 
 const struct SearchEngine kSearchEngines[] = {
