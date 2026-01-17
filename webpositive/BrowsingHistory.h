@@ -73,6 +73,8 @@ public:
 			void				SetMaxHistoryItemAge(int32 days);
 			int32				MaxHistoryItemAge() const;
 
+			uint32				Generation() const { return fGeneration; }
+
 private:
 								BrowsingHistory();
 	virtual						~BrowsingHistory();
@@ -96,6 +98,7 @@ private:
 	static	BrowsingHistory		sDefaultInstance;
 			bool				fSettingsLoaded;
 			BMessageRunner*		fSaveRunner;
+			uint32				fGeneration;
 };
 
 
