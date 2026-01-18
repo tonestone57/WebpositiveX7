@@ -30,6 +30,7 @@ public:
 
 	virtual	void				MessageReceived(BMessage* message);
 	virtual	bool				QuitRequested();
+			void				PrepareToQuit();
 
 	virtual	void				Show();
 
@@ -64,6 +65,7 @@ private:
 
 private:
 			SettingsMessage*	fSettings;
+			bool				fQuitting;
 
 			BTextControl*		fStartPageControl;
 			BTextControl*		fSearchPageControl;

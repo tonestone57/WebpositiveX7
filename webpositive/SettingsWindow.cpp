@@ -18,6 +18,7 @@
 #include <MenuField.h>
 #include <Message.h>
 #include <PopUpMenu.h>
+#include <KeyStore.h>
 #include <ScrollView.h>
 #include <SeparatorView.h>
 #include <SpaceLayoutItem.h>
@@ -93,7 +94,8 @@ SettingsWindow::SettingsWindow(BRect frame, SettingsMessage* settings)
 	BWindow(frame, B_TRANSLATE("Settings"), B_TITLED_WINDOW_LOOK,
 		B_NORMAL_WINDOW_FEEL, B_AUTO_UPDATE_SIZE_LIMITS
 			| B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE),
-	fSettings(settings)
+	fSettings(settings),
+	fQuitting(false)
 {
 	fApplyButton = new BButton(B_TRANSLATE("Apply"), new BMessage(MSG_APPLY));
 	fCancelButton = new BButton(B_TRANSLATE("Cancel"),
@@ -336,9 +338,19 @@ SettingsWindow::MessageReceived(BMessage* message)
 bool
 SettingsWindow::QuitRequested()
 {
+	if (fQuitting)
+		return true;
+
 	if (!IsHidden())
 		Hide();
 	return false;
+}
+
+
+void
+SettingsWindow::PrepareToQuit()
+{
+	fQuitting = true;
 }
 
 
@@ -1099,8 +1111,15 @@ SettingsWindow::_UpdateProxySettings()
 		fUseProxyAuthCheckBox->Value() == B_CONTROL_ON);
 	fSettings->SetValue(kSettingsKeyProxyUsername,
 		fProxyUsernameControl->Text());
-	fSettings->SetValue(kSettingsKeyProxyPassword,
-		fProxyPasswordControl->Text());
+
+	// Securely store proxy password in KeyStore
+	BKeyStore keyStore;
+	keyStore.SetPassword("WebPositive", "ProxySettings",
+		fProxyPasswordControl->Text(), "");
+
+	// Clear plaintext password from settings file if present
+	if (fSettings->GetValue(kSettingsKeyProxyPassword, "") != "")
+		fSettings->SetValue(kSettingsKeyProxyPassword, "");
 
 	if (fUseProxyCheckBox->Value() == B_CONTROL_ON) {
 		if (fUseProxyAuthCheckBox->Value() == B_CONTROL_ON) {
