@@ -389,6 +389,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fPermissionsWindow(NULL),
 	fNetworkWindow(NULL),
 	fIsBypassingCache(false),
+	fIsPrivate(privateWindow),
 	fMemoryPressureRunner(NULL),
 	fButtonResetRunner(NULL)
 {
@@ -2770,7 +2771,8 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 	bool allowPopups = true;
 	float zoom = 1.0;
 	bool forceDesktop = false;
-	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop);
+	BString customUserAgent;
+	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop, customUserAgent);
 
 	if (view) {
 		// Apply Per-Site Zoom
@@ -3959,7 +3961,7 @@ BrowserWindow::_GetFaviconPath(const BString& url, BPath& path)
 void
 BrowserWindow::_SaveFavicon(const BString& url, const BBitmap* icon)
 {
-	if (icon == NULL)
+	if (icon == NULL || fIsPrivate)
 		return;
 
 	BPath path;
