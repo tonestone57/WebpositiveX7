@@ -5,14 +5,10 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include "String.h"
-#include "Roster.h"
-
-// Mock for be_roster
-BRoster* be_roster = new BRoster();
+#include <String.h>
+#include <Roster.h>
 
 #include "../support/URLHandler.h"
-#include "../support/URLHandler.cpp"
 
 // Mock for kSearchEngines matching SettingsKeys.cpp format (with spaces)
 const struct SearchEngine kSearchEngines[] = {
