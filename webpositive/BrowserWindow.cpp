@@ -3569,7 +3569,7 @@ BrowserWindow::_InvokeButtonVisibly(BButton* button)
 	button->SetValue(B_CONTROL_ON);
 	UpdateIfNeeded();
 	button->Invoke();
-	snooze(1000);
+	snooze(50000);
 	button->SetValue(B_CONTROL_OFF);
 }
 

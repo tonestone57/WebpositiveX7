@@ -77,7 +77,7 @@ URLHandler::_VisitSearchEngine(const BString& search, BString& outURL, const BSt
 	BString engine(searchPageURL);
 
 	// Check if the string starts with one of the search engine shortcuts
-	for (int i = 0; kSearchEngines[i].url != NULL; i++) {
+	for (int32 i = 0; kSearchEngines[i].url != NULL; i++) {
 		if (kSearchEngines[i].shortcut == searchPrefix) {
 			engine = kSearchEngines[i].url;
 			searchQuery.Remove(0, 2);
@@ -106,7 +106,7 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 		bool handled = false;
 
 		// First try the built-in supported ones
-		for (unsigned int i = 0; i < sizeof(kHandledProtocols) / sizeof(char*);
+		for (int32 i = 0; i < (int32)(sizeof(kHandledProtocols) / sizeof(char*));
 				i++) {
 			handled = (proto == kHandledProtocols[i]);
 			if (handled)
