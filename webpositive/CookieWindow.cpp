@@ -321,6 +321,15 @@ CookieWindow::_BuildDomainList()
 	const BPrivate::Network::BNetworkCookie* cookie;
 
 	while ((cookie = it.Next()) != NULL) {
+		fCookieMap[cookie->Domain()].push_back(*cookie);
+	}
+
+	// Second pass: add domains to the list.
+	std::map<BString, std::vector<BPrivate::Network::BNetworkCookie> >::iterator
+		mapIt;
+	for (mapIt = fCookieMap.begin(); mapIt != fCookieMap.end(); mapIt++) {
+		_AddDomain(mapIt->first, false, domainItemMap);
+	}
 		BString domain = cookie->Domain();
 		fCookieMap[domain].push_back(*cookie);
 
