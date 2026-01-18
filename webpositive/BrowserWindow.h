@@ -131,7 +131,7 @@ enum {
 	IMPORT_BOOKMARKS							= 'imbm',
 	EXPORT_HISTORY								= 'exhi',
 	SYNC_EXPORT									= 'syex',
-	SYNC_IMPORT									= 'syim'
+	SYNC_IMPORT									= 'syim',
 	CHECK_MEMORY_PRESSURE			= 'cmem'
 };
 

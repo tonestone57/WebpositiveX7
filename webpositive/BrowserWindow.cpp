@@ -31,6 +31,9 @@
 
 #include "BrowserWindow.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 #include <OS.h>
 #include <Alert.h>
 #include <Application.h>
@@ -337,7 +340,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fLastHistoryGeneration(0),
 	fPermissionsWindow(NULL),
 	fNetworkWindow(NULL),
-	fIsBypassingCache(false)
+	fIsBypassingCache(false),
 	fMemoryPressureRunner(NULL)
 {
 	fFormSafetyHelper = new FormSafetyHelper(this);

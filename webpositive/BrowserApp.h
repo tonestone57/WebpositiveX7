@@ -50,7 +50,7 @@ public:
 	virtual						~BrowserApp();
 
 	virtual	void				AboutRequested();
-	virtual	void				ArgvReceived(int32 agrc, char** argv);
+	virtual	void				ArgvReceived(int32 argc, char** argv);
 	virtual	void				MessageReceived(BMessage* message);
 	virtual	void				RefsReceived(BMessage* message);
 	virtual	void				ReadyToRun();
