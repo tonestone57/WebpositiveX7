@@ -9,6 +9,9 @@
 #include <algorithm>
 #include <new>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 #include <vector>
 
 #include <Autolock.h>
@@ -205,107 +208,117 @@ BrowsingHistory::ImportHistory(const BPath& path)
 
 	off_t size;
 	file.GetSize(&size);
-	BString content;
-	char* buffer = content.LockBuffer(size);
-	file.Read(buffer, size);
-	content.UnlockBuffer(size);
+	// Optimize: raw buffer for manual parsing
+	char* buffer = new(std::nothrow) char[size + 1];
+	if (!buffer) return B_NO_MEMORY;
+
+	if (file.Read(buffer, size) != size) {
+		delete[] buffer;
+		return B_IO_ERROR;
+	}
+	buffer[size] = '\0';
 
 	std::vector<BrowsingHistoryItem> items;
+	// Pre-allocate to reduce reallocations
+	items.reserve(size / 50);
 
-	int32 pos = 0;
+	char* cursor = buffer;
+	char* end = buffer + size;
+
 	// Skip header
-	int32 headerEnd = content.FindFirst("\n");
-	if (headerEnd >= 0)
-		pos = headerEnd + 1;
+	while (cursor < end && *cursor != '\n') cursor++;
+	if (cursor < end) cursor++;
 
-	while (pos < content.Length()) {
-		int32 nextPos = pos;
-		bool inQuotes = false;
+	while (cursor < end && *cursor) {
+		char* lineStart = cursor;
 		// Find end of line, respecting quotes
-		while (nextPos < content.Length()) {
-			char c = content.ByteAt(nextPos);
-			if (c == '"') {
-				inQuotes = !inQuotes;
-			} else if (c == '\n' && !inQuotes) {
-				break;
-			}
-			nextPos++;
+		bool inQuotes = false;
+		while (cursor < end) {
+			if (*cursor == '"') inQuotes = !inQuotes;
+			else if (*cursor == '\n' && !inQuotes) break;
+			cursor++;
 		}
 
-		BString line;
-		content.CopyInto(line, pos, nextPos - pos);
-		pos = nextPos + 1;
-
-		if (line.IsEmpty())
+		size_t lineLen = cursor - lineStart;
+		if (lineLen == 0) {
+			if (cursor < end) cursor++;
 			continue;
+		}
 
-		// Parse line
-		// URL,Date,Count
-		// URL can be quoted.
+		// Temporarily null-terminate the line
+		char originalChar = *cursor;
+		*cursor = '\0';
 
+		// Parse Line
+		char* token = lineStart;
 		BString url;
-		BString dateStr;
-		BString countStr;
 
-		int32 linePos = 0;
 		// URL
-		if (line.ByteAt(0) == '"') {
-			// Quoted
-			linePos = 1;
-			while (linePos < line.Length()) {
-				int32 quote = line.FindFirst('"', linePos);
-				if (quote < 0) break; // Error
-				if (quote + 1 < line.Length() && line.ByteAt(quote + 1) == '"') {
-					// Escaped quote: append everything up to and including the first "
-					url.Append(line.String() + linePos, quote - linePos + 1);
-					// Skip the second "
-					linePos = quote + 2;
+		if (*token == '"') {
+			token++; // Skip opening quote
+			// Manual unescaping
+			while (*token) {
+				if (*token == '"') {
+					if (*(token + 1) == '"') {
+						url += '"';
+						token += 2;
+					} else {
+						// End quote
+						token++;
+						if (*token == ',') token++;
+						break;
+					}
 				} else {
-					// End of field
-					url.Append(line.String() + linePos, quote - linePos);
-					linePos = quote + 1;
-					// Consume comma
-					if (linePos < line.Length() && line.ByteAt(linePos) == ',')
-						linePos++;
-					break;
+					// Optimization: append chunk until next quote
+					char* nextQuote = strchr(token, '"');
+					if (nextQuote) {
+						url.Append(token, nextQuote - token);
+						token = nextQuote;
+					} else {
+						// Should not happen if well-formed
+						url += token;
+						break;
+					}
 				}
 			}
 		} else {
-			int32 comma = line.FindFirst(',', linePos);
-			if (comma < 0) {
-				// Should not happen as we expect 3 fields
-				url = line;
-				linePos = line.Length();
+			char* comma = strchr(token, ',');
+			if (comma) {
+				url.Append(token, comma - token);
+				token = comma + 1;
 			} else {
-				line.CopyInto(url, linePos, comma - linePos);
-				linePos = comma + 1;
+				url = token;
+				token += strlen(token);
 			}
 		}
 
 		// Date
-		int32 comma = line.FindFirst(',', linePos);
-		if (comma < 0) continue; // Invalid
-		line.CopyInto(dateStr, linePos, comma - linePos);
-		linePos = comma + 1;
+		char* comma = strchr(token, ',');
+		if (comma) {
+			*comma = '\0';
+			struct tm timeinfo;
+			memset(&timeinfo, 0, sizeof(struct tm));
+			strptime(token, "%Y-%m-%d %H:%M:%S", &timeinfo);
+			time_t t = mktime(&timeinfo);
+			BDateTime dateTime;
+			dateTime.SetTime_t(t);
 
-		// Count
-		line.CopyInto(countStr, linePos, line.Length() - linePos);
+			// Count
+			token = comma + 1;
+			uint32 count = (uint32)atoi(token);
 
-		struct tm timeinfo;
-		memset(&timeinfo, 0, sizeof(struct tm));
-		strptime(dateStr.String(), "%Y-%m-%d %H:%M:%S", &timeinfo);
-		time_t t = mktime(&timeinfo);
-		BDateTime dateTime;
-		dateTime.SetTime_t(t);
+			BrowsingHistoryItem item(url);
+			item.SetDateTime(dateTime);
+			item.SetInvokationCount(count);
+			items.push_back(item);
+		}
 
-		uint32 count = (uint32)atoi(countStr.String());
-
-		BrowsingHistoryItem item(url);
-		item.SetDateTime(dateTime);
-		item.SetInvokationCount(count);
-
-		items.push_back(item);
+		// Restore and advance
+		*cursor = originalChar;
+		if (cursor < end) cursor++;
 	}
+
+	delete[] buffer;
 
 	if (items.empty())
 		return B_OK;

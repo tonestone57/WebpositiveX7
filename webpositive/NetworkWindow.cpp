@@ -66,6 +66,8 @@ NetworkWindow::MessageReceived(BMessage* message)
 				BString displayText;
 				displayText.SetToFormat("[Pending] %s (Headers: N/A)", url.String());
 				fRequestListView->AddItem(new BStringItem(displayText));
+				if (fRequestListView->CountItems() > 500)
+					delete fRequestListView->RemoveItem(0);
 				fRequestListView->ScrollTo(fRequestListView->CountItems() - 1);
 			}
 			break;
