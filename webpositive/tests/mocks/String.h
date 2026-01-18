@@ -23,6 +23,30 @@ public:
          size_t pos = fString.find(c);
          return (pos == std::string::npos) ? B_ERROR : (int32)pos;
     }
+    int32 FindFirst(char c, int32 from) const {
+        size_t pos = fString.find(c, from);
+        return (pos == std::string::npos) ? B_ERROR : (int32)pos;
+    }
+    int32 FindFirst(const BString& str, int32 from = 0) const {
+		size_t pos = fString.find(str.fString, from);
+		return (pos == std::string::npos) ? B_ERROR : (int32)pos;
+	}
+
+    void Append(const char* str, int32 length) {
+		fString.append(str, length);
+	}
+
+    char* LockBuffer(int32 maxLength) {
+		fString.resize(maxLength);
+		return &fString[0];
+	}
+
+	void UnlockBuffer(int32 length = -1) {
+		if (length != -1)
+			fString.resize(length);
+		else
+			fString.resize(strlen(fString.c_str()));
+	}
 
     // Add EndsWith
     bool EndsWith(const BString& str) const {

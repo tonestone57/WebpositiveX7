@@ -65,9 +65,9 @@ private:
 
 class BDateTime {
 public:
-	BDateTime() {}
-	BDateTime(const BDate& date, const BTime& time) : fDate(date), fTime(time) {}
-	BDateTime(const BMessage* message) {}
+	BDateTime() : fTimeValue(0) {}
+	BDateTime(const BDate& date, const BTime& time) : fDate(date), fTime(time), fTimeValue(0) {}
+	BDateTime(const BMessage* message) : fTimeValue(0) {}
 
 	status_t Archive(BMessage* archive) const { return B_OK; }
 
@@ -79,7 +79,8 @@ public:
 	BTime Time() const { return fTime; }
 
     // Add Time_t
-    time_t Time_t() const { return 0; }
+    time_t Time_t() const { return fTimeValue; }
+	void SetTime_t(time_t value) { fTimeValue = value; }
 
 	bool operator<(const BDateTime& other) const {
 		if (fDate < other.fDate) return true;

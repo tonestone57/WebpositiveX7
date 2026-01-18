@@ -19,7 +19,7 @@
 #include <MessageRunner.h>
 #include <Path.h>
 
-#include "BrowserApp.h"
+#include "BrowserApp.hh"
 
 
 static const uint32 SAVE_HISTORY = 'svhs';
@@ -210,6 +210,8 @@ BrowsingHistory::ImportHistory(const BPath& path)
 	file.Read(buffer, size);
 	content.UnlockBuffer(size);
 
+	std::vector<BrowsingHistoryItem> items;
+
 	int32 pos = 0;
 	// Skip header
 	int32 headerEnd = content.FindFirst("\n");
@@ -302,8 +304,46 @@ BrowsingHistory::ImportHistory(const BPath& path)
 		item.SetDateTime(dateTime);
 		item.SetInvokationCount(count);
 
-		DefaultInstance()->AddItem(item);
+		items.push_back(item);
 	}
+
+	if (items.empty())
+		return B_OK;
+
+	BAutolock lock(DefaultInstance());
+	if (!lock.IsLocked())
+		return B_ERROR;
+
+	int32 importedCount = 0;
+	for (size_t i = 0; i < items.size(); i++) {
+		const BrowsingHistoryItem& item = items[i];
+		if (DefaultInstance()->fHistoryMap.find(item.URL())
+				== DefaultInstance()->fHistoryMap.end()) {
+			// Item does not exist, add it
+			BrowsingHistoryItem* newItem = new(std::nothrow) BrowsingHistoryItem(item);
+			if (newItem) {
+				try {
+					DefaultInstance()->fHistoryList.push_back(newItem);
+					DefaultInstance()->fHistoryMap[newItem->URL()] = newItem;
+					importedCount++;
+				} catch (...) {
+					// In case of allocation error in the map
+					DefaultInstance()->fHistoryList.pop_back();
+					delete newItem;
+					// Continue to next item
+				}
+			}
+		}
+	}
+
+	if (importedCount > 0) {
+		std::sort(DefaultInstance()->fHistoryList.begin(),
+			DefaultInstance()->fHistoryList.end(),
+			BrowsingHistoryItemPointerCompare());
+		DefaultInstance()->fGeneration++;
+		DefaultInstance()->_ScheduleSave();
+	}
+
 	return B_OK;
 }
 
