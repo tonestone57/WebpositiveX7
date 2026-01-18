@@ -99,7 +99,7 @@ NetworkWindow::MessageReceived(BMessage* message)
 				std::map<BString, std::deque<NetworkRequestItem*> >::iterator it
 					= fPendingRequests.find(url);
 				if (it != fPendingRequests.end() && !it->second.empty()) {
-					NetworkRequestItem* item = it->second.back();
+					NetworkRequestItem* item = it->second.front();
 
 					BString displayText;
 					displayText.SetToFormat("[%s] %s (Headers: N/A)",
@@ -110,7 +110,7 @@ NetworkWindow::MessageReceived(BMessage* message)
 					fRequestListView->InvalidateItem(
 						fRequestListView->IndexOf(item));
 
-					it->second.pop_back();
+					it->second.pop_front();
 					if (it->second.empty())
 						fPendingRequests.erase(it);
 				}

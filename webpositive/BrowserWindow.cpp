@@ -342,7 +342,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fPermissionsWindow(NULL),
 	fNetworkWindow(NULL),
 	fIsBypassingCache(false),
-	fMemoryPressureRunner(NULL)
+	fMemoryPressureRunner(NULL),
+	fButtonResetRunner(NULL)
 {
 	fFormSafetyHelper = new FormSafetyHelper(this);
 
@@ -821,6 +822,7 @@ BrowserWindow::~BrowserWindow()
 	fAppSettings->RemoveListener(BMessenger(this));
 	delete fTabManager;
 	delete fPulseRunner;
+	delete fButtonResetRunner;
 	delete fMemoryPressureRunner;
 	delete fSavePanel;
 	delete fFormSafetyHelper;
@@ -1932,6 +1934,18 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case CHECK_MEMORY_PRESSURE:
 			_CheckMemoryPressure();
 			break;
+
+		case RESET_BUTTON_STATE:
+		{
+			delete fButtonResetRunner;
+			fButtonResetRunner = NULL;
+
+			BButton* button = NULL;
+			if (message->FindPointer("button", (void**)&button) == B_OK) {
+				button->SetValue(B_CONTROL_OFF);
+			}
+			break;
+		}
 
 		case B_COPY_TARGET:
 		{
@@ -3569,11 +3583,16 @@ BrowserWindow::_EnsureProgressBarHidden()
 void
 BrowserWindow::_InvokeButtonVisibly(BButton* button)
 {
+	delete fButtonResetRunner;
+	fButtonResetRunner = NULL;
+
 	button->SetValue(B_CONTROL_ON);
-	UpdateIfNeeded();
+	// UpdateIfNeeded(); // Usually handled by window loop, removing unless critical
 	button->Invoke();
-	snooze(50000);
-	button->SetValue(B_CONTROL_OFF);
+
+	BMessage message(RESET_BUTTON_STATE);
+	message.AddPointer("button", button);
+	fButtonResetRunner = new BMessageRunner(BMessenger(this), &message, 50000, 1);
 }
 
 
