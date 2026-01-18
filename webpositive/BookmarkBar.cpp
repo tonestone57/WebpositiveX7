@@ -543,7 +543,7 @@ BookmarkBar::FrameResized(float width, float height)
 	// Since this is UI code on resize, a vector of pointers is cheap enough.
 	std::vector<BMenuItem*> allItems;
 
-	bool overflowMenuAttached = (IndexOf(fOverflowMenu) != B_ERROR);
+	bool overflowMenuAttached = (fOverflowMenuOwner.get() == NULL);
 	if (overflowMenuAttached)
 		count--;
 

@@ -8,6 +8,8 @@
 #include <SupportDefs.h>
 #include <String.h>
 
+#include <memory>
+
 class BMessage;
 class BMessageRunner;
 class BWebView;
@@ -34,7 +36,7 @@ private:
 			bool				fForceClose;
 			int32				fTabsToCheck;
 			int32				fDirtyTabs;
-			BMessageRunner*		fFormCheckTimeoutRunner;
+			std::unique_ptr<BMessageRunner>		fFormCheckTimeoutRunner;
 };
 
 #endif // FORM_SAFETY_HELPER_H

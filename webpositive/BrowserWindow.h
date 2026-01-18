@@ -232,7 +232,6 @@ private:
 
 			bool				_ShowPage(BWebView* view);
 
-			void				_ToggleFullscreen();
 			void				_ResizeToScreen();
 			void				_SetAutoHideInterfaceInFullscreen(bool doIt);
 			void				_CheckAutoHideInterface();

@@ -842,8 +842,10 @@ BrowserWindow::~BrowserWindow()
 	fSavePanel.reset();
 	fFormSafetyHelper.reset();
 	if (fPermissionsWindow) {
-		fPermissionsWindow->PrepareToQuit();
-		fPermissionsWindow->Quit();
+		if (fPermissionsWindow->Lock()) {
+			fPermissionsWindow->PrepareToQuit();
+			fPermissionsWindow->Quit();
+		}
 	}
 	if (fNetworkWindow) {
 		fNetworkWindow->Lock();
