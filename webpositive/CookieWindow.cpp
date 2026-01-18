@@ -330,6 +330,11 @@ CookieWindow::_BuildDomainList()
 	while ((cookie = it.Next()) != NULL) {
 		BString domain = cookie->Domain();
 		fCookieMap[domain].push_back(*cookie);
+	}
+
+	std::map<BString, std::vector<BPrivate::Network::BNetworkCookie> >::iterator mapIt;
+	for (mapIt = fCookieMap.begin(); mapIt != fCookieMap.end(); ++mapIt) {
+		BString domain = mapIt->first;
 
 		// Decompose domain into parts to build the tree.
 		// We want to process from root down to leaf.

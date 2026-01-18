@@ -611,19 +611,14 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 void
 BrowsingHistory::_RemoveItemsForDomain(const char* domain)
 {
-	// Batch removal to avoid O(N^2) complexity of removing items one by one
-	// from the vector.
 	BString targetDomain(domain);
-	HistoryList newList;
-	newList.reserve(fHistoryList.size());
-
-	std::map<BString, BrowsingHistoryItem*> newMap;
+	int32 writeIndex = 0;
 	bool changed = false;
+	int32 count = (int32)fHistoryList.size();
 
-	for (HistoryList::iterator it = fHistoryList.begin();
-			it != fHistoryList.end(); ++it) {
-		BrowsingHistoryItem* item = *it;
-		bool keep = true;
+	for (int32 i = 0; i < count; i++) {
+		BrowsingHistoryItem* item = fHistoryList[i];
+		bool remove = false;
 
 		// Fast pre-filter
 		if (item->URL().IFindFirst(targetDomain) >= 0) {
@@ -632,22 +627,23 @@ BrowsingHistory::_RemoveItemsForDomain(const char* domain)
 				(url.Host().EndsWith(targetDomain) &&
 				 url.Host().Length() > targetDomain.Length() &&
 				 url.Host()[url.Host().Length() - targetDomain.Length() - 1] == '.')) {
-				keep = false;
+				remove = true;
 			}
 		}
 
-		if (keep) {
-			newList.push_back(item);
-			newMap[item->URL()] = item;
-		} else {
+		if (remove) {
+			fHistoryMap.erase(item->URL());
 			delete item;
 			changed = true;
+		} else {
+			if (writeIndex != i)
+				fHistoryList[writeIndex] = item;
+			writeIndex++;
 		}
 	}
 
 	if (changed) {
-		fHistoryList = newList;
-		fHistoryMap = newMap;
+		fHistoryList.resize(writeIndex);
 		fGeneration++;
 		_ScheduleSave();
 	}
