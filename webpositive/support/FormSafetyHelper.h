@@ -7,6 +7,7 @@
 
 #include <SupportDefs.h>
 #include <String.h>
+#include <memory>
 
 class BMessage;
 class BMessageRunner;
@@ -20,7 +21,7 @@ public:
 
 			bool				QuitRequested();
 			void				MessageReceived(BMessage* message);
-			void				StatusChanged(const BString& status, BWebView* view);
+			void				ConsoleMessage(const BString& message);
 
 			bool				IsFormCheckPending() const { return fFormCheckPending; }
 			bool				IsForceClose() const { return fForceClose; }
@@ -34,7 +35,7 @@ private:
 			bool				fForceClose;
 			int32				fTabsToCheck;
 			int32				fDirtyTabs;
-			BMessageRunner*		fFormCheckTimeoutRunner;
+			std::unique_ptr<BMessageRunner> fFormCheckTimeoutRunner;
 };
 
 #endif // FORM_SAFETY_HELPER_H

@@ -7,6 +7,7 @@
 #define SETTINGS_WINDOW_H
 
 #include <Window.h>
+#include <memory>
 
 
 class BButton;
@@ -123,7 +124,7 @@ private:
 			BSpinner*			fStandardSizesSpinner;
 			BSpinner*			fFixedSizesSpinner;
 
-			BFilePanel*			fOpenFilePanel;
+			std::unique_ptr<BFilePanel> fOpenFilePanel;
 };
 
 

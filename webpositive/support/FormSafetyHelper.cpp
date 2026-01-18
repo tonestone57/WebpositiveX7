@@ -30,7 +30,6 @@ FormSafetyHelper::FormSafetyHelper(BrowserWindow* window)
 
 FormSafetyHelper::~FormSafetyHelper()
 {
-	delete fFormCheckTimeoutRunner;
 }
 
 
@@ -73,7 +72,7 @@ FormSafetyHelper::QuitRequested()
 		"            if (dirty) break;"
 		"        }"
 		"    } catch(e) {}"
-		"    window.status = 'WebPositive:FormDirty:' + (dirty ? 'true' : 'false');"
+		"    console.log('WebPositive:FormDirty:' + (dirty ? 'true' : 'false'));"
 		"})();"
 	);
 
@@ -100,8 +99,7 @@ FormSafetyHelper::QuitRequested()
 
 	// Wait up to 1 second for results
 	BMessage msg(CHECK_FORM_DIRTY_TIMEOUT);
-	delete fFormCheckTimeoutRunner;
-	fFormCheckTimeoutRunner = new BMessageRunner(BMessenger(fWindow), &msg, 1000000, 1);
+	fFormCheckTimeoutRunner.reset(new BMessageRunner(BMessenger(fWindow), &msg, 1000000, 1));
 
 	return false;
 }
@@ -119,11 +117,11 @@ FormSafetyHelper::MessageReceived(BMessage* message)
 
 
 void
-FormSafetyHelper::StatusChanged(const BString& statusText, BWebView* view)
+FormSafetyHelper::ConsoleMessage(const BString& message)
 {
-	if (statusText.Compare("WebPositive:FormDirty:", 22) == 0) {
+	if (message.Compare("WebPositive:FormDirty:", 22) == 0) {
 		if (fFormCheckPending) {
-			if (strncmp(statusText.String() + 22, "true", 4) == 0)
+			if (strncmp(message.String() + 22, "true", 4) == 0)
 				fDirtyTabs++;
 
 			fTabsToCheck--;
@@ -138,8 +136,7 @@ FormSafetyHelper::StatusChanged(const BString& statusText, BWebView* view)
 void
 FormSafetyHelper::_CheckFormDirtyFinished()
 {
-	delete fFormCheckTimeoutRunner;
-	fFormCheckTimeoutRunner = NULL;
+	fFormCheckTimeoutRunner.reset();
 	fFormCheckPending = false;
 
 	if (fDirtyTabs > 0) {
