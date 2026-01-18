@@ -107,6 +107,28 @@ public:
 };
 
 
+struct DomainNode {
+	BString domain;
+	bool fake;
+	std::map<BString, DomainNode*> children;
+
+	DomainNode(const BString& d, bool f)
+		:
+		domain(d),
+		fake(f)
+	{
+	}
+
+	~DomainNode()
+	{
+		std::map<BString, DomainNode*>::iterator it;
+		for (it = children.begin(); it != children.end(); it++) {
+			delete it->second;
+		}
+	}
+};
+
+
 CookieWindow::CookieWindow(BRect frame,
 	BPrivate::Network::BNetworkCookieJar& jar)
 	:
@@ -288,20 +310,16 @@ CookieWindow::_BuildDomainList()
 
 	_EmptyDomainList();
 
-	// BOutlineListView does not handle parent = NULL in many methods, so let's
-	// make sure everything always has a parent.
-	DomainItem* rootItem = new DomainItem("", true);
-	fDomains->AddItem(rootItem);
-
 	// Populate the domain list
 	fCookieMap.clear();
-	std::map<BString, BStringItem*> domainItemMap;
+
+	// 1. Build a tree of domains in memory
+	DomainNode* rootNode = new DomainNode("", true);
+	std::map<BString, DomainNode*> nodeMap;
 
 	BPrivate::Network::BNetworkCookieJar::Iterator it = fCookieJar.GetIterator();
-
-	// First pass: group cookies by domain.
-	// This avoids checking if the domain is already in the list for every cookie.
 	const BPrivate::Network::BNetworkCookie* cookie;
+
 	while ((cookie = it.Next()) != NULL) {
 		fCookieMap[cookie->Domain()].push_back(*cookie);
 	}
@@ -312,19 +330,100 @@ CookieWindow::_BuildDomainList()
 	for (mapIt = fCookieMap.begin(); mapIt != fCookieMap.end(); mapIt++) {
 		_AddDomain(mapIt->first, false, domainItemMap);
 	}
+		BString domain = cookie->Domain();
+		fCookieMap[domain].push_back(*cookie);
 
-	int i = 1;
-	while (i < fDomains->FullListCountItems())
-	{
-		DomainItem* item = (DomainItem*)fDomains->FullListItemAt(i);
-		// Detach items from the fake root
-		item->SetOutlineLevel(item->OutlineLevel() - 1);
-		i++;
+		if (nodeMap.count(domain) != 0) {
+			nodeMap[domain]->fake = false;
+			continue;
+		}
+
+		// Ensure the node and its parents exist
+		DomainNode* parentNode = rootNode;
+		BString currentDomain(domain);
+		std::vector<BString> parts;
+
+		// Decompose domain into parts to find parents top-down or bottom-up?
+		// The original logic split from the right: "mail.google.com" -> parent "google.com" -> parent "com"
+		// We can do the same to find/create the path.
+
+		// However, we need to create them in the tree structure.
+		// "mail.google.com":
+		// Find "com" in root->children. If not, create.
+		// Find "google.com" in com->children. If not, create.
+		// Find "mail.google.com" in google.com->children. If not, create.
+
+		// This approach requires parsing the domain differently than the original code.
+		// The original code uses:
+		// int firstDot = domain.FindFirst('.');
+		// if (firstDot >= 0) parent = _AddDomain(remainder);
+		// else parent = root;
+		// This recursively builds parents. We can do the same with Nodes.
+
+		DomainNode* node = NULL;
+
+		// Recursive-like stack to build path
+		std::vector<BString> path;
+		BString temp = domain;
+		while (true) {
+			path.push_back(temp);
+			int firstDot = temp.FindFirst('.');
+			if (firstDot < 0) break;
+			temp.Remove(0, firstDot + 1);
+		}
+
+		// path now contains ["mail.google.com", "google.com", "com"]
+		// We want to process from "com" down to "mail.google.com"
+
+		DomainNode* current = rootNode;
+		for (int i = path.size() - 1; i >= 0; i--) {
+			BString& part = path[i];
+			if (current->children.find(part) == current->children.end()) {
+				bool isLeaf = (i == 0);
+				// If it's an intermediate node, it's fake unless we visited it explicitly before as a real domain
+				// But wait, if we visit "com" here, it is fake. If we later see a cookie for "com", we update it.
+				// We need to check nodeMap if it exists elsewhere? No, nodeMap is global for this build.
+
+				// Check if we already created it (should be in current->children if we did, but let's be safe)
+				// Actually current->children check is enough.
+
+				DomainNode* newNode = new DomainNode(part, !isLeaf);
+				// We set !isLeaf (fake) for now. If i==0, it's the domain we are currently adding, so it's not fake (unless updated later)
+				// Actually, if i==0, it IS the cookie domain we are processing, so fake=false.
+
+				current->children[part] = newNode;
+				nodeMap[part] = newNode;
+				current = newNode;
+			} else {
+				current = current->children[part];
+				if (i == 0) current->fake = false; // Mark as real if we hit it explicitly
+			}
+		}
 	}
-	fDomains->RemoveItem(rootItem);
-	delete rootItem;
 
-	i = 0;
+	// 2. Traverse the tree and populate the list
+	// Use a stack for non-recursive or just a recursive helper function?
+	// C++ recursion is fine for domain depth.
+	// We need to track OutlineLevel.
+
+	struct Tree flattener {
+		static void Flatten(DomainNode* node, BOutlineListView* list, int level) {
+			std::map<BString, DomainNode*>::iterator it;
+			for (it = node->children.begin(); it != node->children.end(); it++) {
+				DomainNode* child = it->second;
+				DomainItem* item = new DomainItem(child->domain, child->fake);
+				item->SetOutlineLevel(level);
+				list->AddItem(item);
+				Flatten(child, list, level + 1);
+			}
+		}
+	};
+
+	flattener::Flatten(rootNode, fDomains, 0);
+
+	delete rootNode;
+
+	int i = 0;
 	int firstNotEmpty = i;
 	// Collapse empty items to keep the list short
 	while (i < fDomains->FullListCountItems())
@@ -361,66 +460,6 @@ CookieWindow::_BuildDomainList()
 	}
 
 	fDomains->Select(firstNotEmpty);
-}
-
-
-BStringItem*
-CookieWindow::_AddDomain(BString domain, bool fake,
-	std::map<BString, BStringItem*>& domainMap)
-{
-	if (domainMap.count(domain) != 0) {
-		DomainItem* item = (DomainItem*)domainMap[domain];
-		if (!fake)
-			item->fEmpty = false;
-		return item;
-	}
-
-	BStringItem* parent = NULL;
-	int firstDot = domain.FindFirst('.');
-	if (firstDot >= 0) {
-		BString parentDomain(domain);
-		parentDomain.Remove(0, firstDot + 1);
-		parent = _AddDomain(parentDomain, true, domainMap);
-	} else {
-		parent = (BStringItem*)fDomains->FullListItemAt(0);
-	}
-
-	int i = 0;
-#if 0
-	puts("==============================");
-	for (i = 0; i < fDomains->FullListCountItems(); i++) {
-		BStringItem* t = (BStringItem*)fDomains->FullListItemAt(i);
-		for (unsigned j = 0; j < t->OutlineLevel(); j++)
-			printf("  ");
-		printf("%s\n", t->Text());
-	}
-#endif
-
-	// Insert the new item, keeping the list alphabetically sorted
-	BStringItem* domainItem = new DomainItem(domain, fake);
-	domainMap[domain] = domainItem;
-	domainItem->SetOutlineLevel(parent->OutlineLevel() + 1);
-	BStringItem* sibling = NULL;
-	int siblingCount = fDomains->CountItemsUnder(parent, true);
-	for (i = 0; i < siblingCount; i++) {
-		sibling = (BStringItem*)fDomains->ItemUnderAt(parent, true, i);
-		if (strcmp(sibling->Text(), domainItem->Text()) > 0) {
-			fDomains->AddItem(domainItem, fDomains->FullListIndexOf(sibling));
-			return domainItem;
-		}
-	}
-
-	if (sibling) {
-		// There were siblings, but all smaller than what we try to insert.
-		// Insert after the last one (and its subitems)
-		fDomains->AddItem(domainItem, fDomains->FullListIndexOf(sibling)
-			+ fDomains->CountItemsUnder(sibling, false) + 1);
-	} else {
-		// There were no siblings, insert right after the parent
-		fDomains->AddItem(domainItem, fDomains->FullListIndexOf(parent) + 1);
-	}
-
-	return domainItem;
 }
 
 
@@ -470,19 +509,14 @@ CookieWindow::_DeleteCookies()
 
 	// A domain was selected in the domain list
 	if (prevRow == NULL) {
-		while (true) {
-			// Clear the first cookie continuously
-			row = (CookieRow*)fCookies->RowAt(0);
-
-			if (row == NULL)
-				break;
-
+		int32 count = fCookies->CountRows();
+		for (int32 i = 0; i < count; i++) {
+			row = (CookieRow*)fCookies->RowAt(i);
 			BPrivate::Network::BNetworkCookie& cookie = row->Cookie();
 			cookie.SetExpirationDate(0);
 			fCookieJar.AddCookie(cookie);
-			fCookies->RemoveRow(row);
-			delete row;
 		}
+		fCookies->Clear();
 	}
 
 	PostMessage(COOKIE_REFRESH);
