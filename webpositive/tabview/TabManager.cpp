@@ -626,6 +626,20 @@ WebTabView::MouseDown(BPoint where, uint32 buttons)
 		msg->AddInt32("tab index", ContainerView()->IndexOf(this));
 		menu->AddItem(new BMenuItem(B_TRANSLATE("Close tab"), msg));
 
+		// Close other tabs
+		msg = new BMessage(CLOSE_OTHER_TABS);
+		msg->AddInt32("tab index", ContainerView()->IndexOf(this));
+		BMenuItem* closeOtherItem = new BMenuItem(B_TRANSLATE("Close other tabs"), msg);
+		closeOtherItem->SetEnabled(ContainerView()->CountTabs() > 1);
+		menu->AddItem(closeOtherItem);
+
+		// Close tabs to the right
+		msg = new BMessage(CLOSE_TABS_TO_RIGHT);
+		msg->AddInt32("tab index", ContainerView()->IndexOf(this));
+		BMenuItem* closeRightItem = new BMenuItem(B_TRANSLATE("Close tabs to the right"), msg);
+		closeRightItem->SetEnabled(ContainerView()->IndexOf(this) < ContainerView()->CountTabs() - 1);
+		menu->AddItem(closeRightItem);
+
 		menu->SetTargetForItems(Window()); // Send to BrowserWindow
 		menu->SetAsyncAutoDestruct(true);
 		menu->Go(ConvertToScreen(where), true, true, true);
