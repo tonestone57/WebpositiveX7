@@ -34,6 +34,8 @@ private:
 	SitePermissionsManager();
 	~SitePermissionsManager();
 
+	void _Save();
+
 	std::map<BString, PermissionEntry> fPermissionMap;
 	BLocker fLock;
 };

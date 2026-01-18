@@ -194,6 +194,8 @@ BrowserApp::BrowserApp()
 
 BrowserApp::~BrowserApp()
 {
+	if (fContext)
+		fContext->Release();
 	delete fLaunchRefsMessage;
 	delete fSettings;
 	delete fCookies;
@@ -576,6 +578,7 @@ BrowserApp::QuitRequested()
 	if (fDownloadWindow->Lock()) {
 		fSettings->SetValue("downloads window frame", fDownloadWindow->Frame());
 		fSettings->SetValue("show downloads", !fDownloadWindow->IsHidden());
+		fDownloadWindow->PrepareToQuit();
 		fDownloadWindow->Unlock();
 	}
 	if (fSettingsWindow->Lock()) {
@@ -584,10 +587,12 @@ BrowserApp::QuitRequested()
 	}
 	if (fConsoleWindow->Lock()) {
 		fSettings->SetValue("console window frame", fConsoleWindow->Frame());
+		fConsoleWindow->PrepareToQuit();
 		fConsoleWindow->Unlock();
 	}
 	if (fCookieWindow->Lock()) {
 		fSettings->SetValue("cookie window frame", fCookieWindow->Frame());
+		fCookieWindow->PrepareToQuit();
 		fCookieWindow->Unlock();
 	}
 

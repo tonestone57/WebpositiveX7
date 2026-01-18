@@ -364,38 +364,5 @@ PermissionsWindow::_ClearSiteData(const char* domain)
 	}
 
 	// 2. Clear History
-	BrowsingHistory* history = BrowsingHistory::DefaultInstance();
-	if (history->Lock()) {
-		// BrowsingHistory doesn't support iteration easily from outside without locking issues if we modify?
-		// But RemoveUrl is O(log N). We need to find URLs matching the domain.
-		// History stores URLs.
-
-		int32 count = history->CountItems();
-		std::vector<BString> urlsToRemove;
-		for (int32 i = 0; i < count; i++) {
-			const BrowsingHistoryItem* item = history->HistoryItemAt(i);
-			if (!item)
-				continue;
-
-			if (item->URL().IFindFirst(targetDomain) < 0)
-				continue;
-
-			BUrl url(item->URL());
-			if (url.Host() == targetDomain ||
-				(url.Host().EndsWith(targetDomain) &&
-				 url.Host().Length() > targetDomain.Length() &&
-				 url.Host()[url.Host().Length() - targetDomain.Length() - 1] == '.')) {
-				urlsToRemove.push_back(item->URL());
-			}
-		}
-
-		history->Unlock();
-		// Re-lock for modification if needed, or modify while locked if safe.
-		// RemoveUrl takes a lock internally? Let's check BrowsingHistory.
-		// Assuming we should just call RemoveUrl outside the loop if it locks.
-
-		for (size_t i = 0; i < urlsToRemove.size(); i++) {
-			history->RemoveUrl(urlsToRemove[i]);
-		}
-	}
+	BrowsingHistory::DefaultInstance()->RemoveItemsForDomain(domain);
 }

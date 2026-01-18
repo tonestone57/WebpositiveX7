@@ -27,10 +27,13 @@ public:
 	virtual	void				MessageReceived(BMessage* message);
 	virtual	bool				QuitRequested();
 
+			void				PrepareToQuit();
+
 private:
 			void				_CopyToClipboard();
 
 private:
+			bool				fQuitting;
 			BListView*			fMessagesListView;
 			BButton* 			fClearMessagesButton;
 			BButton* 			fCopyMessagesButton;

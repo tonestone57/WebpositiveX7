@@ -21,6 +21,7 @@
 #include <Message.h>
 #include <MessageRunner.h>
 #include <Path.h>
+#include <Url.h>
 
 #include "BrowserApp.hh"
 
@@ -444,6 +445,14 @@ BrowsingHistory::RemoveUrl(const BString& url)
 }
 
 
+void
+BrowsingHistory::RemoveItemsForDomain(const char* domain)
+{
+	BAutolock _(this);
+	_RemoveItemsForDomain(domain);
+}
+
+
 int32
 BrowsingHistory::BrowsingHistory::CountItems() const
 {
@@ -596,6 +605,52 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 	fGeneration++;
 
 	return true;
+}
+
+
+void
+BrowsingHistory::_RemoveItemsForDomain(const char* domain)
+{
+	// Batch removal to avoid O(N^2) complexity of removing items one by one
+	// from the vector.
+	BString targetDomain(domain);
+	HistoryList newList;
+	newList.reserve(fHistoryList.size());
+
+	std::map<BString, BrowsingHistoryItem*> newMap;
+	bool changed = false;
+
+	for (HistoryList::iterator it = fHistoryList.begin();
+			it != fHistoryList.end(); ++it) {
+		BrowsingHistoryItem* item = *it;
+		bool keep = true;
+
+		// Fast pre-filter
+		if (item->URL().IFindFirst(targetDomain) >= 0) {
+			BUrl url(item->URL());
+			if (url.Host() == targetDomain ||
+				(url.Host().EndsWith(targetDomain) &&
+				 url.Host().Length() > targetDomain.Length() &&
+				 url.Host()[url.Host().Length() - targetDomain.Length() - 1] == '.')) {
+				keep = false;
+			}
+		}
+
+		if (keep) {
+			newList.push_back(item);
+			newMap[item->URL()] = item;
+		} else {
+			delete item;
+			changed = true;
+		}
+	}
+
+	if (changed) {
+		fHistoryList = newList;
+		fHistoryMap = newMap;
+		fGeneration++;
+		_ScheduleSave();
+	}
 }
 
 

@@ -33,6 +33,8 @@ public:
 	virtual	void				MessageReceived(BMessage* message);
 	virtual	bool				QuitRequested();
 
+			void				PrepareToQuit();
+
 			bool				DownloadsInProgress();
 			void				SetMinimizeOnClose(bool minimize);
 
@@ -57,6 +59,7 @@ private:
 			BButton*			fOpenFolderButton;
 			BString				fDownloadPath;
 			bool				fMinimizeOnClose;
+			bool				fQuitting;
 			bool				fSettingsDirty;
 			BMessageRunner*		fSaveSettingsRunner;
 };

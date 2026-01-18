@@ -135,6 +135,7 @@ CookieWindow::CookieWindow(BRect frame,
 	BWindow(frame, B_TRANSLATE("Cookie manager"), B_TITLED_WINDOW,
 		B_NORMAL_WINDOW_FEEL,
 		B_AUTO_UPDATE_SIZE_LIMITS | B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE),
+	fQuitting(false),
 	fCookieJar(jar)
 {
 	BGroupLayout* root = new BGroupLayout(B_HORIZONTAL, 0.0);
@@ -278,9 +279,19 @@ CookieWindow::Hide()
 bool
 CookieWindow::QuitRequested()
 {
+	if (fQuitting)
+		return true;
+
 	if (!IsHidden())
 		Hide();
 	return false;
+}
+
+
+void
+CookieWindow::PrepareToQuit()
+{
+	fQuitting = true;
 }
 
 

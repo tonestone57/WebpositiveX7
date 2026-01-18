@@ -128,9 +128,7 @@ SitePermissionsManager::SetZoom(const char* domain, float zoom)
 		fPermissionMap[host] = entry;
 	}
 
-	// Release lock before saving
-	lock.Unlock();
-	Save();
+	_Save();
 }
 
 void
@@ -146,6 +144,12 @@ void
 SitePermissionsManager::Save()
 {
 	BAutolock lock(fLock);
+	_Save();
+}
+
+void
+SitePermissionsManager::_Save()
+{
 	BPath path;
 	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
 		path.Append(kApplicationName);

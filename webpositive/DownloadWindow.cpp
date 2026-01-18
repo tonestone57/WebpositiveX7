@@ -125,6 +125,7 @@ DownloadWindow::DownloadWindow(BRect frame, bool visible,
 		B_TITLED_WINDOW_LOOK, B_NORMAL_WINDOW_FEEL,
 		B_AUTO_UPDATE_SIZE_LIMITS | B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE),
 	fMinimizeOnClose(false),
+	fQuitting(false),
 	fSettingsDirty(false),
 	fSaveSettingsRunner(NULL)
 {
@@ -367,6 +368,9 @@ DownloadWindow::MessageReceived(BMessage* message)
 bool
 DownloadWindow::QuitRequested()
 {
+	if (fQuitting)
+		return true;
+
 	if (fMinimizeOnClose) {
 		if (!IsMinimized())
 			Minimize(true);
@@ -375,6 +379,13 @@ DownloadWindow::QuitRequested()
 			Hide();
 	}
 	return false;
+}
+
+
+void
+DownloadWindow::PrepareToQuit()
+{
+	fQuitting = true;
 }
 
 
