@@ -439,27 +439,16 @@ void
 CookieWindow::_DeleteCookies()
 {
 	CookieRow* row;
-	CookieRow* prevRow;
+	std::vector<CookieRow*> rowsToDelete;
 
-	for (prevRow = NULL; ; prevRow = row) {
-		row = (CookieRow*)fCookies->CurrentSelection(prevRow);
-
-		if (prevRow != NULL) {
-			fCookies->RemoveRow(prevRow);
-			delete prevRow;
-		}
-
-		if (row == NULL)
-			break;
-
-		// delete this cookie
-		BPrivate::Network::BNetworkCookie& cookie = row->Cookie();
-		cookie.SetExpirationDate(0);
-		fCookieJar.AddCookie(cookie);
+	for (row = (CookieRow*)fCookies->CurrentSelection(NULL); row != NULL;
+			row = (CookieRow*)fCookies->CurrentSelection(row)) {
+		rowsToDelete.push_back(row);
 	}
 
-	// A domain was selected in the domain list
-	if (prevRow == NULL) {
+	if (rowsToDelete.empty()) {
+		// A domain was selected in the domain list, but no specific cookies
+		// selected -> delete all cookies for this domain.
 		int32 count = fCookies->CountRows();
 		for (int32 i = 0; i < count; i++) {
 			row = (CookieRow*)fCookies->RowAt(i);
@@ -468,6 +457,17 @@ CookieWindow::_DeleteCookies()
 			fCookieJar.AddCookie(cookie);
 		}
 		fCookies->Clear();
+	} else {
+		// Delete selected cookies
+		for (size_t i = 0; i < rowsToDelete.size(); i++) {
+			row = rowsToDelete[i];
+			BPrivate::Network::BNetworkCookie& cookie = row->Cookie();
+			cookie.SetExpirationDate(0);
+			fCookieJar.AddCookie(cookie);
+
+			fCookies->RemoveRow(row);
+			delete row;
+		}
 	}
 
 	PostMessage(COOKIE_REFRESH);

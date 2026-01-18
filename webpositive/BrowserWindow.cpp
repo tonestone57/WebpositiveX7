@@ -830,6 +830,7 @@ BrowserWindow::~BrowserWindow()
 	}
 	if (fNetworkWindow) {
 		fNetworkWindow->Lock();
+		fNetworkWindow->PrepareToQuit();
 		fNetworkWindow->Quit();
 	}
 }
