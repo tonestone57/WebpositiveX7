@@ -109,7 +109,7 @@ TabSearchWindow::QuitRequested()
 void
 TabSearchWindow::_UpdateList()
 {
-	fTabList->MakeEmpty();
+	fTabList->RemoveItems(0, fTabList->CountItems(), true);
 	if (!fTabManager) return;
 
 	for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
@@ -124,7 +124,7 @@ void
 TabSearchWindow::_FilterList()
 {
 	BString filter = fSearchControl->Text();
-	fTabList->MakeEmpty();
+	fTabList->RemoveItems(0, fTabList->CountItems(), true);
 
 	for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
 		BString label = fTabManager->TabLabel(i);
