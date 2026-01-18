@@ -76,6 +76,7 @@
 #include <Url.h>
 
 #include <map>
+#include <algorithm>
 #include <stdio.h>
 
 #include "AuthenticationPanel.h"
@@ -3351,7 +3352,8 @@ BrowserWindow::_UpdateHistoryMenu()
 	HistoryMenuBuilder fiveDaysAgoBuilder(fiveDaysAgoMenu);
 	HistoryMenuBuilder earlierBuilder(earlierMenu);
 
-	for (int32 i = 0; i < count; i++) {
+	int32 start = std::max((int32)0, count - 100);
+	for (int32 i = start; i < count; i++) {
 		BrowsingHistoryItem historyItem = history->HistoryItemAt(i);
 		BMessage* message = new BMessage(GOTO_URL);
 		message->AddString("url", historyItem.URL().String());
