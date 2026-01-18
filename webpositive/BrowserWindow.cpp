@@ -1908,7 +1908,8 @@ BrowserWindow::MessageReceived(BMessage* message)
 					// but rigorous impl would buffer by index.
 					// Simple append for now as JS execution is single threaded usually.
 					int32 firstColon = text.FindFirst(':', strlen("INSPECT_DOM_CHUNK:"));
-					if (firstColon > 0) {
+					// Cap at 20MB to prevent DoS
+					if (firstColon > 0 && fInspectDomBuffer.Length() < 20 * 1024 * 1024) {
 						fInspectDomBuffer << (text.String() + firstColon + 1);
 						fInspectDomReceivedChunks++;
 					}
