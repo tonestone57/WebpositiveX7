@@ -28,6 +28,8 @@ class CookieWindow : public BWindow {
 public:
 								CookieWindow(BRect frame,
 									BPrivate::Network::BNetworkCookieJar& jar);
+	virtual						~CookieWindow();
+
 	virtual	void				MessageReceived(BMessage* message);
 	virtual void				Show();
 	virtual void				Hide();
