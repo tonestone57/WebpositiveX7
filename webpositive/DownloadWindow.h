@@ -51,6 +51,7 @@ private:
 			BGroupLayout*		fDownloadViewsLayout;
 			BButton*			fRemoveFinishedButton;
 			BButton*			fRemoveMissingButton;
+			BButton*			fOpenFolderButton;
 			BString				fDownloadPath;
 			bool				fMinimizeOnClose;
 			bool				fSettingsDirty;

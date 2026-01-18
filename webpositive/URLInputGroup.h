@@ -32,6 +32,8 @@ public:
 			bool				IsURLInputLocked() const;
 	virtual	void				LockURLInput(bool lock = true);
 
+			void				SetPrivateMode(bool privateMode);
+
 private:
 			class PageIconView;
 			class URLTextView;

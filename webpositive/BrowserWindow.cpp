@@ -311,7 +311,7 @@ private:
 
 BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BString& url,
 	BPrivate::Network::BUrlContext* context, uint32 interfaceElements, BWebView* webView,
-	uint32 workspaces)
+	uint32 workspaces, bool privateWindow)
 	:
 	BWebWindow(frame, kApplicationName, B_DOCUMENT_WINDOW_LOOK, B_NORMAL_WINDOW_FEEL,
 		B_AUTO_UPDATE_SIZE_LIMITS | B_ASYNCHRONOUS_CONTROLS, workspaces),
@@ -606,6 +606,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 
 	// URL input group
 	fURLInputGroup = new URLInputGroup(new BMessage(GOTO_URL));
+	if (privateWindow)
+		fURLInputGroup->SetPrivateMode(true);
 
 	// Status Bar
 	fStatusText = new BStringView("status", "");
