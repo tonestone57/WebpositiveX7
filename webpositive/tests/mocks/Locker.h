@@ -2,6 +2,7 @@
 #define LOCKER_H
 
 #include <SupportDefs.h>
+#include <stddef.h>
 
 class BLocker {
 public:
@@ -10,6 +11,7 @@ public:
 
 	bool Lock() { return true; }
 	void Unlock() {}
+    bool IsLocked() const { return true; }
 };
 
 #endif

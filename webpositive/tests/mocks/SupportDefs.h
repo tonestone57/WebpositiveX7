@@ -24,6 +24,7 @@ typedef int64_t int64;
 #define B_NO_MEMORY -5
 #define B_TIMED_OUT -6
 #define B_ALREADY_RUNNING -7
+#define B_NO_INIT -8
 
 // File open modes
 #define B_READ_ONLY 0x00

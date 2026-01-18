@@ -7,6 +7,7 @@
 #define DATE_TIME_H
 
 #include <SupportDefs.h>
+#include <String.h>
 
 class BMessage;
 
@@ -78,8 +79,8 @@ public:
 	BDate& Date() { return fDate; } // Return ref for non-const
 	BTime Time() const { return fTime; }
 
-    // Add Time_t
     time_t Time_t() const { return 0; }
+    void SetTime_t(time_t t) {}
 
 	bool operator<(const BDateTime& other) const {
 		if (fDate < other.fDate) return true;

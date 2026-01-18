@@ -1,87 +1,98 @@
 /*
- * Benchmark/Mock test for BookmarkBar loading optimization.
- * This test simulates the cost of loading bookmarks synchronously vs asynchronously.
- *
- * Note: This file requires Haiku system headers to compile.
- * It serves as documentation and a verification plan for the optimization.
+ * Copyright 2024 Haiku, Inc. All rights reserved.
+ * Distributed under the terms of the MIT License.
  */
 
-#include <vector>
 #include <stdio.h>
-#include <OS.h>
+#include <vector>
+#include <time.h>
+#include <sys/time.h>
 
-// Mock structures
-struct entry_ref {
-    char name[256];
+// Mock Headers
+#include "String.h"
+#include "Message.h"
+#include "Handler.h"
+#include "Looper.h"
+// #include "BookmarkBar.h" // Commented out to avoid linking real BookmarkBar which pulls in UI dependencies
+
+// Mock BookmarkBar for benchmark purposes
+class BookmarkBar : public BHandler {
+public:
+    BookmarkBar() : BHandler("BookmarkBar") {}
+
+    virtual void MessageReceived(BMessage* message) {
+        // Simulate processing
+        if (message->what == 1234) { // Simulate bookmark loaded message
+            // Do some work
+            for(volatile int i=0; i<1000; ++i) {}
+        }
+    }
+
+    void AddItem(const char* title, const char* url) {
+        // Simulate adding item
+        BString t(title);
+        BString u(url);
+    }
 };
 
-struct BMenuItem {
-    // Mock UI Object
-};
-
-struct BookmarkItem {
-    int64 inode;
-    BMenuItem* item;
-};
-
-// Simulated I/O cost (e.g. 2ms per item)
-void SimulateIO() {
-    snooze(2000);
+bigtime_t system_time() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (bigtime_t)tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
-// Simulated CreateBookmarkItem (Heavy operation)
-BMenuItem* CreateBookmarkItemMock(int id) {
-    SimulateIO();
-    return new BMenuItem();
-}
-
-// Scenario 1: Blocking Load (Original)
 void TestBlockingLoad(int count) {
+    BookmarkBar bar;
     bigtime_t start = system_time();
 
-    // UI Thread blocks here
+    // Simulate blocking load: read file, create item, add item - all in one go
     for (int i = 0; i < count; i++) {
-        // Iterate directory
-        SimulateIO(); // Directory iteration cost
+        BMessage msg(1234);
+        msg.AddString("title", "Bookmark");
+        msg.AddString("url", "http://example.com");
 
-        // Create Item (I/O heavy)
-        BMenuItem* item = CreateBookmarkItemMock(i);
-
-        // Add to UI (Fast)
-        // AddItem(item);
+        // Direct processing (Blocking UI)
+        bar.MessageReceived(&msg);
+        bar.AddItem("Bookmark", "http://example.com");
     }
 
     bigtime_t end = system_time();
-    printf("Blocking Load (%d items): %lld us (UI Frozen)\n", count, end - start);
+    printf("Blocking Load (%d items): %ld us (UI Frozen)\n", count, end - start);
 }
 
-// Scenario 2: Async Load (Optimized)
 void TestAsyncLoad(int count) {
+    BookmarkBar bar;
     bigtime_t start = system_time();
 
-    // Background Thread
-    std::vector<BookmarkItem*>* items = new std::vector<BookmarkItem*>();
+    // Simulate Async Load:
+    // 1. Worker thread reads file (simulated delay)
+    // 2. Worker sends message to Window (simulated here)
+    // 3. Window processes message (add item)
+
+    // Step 1: Simulate reading (fast in memory)
+    std::vector<BMessage*> messages;
     for (int i = 0; i < count; i++) {
-        SimulateIO(); // Directory iteration
-        BMenuItem* item = CreateBookmarkItemMock(i);
-        BookmarkItem* data = new BookmarkItem{ (int64)i, item };
-        items->push_back(data);
+        BMessage* msg = new BMessage(1234);
+        msg->AddString("title", "Bookmark");
+        msg->AddString("url", "http://example.com");
+        messages.push_back(msg);
     }
 
-    // Main Thread receives message
+    bigtime_t readDone = system_time();
+
+    // Step 2 & 3: Process messages (UI thread work)
+    // This is the part that blocks UI. In async model, this happens interleaved or batched.
+    // Here we simulate the total time UI is busy.
+
     bigtime_t msgReceivedStart = system_time();
-
-    for (size_t i = 0; i < items->size(); i++) {
-        BookmarkItem* data = (*items)[i];
-        // Add to UI (Fast)
-        // AddItem(data->item);
-        delete data;
+    for (int i = 0; i < count; i++) {
+        bar.MessageReceived(messages[i]);
+        bar.AddItem("Bookmark", "http://example.com");
+        delete messages[i];
     }
-    delete items;
-
     bigtime_t end = system_time();
 
-    printf("Async Load (%d items): Total %lld us, UI Blocked only %lld us\n",
+    printf("Async Load (%d items): Total %ld us, UI Blocked only %ld us\n",
         count, end - start, end - msgReceivedStart);
 }
 
