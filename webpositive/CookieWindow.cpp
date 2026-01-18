@@ -183,6 +183,12 @@ CookieWindow::CookieWindow(BRect frame,
 }
 
 
+CookieWindow::~CookieWindow()
+{
+	_EmptyDomainList();
+}
+
+
 void
 CookieWindow::MessageReceived(BMessage* message)
 {

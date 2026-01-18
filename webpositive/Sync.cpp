@@ -81,10 +81,13 @@ Sync::ExportCookies(const BPath& path,
 		BString line;
 
 		// domain
-		line << cookie->Domain() << "\t";
-		// flag (include subdomains?) - BNetworkCookie doesn't seem to expose this directly easily
-		// Usually TRUE if domain starts with .
-		line << (cookie->Domain().StartsWith(".") ? "TRUE" : "FALSE") << "\t";
+		if (cookie->HttpOnly())
+			line << "#HttpOnly_" << cookie->Domain() << "\t";
+		else
+			line << cookie->Domain() << "\t";
+
+		// flag (include subdomains?)
+		line << (!cookie->IsHostOnly() ? "TRUE" : "FALSE") << "\t";
 		// path
 		line << cookie->Path() << "\t";
 		// secure
@@ -126,8 +129,14 @@ Sync::ImportCookies(const BPath& path,
 		content.CopyInto(line, pos, nextPos - pos);
 		pos = nextPos + 1;
 
-		if (line.IsEmpty() || line.StartsWith("#"))
+		if (line.IsEmpty() || (line.StartsWith("#") && !line.StartsWith("#HttpOnly_")))
 			continue;
+
+		bool httpOnly = false;
+		if (line.StartsWith("#HttpOnly_")) {
+			httpOnly = true;
+			line.Remove(0, 10); // Remove "#HttpOnly_"
+		}
 
 		// Split by tab
 		// domain flag path secure expiration name value
@@ -154,6 +163,7 @@ Sync::ImportCookies(const BPath& path,
 			cookie.SetDomain(parts[0]);
 			cookie.SetPath(parts[2]);
 			cookie.SetSecure(parts[3] == "TRUE");
+			cookie.SetHttpOnly(httpOnly);
 
 			// Expiration is time_t
 			time_t exp = (time_t)strtoll(parts[4].String(), NULL, 10);

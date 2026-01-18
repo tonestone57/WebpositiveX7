@@ -75,6 +75,14 @@ ConsoleWindow::ConsoleWindow(BRect frame)
 }
 
 
+ConsoleWindow::~ConsoleWindow()
+{
+	int count = fMessagesListView->CountItems();
+	for (int i = count - 1; i >= 0; i--)
+		delete fMessagesListView->RemoveItem(i);
+}
+
+
 void
 ConsoleWindow::MessageReceived(BMessage* message)
 {

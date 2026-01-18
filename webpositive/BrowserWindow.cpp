@@ -2035,9 +2035,15 @@ BrowserWindow::MenusBeginning()
 					// Remove existing Pin/Unpin items if any to avoid duplicates
 					// Simple check: Look for items with matching command
 					BMenuItem* item = viewMenu->FindItem(PIN_TAB);
-					if (item) viewMenu->RemoveItem(item);
+					if (item) {
+						item->Menu()->RemoveItem(item);
+						delete item;
+					}
 					item = viewMenu->FindItem(UNPIN_TAB);
-					if (item) viewMenu->RemoveItem(item);
+					if (item) {
+						item->Menu()->RemoveItem(item);
+						delete item;
+					}
 
 					// Add appropriate item
 					if (tab->IsPinned()) {
@@ -2403,6 +2409,7 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 		BUrl checkUrl(url);
 		if (checkUrl.IsValid()) {
 			BString host = checkUrl.Host();
+			host.ToLower();
 			for (int i = 0; kBlockedDomains[i]; i++) {
 				// Check if host matches exactly or ends with .domain
 				if (host == kBlockedDomains[i]) {

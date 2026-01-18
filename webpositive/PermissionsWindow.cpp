@@ -234,7 +234,9 @@ SetDomainSettings(BMessage& msg, bool js, bool cookies, bool popups, float zoom,
 void
 PermissionsWindow::_LoadPermissions()
 {
-	fDomainList->MakeEmpty();
+	for (int32 i = fDomainList->CountItems() - 1; i >= 0; i--)
+		delete fDomainList->RemoveItem(i);
+
 	BPath path;
 	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
 		path.Append(kApplicationName);
@@ -268,7 +270,8 @@ PermissionsWindow::_LoadPermissions()
 void
 PermissionsWindow::_ClearPermissions()
 {
-	fDomainList->MakeEmpty();
+	for (int32 i = fDomainList->CountItems() - 1; i >= 0; i--)
+		delete fDomainList->RemoveItem(i);
 }
 
 

@@ -22,6 +22,8 @@ class BCheckBox;
 class ConsoleWindow : public BWindow {
 public:
 								ConsoleWindow(BRect frame);
+	virtual						~ConsoleWindow();
+
 	virtual	void				MessageReceived(BMessage* message);
 	virtual	bool				QuitRequested();
 
