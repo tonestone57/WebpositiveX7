@@ -324,7 +324,6 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fIsFullscreen(false),
 	fInterfaceVisible(false),
 	fMenusRunning(false),
-	fPulseRunner(NULL),
 	fVisibleInterfaceElements(interfaceElements),
 	fContext(context),
 	fAppSettings(appSettings),
@@ -345,10 +344,9 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fNetworkWindow(NULL),
 	fIsBypassingCache(false),
 	fIsPrivate(privateWindow),
-	fMemoryPressureRunner(NULL),
 	fButtonResetRunner(NULL)
 {
-	fFormSafetyHelper = new FormSafetyHelper(this);
+	fFormSafetyHelper.reset(new FormSafetyHelper(this));
 
 	// Begin listening to settings changes and read some current values.
 	fAppSettings->AddListener(BMessenger(this));
@@ -378,7 +376,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	newTabMessage->AddString("url", "");
 	newTabMessage->AddPointer("window", this);
 	newTabMessage->AddBool("select", true);
-	fTabManager = new TabManager(BMessenger(this), newTabMessage);
+	fTabManager.reset(new TabManager(BMessenger(this), newTabMessage));
 
 	// Menu
 #if INTEGRATE_MENU_INTO_TAB_BAR
@@ -728,8 +726,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	else
 		_ShowBookmarkBar(false);
 
-	fSavePanel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this), NULL, 0,
-		false);
+	fSavePanel.reset(new BFilePanel(B_SAVE_PANEL, new BMessenger(this), NULL, 0,
+		false));
 
 	// Layout
 	BGroupView* topView = new BGroupView(B_VERTICAL, 0.0);
@@ -828,7 +826,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	unmodified.MakeEmpty();
 
 	BMessage memMsg(CHECK_MEMORY_PRESSURE);
-	fMemoryPressureRunner = new BMessageRunner(BMessenger(this), &memMsg, 30000000); // 30 seconds
+	fMemoryPressureRunner.reset(new BMessageRunner(BMessenger(this), &memMsg, 30000000)); // 30 seconds
 
 	be_app->PostMessage(WINDOW_OPENED);
 }
@@ -837,12 +835,12 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 BrowserWindow::~BrowserWindow()
 {
 	fAppSettings->RemoveListener(BMessenger(this));
-	delete fTabManager;
-	delete fPulseRunner;
-	delete fButtonResetRunner;
-	delete fMemoryPressureRunner;
-	delete fSavePanel;
-	delete fFormSafetyHelper;
+	fTabManager.reset();
+	fPulseRunner.reset();
+	fButtonResetRunner.reset();
+	fMemoryPressureRunner.reset();
+	fSavePanel.reset();
+	fFormSafetyHelper.reset();
 	if (fPermissionsWindow) {
 		fPermissionsWindow->PrepareToQuit();
 		fPermissionsWindow->Quit();
@@ -1967,8 +1965,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case RESET_BUTTON_STATE:
 		{
-			delete fButtonResetRunner;
-			fButtonResetRunner = NULL;
+			fButtonResetRunner.reset();
 
 			BButton* button = NULL;
 			if (message->FindPointer("button", (void**)&button) == B_OK) {
@@ -3258,10 +3255,12 @@ BrowserWindow::_ShutdownTab(int32 index)
 	// webView pointer is still valid here, as RemoveTab only removed it from layout
 	if (webView == CurrentWebView())
 		SetCurrentWebView(NULL);
-	if (webView != NULL)
+	if (webView != NULL) {
 		webView->Shutdown();
-	else
+		delete webView;
+	} else {
 		delete view;
+	}
 }
 
 
@@ -3556,10 +3555,9 @@ BrowserWindow::_SetAutoHideInterfaceInFullscreen(bool doIt)
 
 	if (fAutoHideInterfaceInFullscreenMode) {
 		BMessage message(CHECK_AUTO_HIDE_INTERFACE);
-		fPulseRunner = new BMessageRunner(BMessenger(this), &message, 300000);
+		fPulseRunner.reset(new BMessageRunner(BMessenger(this), &message, 300000));
 	} else {
-		delete fPulseRunner;
-		fPulseRunner = NULL;
+		fPulseRunner.reset();
 		_ShowInterface(true);
 	}
 }
@@ -3656,8 +3654,7 @@ BrowserWindow::_EnsureProgressBarHidden()
 void
 BrowserWindow::_InvokeButtonVisibly(BButton* button)
 {
-	delete fButtonResetRunner;
-	fButtonResetRunner = NULL;
+	fButtonResetRunner.reset();
 
 	button->SetValue(B_CONTROL_ON);
 	// UpdateIfNeeded(); // Usually handled by window loop, removing unless critical
@@ -3665,7 +3662,7 @@ BrowserWindow::_InvokeButtonVisibly(BButton* button)
 
 	BMessage message(RESET_BUTTON_STATE);
 	message.AddPointer("button", button);
-	fButtonResetRunner = new BMessageRunner(BMessenger(this), &message, 50000, 1);
+	fButtonResetRunner.reset(new BMessageRunner(BMessenger(this), &message, 50000, 1));
 }
 
 

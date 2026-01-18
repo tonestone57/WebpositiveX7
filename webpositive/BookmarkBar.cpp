@@ -147,7 +147,7 @@ BookmarkBar::BookmarkBar(const char* title, BHandler* target,
 	BEntry(navDir).GetNodeRef(&fNodeRef);
 
 	fOverflowMenu = new BMenu(B_UTF8_ELLIPSIS);
-	fOverflowMenuAdded = false;
+	fOverflowMenuOwner.reset(fOverflowMenu);
 
 	fPopUpMenu = new BPopUpMenu("Bookmark Popup", false, false);
 	fPopUpMenu->AddItem(
@@ -163,8 +163,6 @@ BookmarkBar::BookmarkBar(const char* title, BHandler* target,
 BookmarkBar::~BookmarkBar()
 {
 	stop_watching(BMessenger(this));
-	if (!fOverflowMenuAdded)
-		delete fOverflowMenu;
 	delete fPopUpMenu;
 }
 
@@ -600,7 +598,7 @@ BookmarkBar::FrameResized(float width, float height)
 	// Apply changes efficiently to minimize relayouts
 	if (overflowMenuAttached) {
 		RemoveItem(fOverflowMenu);
-		fOverflowMenuAdded = false;
+		fOverflowMenuOwner.reset(fOverflowMenu);
 	}
 
 	// Move excess items from Bar to Overflow
@@ -652,7 +650,7 @@ BookmarkBar::FrameResized(float width, float height)
 	if (needsOverflow || fOverflowMenu->CountItems() > 0) {
 		if (fOverflowMenu->CountItems() > 0) {
 			AddItem(fOverflowMenu);
-			fOverflowMenuAdded = true;
+			fOverflowMenuOwner.release(); // Relinquish ownership to BMenuBar
 		}
 	}
 

@@ -37,6 +37,8 @@
 #include <String.h>
 #include <UrlContext.h>
 
+#include <memory>
+
 #include "bookmarks/BookmarkManager.h"
 #include "support/URLHandler.h"
 #include "support/FormSafetyHelper.h"
@@ -173,7 +175,7 @@ public:
 
 			void				ToggleFullscreen();
 
-			TabManager*			GetTabManager() const { return fTabManager; }
+			TabManager*			GetTabManager() const { return fTabManager.get(); }
 
 private:
 	// WebPage notification API implementations
@@ -304,14 +306,14 @@ private:
 			BButton*			fFindNextButton;
 			BButton*			fFindCloseButton;
 			BCheckBox*			fFindCaseSensitiveCheckBox;
-			TabManager*			fTabManager;
+			std::unique_ptr<TabManager>			fTabManager;
 
 			bool				fIsFullscreen;
 			bool				fInterfaceVisible;
 			bool				fMenusRunning;
 			BRect				fNonFullscreenWindowFrame;
-			BMessageRunner*		fPulseRunner;
-			BMessageRunner*		fButtonResetRunner;
+			std::unique_ptr<BMessageRunner>		fPulseRunner;
+			std::unique_ptr<BMessageRunner>		fButtonResetRunner;
 			uint32				fVisibleInterfaceElements;
 			bigtime_t			fLastMouseMovedTime;
 			BPoint				fLastMousePos;
@@ -333,7 +335,7 @@ private:
 			BMenuItem*			fBookmarkBarMenuItem;
 			BMenuItem*			fAutoHideBookmarkBarMenuItem;
 			BookmarkBar*		fBookmarkBar;
-			BFilePanel*			fSavePanel;
+			std::unique_ptr<BFilePanel>			fSavePanel;
 
 			bool				fDarkMode;
 			BMenuItem*			fDarkModeMenuItem;
@@ -351,14 +353,14 @@ private:
 
 			class TabSearchWindow* fTabSearchWindow;
 
-			FormSafetyHelper*	fFormSafetyHelper;
+			std::unique_ptr<FormSafetyHelper>	fFormSafetyHelper;
 
 			PermissionsWindow*	fPermissionsWindow;
 			NetworkWindow*		fNetworkWindow;
 			bool				fIsBypassingCache;
 			bool				fIsPrivate;
 
-			BMessageRunner*		fMemoryPressureRunner;
+			std::unique_ptr<BMessageRunner>		fMemoryPressureRunner;
 };
 
 
