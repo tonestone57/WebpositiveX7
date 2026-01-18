@@ -3548,10 +3548,7 @@ BrowserWindow::_ShowProgressBar(bool show)
 void
 BrowserWindow::_EnsureProgressBarHidden()
 {
-	// This loop is a workaround for an Interface Kit bug where the status bar
-	// doesn't always hide immediately when Hide() is called.
-	int32 maxTries = 10;
-	while (!fLoadingProgressBar->IsHidden() && maxTries-- > 0)
+	if (!fLoadingProgressBar->IsHidden())
 		fLoadingProgressBar->Hide();
 }
 
