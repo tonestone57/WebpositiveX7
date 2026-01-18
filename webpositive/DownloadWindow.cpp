@@ -275,9 +275,9 @@ DownloadWindow::MessageReceived(BMessage* message)
 				// if needed or starts the download in the browser.
 				// However, if we want to just download without opening a tab, we still need a context.
 				// For now, delegating to the app via RESTART_DOWNLOAD_IN_WINDOW is the safest bet to get a BWebDownload.
-				BMessage* request = new BMessage(RESTART_DOWNLOAD_IN_WINDOW);
-				request->AddString("url", url);
-				be_app->PostMessage(request);
+				BMessage request(RESTART_DOWNLOAD_IN_WINDOW);
+				request.AddString("url", url);
+				be_app->PostMessage(&request);
 			}
 			break;
 		}
@@ -448,6 +448,7 @@ DownloadWindow::_DownloadStarted(BWebDownload* download)
 	fRemoveMissingButton->SetEnabled(missingCount > 0);
 	DownloadProgressView* view = new DownloadProgressView(download);
 	if (!view->Init()) {
+		download->Cancel();
 		delete view;
 		return;
 	}

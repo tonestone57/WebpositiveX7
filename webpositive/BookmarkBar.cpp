@@ -105,7 +105,13 @@ LoadBookmarksThread(void* data)
 				if (items->size() >= 20) {
 					BMessage message(kMsgInitialBookmarksLoaded);
 					message.AddPointer("list", items);
-					params->target.SendMessage(&message);
+					if (params->target.SendMessage(&message) != B_OK) {
+						for (size_t i = 0; i < items->size(); i++) {
+							delete (*items)[i]->item;
+							delete (*items)[i];
+						}
+						delete items;
+					}
 					items = new std::vector<BookmarkItem*>();
 					items->reserve(20);
 				}
@@ -116,7 +122,13 @@ LoadBookmarksThread(void* data)
 	if (!items->empty()) {
 		BMessage message(kMsgInitialBookmarksLoaded);
 		message.AddPointer("list", items);
-		params->target.SendMessage(&message);
+		if (params->target.SendMessage(&message) != B_OK) {
+			for (size_t i = 0; i < items->size(); i++) {
+				delete (*items)[i]->item;
+				delete (*items)[i];
+			}
+			delete items;
+		}
 	} else {
 		delete items;
 	}
