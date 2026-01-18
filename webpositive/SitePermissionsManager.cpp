@@ -61,7 +61,6 @@ SitePermissionsManager::Reload()
 				if (domainMsg.FindBool("popups", &entry.popups) != B_OK) entry.popups = false;
 				if (domainMsg.FindFloat("zoom", &entry.zoom) != B_OK) entry.zoom = 1.0;
 				if (domainMsg.FindBool("forceDesktop", &entry.forceDesktop) != B_OK) entry.forceDesktop = false;
-				if (domainMsg.FindString("customUserAgent", &entry.customUserAgent) != B_OK) entry.customUserAgent = "";
 
 				fPermissionMap[name] = entry;
 			}
@@ -71,7 +70,7 @@ SitePermissionsManager::Reload()
 
 
 bool
-SitePermissionsManager::CheckPermission(const char* url, bool& allowJS, bool& allowCookies, bool& allowPopups, float& zoom, bool& forceDesktop, BString& customUserAgent)
+SitePermissionsManager::CheckPermission(const char* url, bool& allowJS, bool& allowCookies, bool& allowPopups, float& zoom, bool& forceDesktop)
 {
 	BUrl bUrl(url);
 	BString host = bUrl.Host();
@@ -82,7 +81,6 @@ SitePermissionsManager::CheckPermission(const char* url, bool& allowJS, bool& al
 	allowPopups = true;
 	zoom = 1.0;
 	forceDesktop = false;
-	customUserAgent = "";
 
 	BAutolock lock(fLock);
 
@@ -97,7 +95,6 @@ SitePermissionsManager::CheckPermission(const char* url, bool& allowJS, bool& al
 			allowPopups = entry.popups;
 			zoom = entry.zoom;
 			forceDesktop = entry.forceDesktop;
-			customUserAgent = entry.customUserAgent;
 			break;
 		}
 
@@ -127,7 +124,6 @@ SitePermissionsManager::SetZoom(const char* domain, float zoom)
 		entry.cookies = true;
 		entry.popups = false;
 		entry.forceDesktop = false;
-		entry.customUserAgent = "";
 		entry.zoom = zoom;
 		fPermissionMap[host] = entry;
 	}
@@ -171,8 +167,6 @@ SitePermissionsManager::_Save()
 			domainMsg.AddBool("popups", it->second.popups);
 			domainMsg.AddFloat("zoom", it->second.zoom);
 			domainMsg.AddBool("forceDesktop", it->second.forceDesktop);
-			if (it->second.customUserAgent.Length() > 0)
-				domainMsg.AddString("customUserAgent", it->second.customUserAgent);
 
 			settings.AddMessage("domain", &domainMsg);
 		}

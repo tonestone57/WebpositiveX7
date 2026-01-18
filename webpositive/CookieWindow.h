@@ -50,7 +50,6 @@ private:
 
 	bool						fQuitting;
 	BPrivate::Network::BNetworkCookieJar&	fCookieJar;
-	size_t						fLastCookieCount;
 
 	std::map<BString, std::vector<BPrivate::Network::BNetworkCookie> > fCookieMap;
 };

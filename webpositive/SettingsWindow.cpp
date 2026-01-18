@@ -1117,6 +1117,9 @@ SettingsWindow::_UpdateProxySettings()
 	keyStore.SetPassword("WebPositive", "ProxySettings",
 		fProxyPasswordControl->Text(), "");
 
+	// Clear sensitive password from UI control
+	fProxyPasswordControl->SetText("");
+
 	// Clear plaintext password from settings file if present
 	if (fSettings->GetValue(kSettingsKeyProxyPassword, "") != "")
 		fSettings->SetValue(kSettingsKeyProxyPassword, "");

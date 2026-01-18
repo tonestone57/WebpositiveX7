@@ -107,11 +107,8 @@ NetworkWindow::MessageReceived(BMessage* message)
 					item->SetText(displayText);
 					item->SetPending(false);
 
-					if (!fRequestListView->IsHidden()) {
-						int32 index = fRequestListView->IndexOf(item);
-						if (index >= 0)
-							fRequestListView->InvalidateItem(index);
-					}
+					fRequestListView->InvalidateItem(
+						fRequestListView->IndexOf(item));
 
 					it->second.pop_front();
 					if (it->second.empty())
