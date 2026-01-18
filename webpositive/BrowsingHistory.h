@@ -78,6 +78,7 @@ public:
 
 			bool				AddItem(const BrowsingHistoryItem& item);
 			bool				RemoveUrl(const BString& url);
+			void				RemoveItemsForDomain(const char* domain);
 
 	// Should Lock() the object when using these in some loop or so:
 			int32				CountItems() const;
@@ -97,6 +98,7 @@ private:
 			bool				_AddItem(const BrowsingHistoryItem& item,
 									bool invoke);
 			bool				_RemoveUrl(const BString& url);
+			void				_RemoveItemsForDomain(const char* domain);
 
 			void				_LoadSettings();
 			void				_SaveSettings(bool forceSync = false);
