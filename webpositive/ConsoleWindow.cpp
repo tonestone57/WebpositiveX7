@@ -43,6 +43,7 @@ ConsoleWindow::ConsoleWindow(BRect frame)
 	BWindow(frame, B_TRANSLATE("Script console"), B_TITLED_WINDOW,
 		B_NORMAL_WINDOW_FEEL, B_AUTO_UPDATE_SIZE_LIMITS
 			| B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE),
+	fQuitting(false),
 	fPreviousText(""),
 	fRepeatCounter(0)
 {
@@ -151,9 +152,19 @@ ConsoleWindow::MessageReceived(BMessage* message)
 bool
 ConsoleWindow::QuitRequested()
 {
+	if (fQuitting)
+		return true;
+
 	if (!IsHidden())
 		Hide();
 	return false;
+}
+
+
+void
+ConsoleWindow::PrepareToQuit()
+{
+	fQuitting = true;
 }
 
 

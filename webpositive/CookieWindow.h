@@ -35,6 +35,8 @@ public:
 	virtual void				Hide();
 	virtual	bool				QuitRequested();
 
+			void				PrepareToQuit();
+
 private:
 			void				_BuildDomainList();
 			void				_EmptyDomainList();
@@ -46,6 +48,7 @@ private:
 	BColumnListView*			fCookies;
 	BStringView*				fHeaderView;
 
+	bool						fQuitting;
 	BPrivate::Network::BNetworkCookieJar&	fCookieJar;
 
 	std::map<BString, std::vector<BPrivate::Network::BNetworkCookie> > fCookieMap;
