@@ -150,6 +150,7 @@ static const float kHorizontalTextRectInset = 4.0;
 class URLInputGroup::URLTextView : public BTextView {
 private:
 	static const uint32 MSG_CLEAR = 'cler';
+	static const uint32 PASTE_AND_GO = 'psgo';
 
 public:
 								URLTextView(URLInputGroup* parent);
@@ -207,6 +208,14 @@ URLInputGroup::URLTextView::MessageReceived(BMessage* message)
 			SetText("");
 			break;
 
+		case PASTE_AND_GO:
+		{
+			BMessage paste(B_PASTE);
+			BTextView::MessageReceived(&paste);
+			fURLInputGroup->GoButton()->Invoke();
+			break;
+		}
+
 		default:
 			BTextView::MessageReceived(message);
 			break;
@@ -245,17 +254,21 @@ URLInputGroup::URLTextView::MouseDown(BPoint where)
 			new BMessage(B_COPY));
 		BMenuItem* pasteItem = new BMenuItem(B_TRANSLATE("Paste"),
 			new BMessage(B_PASTE));
+		BMenuItem* pasteAndGoItem = new BMenuItem(B_TRANSLATE("Paste and go"),
+			new BMessage(PASTE_AND_GO));
 		BMenuItem* clearItem = new BMenuItem(B_TRANSLATE("Clear"),
 			new BMessage(MSG_CLEAR));
 		cutItem->SetEnabled(canCutOrCopy);
 		copyItem->SetEnabled(canCutOrCopy);
 		pasteItem->SetEnabled(canPaste);
+		pasteAndGoItem->SetEnabled(canPaste);
 		clearItem->SetEnabled(strlen(Text()) > 0);
 
 		BPopUpMenu* menu = new BPopUpMenu("url context");
 		menu->AddItem(cutItem);
 		menu->AddItem(copyItem);
 		menu->AddItem(pasteItem);
+		menu->AddItem(pasteAndGoItem);
 		menu->AddItem(clearItem);
 
 		menu->SetTargetForItems(this);
@@ -781,4 +794,20 @@ void
 URLInputGroup::LockURLInput(bool lock)
 {
 	fURLLocked = lock;
+}
+
+
+void
+URLInputGroup::SetPrivateMode(bool privateMode)
+{
+	rgb_color color = ui_color(B_DOCUMENT_BACKGROUND_COLOR);
+	if (privateMode)
+		color = tint_color(color, B_DARKEN_1_TINT);
+
+	fTextView->SetViewColor(color);
+	fTextView->SetLowColor(color);
+	fTextView->Invalidate();
+
+	SetLowColor(color);
+	Invalidate();
 }

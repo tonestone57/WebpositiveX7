@@ -121,6 +121,8 @@ enum {
 	PIN_TAB							= 'ptab',
 	UNPIN_TAB						= 'uptb',
 	CLOSE_TAB						= 'cltb',
+	CLOSE_OTHER_TABS				= 'clot',
+	CLOSE_TABS_TO_RIGHT				= 'cltr',
 	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb',
 	TOGGLE_LOAD_IMAGES				= 'tgli',
 	INSPECT_ELEMENT					= 'insp',
@@ -140,7 +142,8 @@ public:
 									const BString& url, BPrivate::Network::BUrlContext* context,
 									uint32 interfaceElements = INTERFACE_ELEMENT_ALL,
 									BWebView* webView = NULL,
-									uint32 workspaces = B_CURRENT_WORKSPACE);
+									uint32 workspaces = B_CURRENT_WORKSPACE,
+									bool privateWindow = false);
 	virtual						~BrowserWindow();
 
 	virtual	void				DispatchMessage(BMessage* message,

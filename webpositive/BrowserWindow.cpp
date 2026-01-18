@@ -311,7 +311,7 @@ private:
 
 BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BString& url,
 	BPrivate::Network::BUrlContext* context, uint32 interfaceElements, BWebView* webView,
-	uint32 workspaces)
+	uint32 workspaces, bool privateWindow)
 	:
 	BWebWindow(frame, kApplicationName, B_DOCUMENT_WINDOW_LOOK, B_NORMAL_WINDOW_FEEL,
 		B_AUTO_UPDATE_SIZE_LIMITS | B_ASYNCHRONOUS_CONTROLS, workspaces),
@@ -606,6 +606,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 
 	// URL input group
 	fURLInputGroup = new URLInputGroup(new BMessage(GOTO_URL));
+	if (privateWindow)
+		fURLInputGroup->SetPrivateMode(true);
 
 	// Status Bar
 	fStatusText = new BStringView("status", "");
@@ -1656,6 +1658,34 @@ BrowserWindow::MessageReceived(BMessage* message)
 			} else
 				PostMessage(B_QUIT_REQUESTED);
 			break;
+
+		case CLOSE_OTHER_TABS:
+		{
+			int32 index;
+			if (message->FindInt32("tab index", &index) == B_OK) {
+				// Close tabs from end to start to avoid index shifting problems
+				// Skip the target tab
+				for (int32 i = fTabManager->CountTabs() - 1; i >= 0; i--) {
+					if (i != index)
+						_ShutdownTab(i);
+				}
+				_UpdateTabGroupVisibility();
+			}
+			break;
+		}
+
+		case CLOSE_TABS_TO_RIGHT:
+		{
+			int32 index;
+			if (message->FindInt32("tab index", &index) == B_OK) {
+				// Close tabs from end down to index + 1
+				for (int32 i = fTabManager->CountTabs() - 1; i > index; i--) {
+					_ShutdownTab(i);
+				}
+				_UpdateTabGroupVisibility();
+			}
+			break;
+		}
 
 		case SELECT_TAB:
 		{

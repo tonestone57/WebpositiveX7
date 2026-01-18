@@ -168,6 +168,9 @@ DownloadWindow::DownloadWindow(BRect frame, bool visible,
 		new BMessage(REMOVE_MISSING_DOWNLOADS));
 	fRemoveMissingButton->SetEnabled(false);
 
+	fOpenFolderButton = new BButton(B_TRANSLATE("Open folder"),
+		new BMessage(OPEN_DOWNLOADS_FOLDER));
+
 	const float spacing = be_control_look->DefaultItemSpacing();
 
 	AddChild(BGroupLayoutBuilder(B_VERTICAL, 0.0)
@@ -175,6 +178,7 @@ DownloadWindow::DownloadWindow(BRect frame, bool visible,
 		.Add(fDownloadsScrollView)
 		.Add(new BSeparatorView(B_HORIZONTAL, B_PLAIN_BORDER))
 		.Add(BGroupLayoutBuilder(B_HORIZONTAL, spacing)
+			.Add(fOpenFolderButton)
 			.AddGlue()
 			.Add(fRemoveMissingButton)
 			.Add(fRemoveFinishedButton)
