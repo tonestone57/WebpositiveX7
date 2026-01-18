@@ -156,7 +156,7 @@ Sync::ImportCookies(const BPath& path,
 			cookie.SetSecure(parts[3] == "TRUE");
 
 			// Expiration is time_t
-			time_t exp = strtol(parts[4].String(), NULL, 10);
+			time_t exp = (time_t)strtoll(parts[4].String(), NULL, 10);
 			cookie.SetExpirationDate(exp);
 
 			cookieJar.AddCookie(cookie);

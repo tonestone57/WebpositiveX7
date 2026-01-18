@@ -223,15 +223,6 @@ CookieWindow::MessageReceived(BMessage* message)
 		case B_SAVE_REQUESTED:
 		{
 			if (message->what == B_SAVE_REQUESTED) {
-				// Check which export
-				// Actually BFilePanel sends B_SAVE_REQUESTED to target.
-				// But we attached a message.
-				// Wait, BFilePanel(..., msg) -> msg is used for "selection" in OPEN_PANEL,
-				// but for SAVE_PANEL it sends B_SAVE_REQUESTED.
-				// We need to differentiate if we had multiple save panels.
-				// But here we can just assume it is cookie export if we are in CookieWindow.
-				// Or we can check the message? BFilePanel doesn't easily attach "userdata" to B_SAVE_REQUESTED.
-				// However, we only have one export in CookieWindow.
 				entry_ref ref;
 				BString name;
 				if (message->FindRef("directory", &ref) == B_OK
@@ -290,7 +281,7 @@ CookieWindow::QuitRequested()
 void
 CookieWindow::_EmptyDomainList()
 {
-	for (int i = fDomains->FullListCountItems() - 1; i >= 1; i--) {
+	for (int i = fDomains->FullListCountItems() - 1; i >= 0; i--) {
 		delete fDomains->FullListItemAt(i);
 	}
 	fDomains->MakeEmpty();
@@ -315,54 +306,18 @@ CookieWindow::_BuildDomainList()
 
 	// 1. Build a tree of domains in memory
 	DomainNode* rootNode = new DomainNode("", true);
-	std::map<BString, DomainNode*> nodeMap;
 
 	BPrivate::Network::BNetworkCookieJar::Iterator it = fCookieJar.GetIterator();
 	const BPrivate::Network::BNetworkCookie* cookie;
 
 	while ((cookie = it.Next()) != NULL) {
-		fCookieMap[cookie->Domain()].push_back(*cookie);
-	}
-
-	// Second pass: add domains to the list.
-	std::map<BString, std::vector<BPrivate::Network::BNetworkCookie> >::iterator
-		mapIt;
-	for (mapIt = fCookieMap.begin(); mapIt != fCookieMap.end(); mapIt++) {
-		_AddDomain(mapIt->first, false, domainItemMap);
-	}
 		BString domain = cookie->Domain();
 		fCookieMap[domain].push_back(*cookie);
 
-		if (nodeMap.count(domain) != 0) {
-			nodeMap[domain]->fake = false;
-			continue;
-		}
+		// Decompose domain into parts to build the tree.
+		// We want to process from root down to leaf.
+		// e.g. "mail.google.com" -> ["com", "google.com", "mail.google.com"]
 
-		// Ensure the node and its parents exist
-		DomainNode* parentNode = rootNode;
-		BString currentDomain(domain);
-		std::vector<BString> parts;
-
-		// Decompose domain into parts to find parents top-down or bottom-up?
-		// The original logic split from the right: "mail.google.com" -> parent "google.com" -> parent "com"
-		// We can do the same to find/create the path.
-
-		// However, we need to create them in the tree structure.
-		// "mail.google.com":
-		// Find "com" in root->children. If not, create.
-		// Find "google.com" in com->children. If not, create.
-		// Find "mail.google.com" in google.com->children. If not, create.
-
-		// This approach requires parsing the domain differently than the original code.
-		// The original code uses:
-		// int firstDot = domain.FindFirst('.');
-		// if (firstDot >= 0) parent = _AddDomain(remainder);
-		// else parent = root;
-		// This recursively builds parents. We can do the same with Nodes.
-
-		DomainNode* node = NULL;
-
-		// Recursive-like stack to build path
 		std::vector<BString> path;
 		BString temp = domain;
 		while (true) {
@@ -372,41 +327,30 @@ CookieWindow::_BuildDomainList()
 			temp.Remove(0, firstDot + 1);
 		}
 
-		// path now contains ["mail.google.com", "google.com", "com"]
-		// We want to process from "com" down to "mail.google.com"
-
 		DomainNode* current = rootNode;
+		// Iterate backwards (from "com" to "mail.google.com")
 		for (int i = path.size() - 1; i >= 0; i--) {
 			BString& part = path[i];
 			if (current->children.find(part) == current->children.end()) {
 				bool isLeaf = (i == 0);
-				// If it's an intermediate node, it's fake unless we visited it explicitly before as a real domain
-				// But wait, if we visit "com" here, it is fake. If we later see a cookie for "com", we update it.
-				// We need to check nodeMap if it exists elsewhere? No, nodeMap is global for this build.
-
-				// Check if we already created it (should be in current->children if we did, but let's be safe)
-				// Actually current->children check is enough.
-
+				// If it is the full domain of the cookie, mark it as real (not fake).
+				// Otherwise, it's an intermediate node (fake) unless we find a cookie for it later.
 				DomainNode* newNode = new DomainNode(part, !isLeaf);
-				// We set !isLeaf (fake) for now. If i==0, it's the domain we are currently adding, so it's not fake (unless updated later)
-				// Actually, if i==0, it IS the cookie domain we are processing, so fake=false.
-
 				current->children[part] = newNode;
-				nodeMap[part] = newNode;
 				current = newNode;
 			} else {
 				current = current->children[part];
-				if (i == 0) current->fake = false; // Mark as real if we hit it explicitly
+				if (i == 0) {
+					// We found a cookie for this node, so it's a real domain now.
+					current->fake = false;
+				}
 			}
 		}
 	}
 
 	// 2. Traverse the tree and populate the list
-	// Use a stack for non-recursive or just a recursive helper function?
-	// C++ recursion is fine for domain depth.
-	// We need to track OutlineLevel.
-
-	struct Tree flattener {
+	// We use a recursive helper class to flatten the tree into the BOutlineListView
+	struct TreeFlattener {
 		static void Flatten(DomainNode* node, BOutlineListView* list, int level) {
 			std::map<BString, DomainNode*>::iterator it;
 			for (it = node->children.begin(); it != node->children.end(); it++) {
@@ -419,7 +363,7 @@ CookieWindow::_BuildDomainList()
 		}
 	};
 
-	flattener::Flatten(rootNode, fDomains, 0);
+	TreeFlattener::Flatten(rootNode, fDomains, 0);
 
 	delete rootNode;
 
@@ -459,7 +403,8 @@ CookieWindow::_BuildDomainList()
 		i++;
 	}
 
-	fDomains->Select(firstNotEmpty);
+	if (firstNotEmpty < fDomains->FullListCountItems())
+		fDomains->Select(firstNotEmpty);
 }
 
 
