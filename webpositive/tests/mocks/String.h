@@ -1,134 +1,160 @@
-#ifndef STRING_H
-#define STRING_H
-#include "SupportDefs.h"
+#ifndef _MOCK_B_STRING_H
+#define _MOCK_B_STRING_H
+
+#include <string.h>
 #include <string>
-#include <iostream>
+#include <vector>
 #include <stdio.h>
+#include <stdint.h>
+#include "SupportDefs.h"
 
 class BString {
 public:
-    std::string fString;
-    BString() {}
+    BString() : fString("") {}
     BString(const char* str) : fString(str ? str : "") {}
     BString(const BString& other) : fString(other.fString) {}
 
     const char* String() const { return fString.c_str(); }
-    int32 Length() const { return fString.length(); }
+    int32 Length() const { return (int32)fString.length(); }
+
+    bool operator==(const BString& other) const { return fString == other.fString; }
+    bool operator==(const char* other) const { return fString == (other ? other : ""); }
+    bool operator!=(const BString& other) const { return fString != other.fString; }
+    bool operator<(const BString& other) const { return fString < other.fString; }
+
+    BString& operator=(const char* str) { fString = str ? str : ""; return *this; }
 
     int32 FindFirst(const char* str) const {
         size_t pos = fString.find(str);
-        return (pos == std::string::npos) ? B_ERROR : (int32)pos;
-    }
-    int32 FindFirst(char c) const {
-         size_t pos = fString.find(c);
-         return (pos == std::string::npos) ? B_ERROR : (int32)pos;
+        return pos == std::string::npos ? -1 : (int32)pos;
     }
 
-    // Add EndsWith
-    bool EndsWith(const BString& str) const {
-        if (str.Length() > Length()) return false;
-        return fString.compare(Length() - str.Length(), str.Length(), str.fString) == 0;
+    int32 FindFirst(char c, int32 fromIndex = 0) const {
+        size_t pos = fString.find(c, fromIndex);
+        return pos == std::string::npos ? -1 : (int32)pos;
     }
 
-    // Case insensitive find
-    int32 IFindFirst(const char* str) const {
-        // Just forward to normal find for mock
-        return FindFirst(str);
+    void ReplaceAll(const char* from, const char* to) {
+        size_t start_pos = 0;
+        std::string s_from = from;
+        std::string s_to = to;
+        while((start_pos = fString.find(s_from, start_pos)) != std::string::npos) {
+            fString.replace(start_pos, s_from.length(), s_to);
+            start_pos += s_to.length();
+        }
+    }
+
+    void ReplaceAll(const char* from, const BString& to) {
+        ReplaceAll(from, to.String());
+    }
+
+    BString& operator<<(const char* str) {
+        fString += str;
+        return *this;
+    }
+
+    BString& operator<<(const BString& str) {
+        fString += str.fString;
+        return *this;
+    }
+
+    BString& operator<<(int value) {
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "%d", value);
+        fString += buffer;
+        return *this;
+    }
+
+    BString& operator+=(const char* str) {
+        fString += str;
+        return *this;
+    }
+
+    BString& operator+=(const BString& str) {
+        fString += str.fString;
+        return *this;
+    }
+
+    char ByteAt(int32 index) const {
+        if (index < 0 || index >= Length()) return 0;
+        return fString[index];
+    }
+
+    char operator[](int index) const {
+        return ByteAt(index);
+    }
+
+    char* LockBuffer(int32 size) {
+        fString.resize(size);
+        return &fString[0];
+    }
+
+    void UnlockBuffer(int32 length) {
+        // Assume length is correct
     }
 
     void CopyInto(BString& dest, int32 from, int32 length) const {
+        if (from < 0) from = 0;
+        if (from + length > Length()) length = Length() - from;
+        if (length < 0) length = 0;
         dest.fString = fString.substr(from, length);
     }
 
     void CopyCharsInto(BString& dest, int32 from, int32 length) const {
-        dest.fString = fString.substr(from, length);
+        CopyInto(dest, from, length);
     }
 
-    void ReplaceAll(const char* oldStr, const char* newStr) {
-        size_t pos = 0;
-        std::string o = oldStr;
-        std::string n = newStr;
-        while((pos = fString.find(o, pos)) != std::string::npos) {
-            fString.replace(pos, o.length(), n);
-            pos += n.length();
-        }
+    void CopyCharsInto(char* dest, int32 from, int32 length) const {
+        if (from < 0) from = 0;
+        if (from + length > Length()) length = Length() - from;
+        if (length < 0) length = 0;
+        std::string sub = fString.substr(from, length);
+        memcpy(dest, sub.c_str(), length);
+        dest[length] = '\0';
     }
 
-    void ReplaceAll(const char* oldStr, const BString& newStr) {
-        ReplaceAll(oldStr, newStr.String());
-    }
-
-    void Remove(int32 from, int32 length) {
-        if (from >= fString.length()) return;
-        fString.erase(from, length);
-    }
-
-    bool operator==(const char* str) const { return fString == (str ? str : ""); }
-    bool operator==(const BString& other) const { return fString == other.fString; }
-
-    // Needed for std::map key
-    bool operator<(const BString& other) const {
-        return fString < other.fString;
-    }
-
-    char operator[](int32 index) const { return fString[index]; }
-
-    void SetByteAt(int32 index, char c) { fString[index] = c; }
-
-    // ByteAt for convenience in tests (though real BString doesn't always have it, it might use [])
-    char ByteAt(int32 index) const { return fString[index]; }
-
-    void Insert(const char* str, int32 pos) { fString.insert(pos, str); }
-
-    int Compare(const char* str, int32 len) const { return fString.compare(0, len, str, len); }
-
-    BString& operator<<(const char* str) { fString += str; return *this; }
-    BString& operator<<(const BString& str) { fString += str.fString; return *this; }
-    BString& operator+=(const char* str) { fString += str; return *this; }
-    BString& operator+=(const BString& str) { fString += str.fString; return *this; }
-
-    BString& operator<<(int32 val) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%d", (int)val);
-        fString += buf;
-        return *this;
-    }
-
-    BString& operator<<(uint32 val) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%u", (unsigned int)val);
-        fString += buf;
-        return *this;
-    }
-
-    void SetTo(const char* str) { fString = str; }
-
-    // Helper for Truncate
-    void Truncate(int32 newLength) {
-        if (newLength < fString.length()) fString.resize(newLength);
-    }
-
-    bool StartsWith(const char* prefix) const {
-        return fString.find(prefix) == 0;
-    }
-
-    void ToUpper() {
-        for (size_t i = 0; i < fString.length(); ++i) {
-            fString[i] = toupper(fString[i]);
-        }
+    void Append(const char* str, int32 length) {
+        fString.append(str, length);
     }
 
     bool IsEmpty() const { return fString.empty(); }
 
-    // ICompare (Case insensitive)
-    int ICompare(const char* str) const {
-        // Just do simple compare for mock
-        return fString.compare(str);
+    // Missing methods for URLHandler
+    void SetByteAt(int32 index, char c) {
+        if (index >= 0 && index < Length()) {
+            fString[index] = c;
+        }
     }
+
+    void Insert(const char* str, int32 index) {
+        if (index < 0) index = 0;
+        if (index > Length()) index = Length();
+        fString.insert(index, str);
+    }
+
+    void Remove(int32 index, int32 length) {
+         if (index < 0) index = 0;
+         if (index >= Length()) return;
+         fString.erase(index, length);
+    }
+
+    int Compare(const char* str, int32 len) const {
+        return fString.compare(0, len, str);
+    }
+
+    friend BString operator+(const BString& a, const BString& b) {
+        BString res(a);
+        res += b;
+        return res;
+    }
+
+private:
+    std::string fString;
 };
 
-// Global operators for comparisons
-inline bool operator==(const char* str, const BString& bstr) {
-    return bstr == str;
+// Global operators
+inline bool operator==(const char* a, const BString& b) {
+    return b == a;
 }
+
 #endif

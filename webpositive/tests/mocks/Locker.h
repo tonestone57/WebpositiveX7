@@ -1,15 +1,12 @@
-#ifndef LOCKER_H
-#define LOCKER_H
-
-#include <SupportDefs.h>
+#ifndef _LOCKER_H
+#define _LOCKER_H
 
 class BLocker {
 public:
-	BLocker(const char* name = NULL) {}
-	virtual ~BLocker() {}
-
-	bool Lock() { return true; }
-	void Unlock() {}
+    BLocker(const char* name) {}
+    bool Lock() { return true; }
+    void Unlock() {}
+    bool IsLocked() const { return true; }
 };
 
 #endif

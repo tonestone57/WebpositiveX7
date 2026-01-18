@@ -388,6 +388,14 @@ BrowsingHistory::RemoveUrl(const BString& url)
 }
 
 
+bool
+BrowsingHistory::RemoveUrls(const std::vector<BString>& urls)
+{
+	BAutolock _(this);
+	return _RemoveUrls(urls);
+}
+
+
 int32
 BrowsingHistory::BrowsingHistory::CountItems() const
 {
@@ -537,6 +545,66 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 		_ScheduleSave();
 	}
 
+	fGeneration++;
+
+	return true;
+}
+
+
+struct PointerInList {
+	PointerInList(const std::vector<BrowsingHistoryItem*>& list)
+		: fList(list)
+	{
+	}
+
+	bool operator()(BrowsingHistoryItem* item) const
+	{
+		return std::binary_search(fList.begin(), fList.end(), item);
+	}
+
+	const std::vector<BrowsingHistoryItem*>& fList;
+};
+
+
+bool
+BrowsingHistory::_RemoveUrls(const std::vector<BString>& urls)
+{
+	if (urls.empty())
+		return false;
+
+	std::vector<BrowsingHistoryItem*> itemsToRemove;
+	itemsToRemove.reserve(urls.size());
+	bool changed = false;
+
+	// 1. Identify items to remove using the Map (O(K * log N))
+	for (size_t i = 0; i < urls.size(); i++) {
+		std::map<BString, BrowsingHistoryItem*>::iterator it
+			= fHistoryMap.find(urls[i]);
+		if (it != fHistoryMap.end()) {
+			itemsToRemove.push_back(it->second);
+			fHistoryMap.erase(it);
+			changed = true;
+		}
+	}
+
+	if (!changed)
+		return false;
+
+	// Sort pointers for binary search (O(K log K))
+	std::sort(itemsToRemove.begin(), itemsToRemove.end());
+
+	// 2. Remove from List using remove_if (O(N * log K) with binary search)
+	HistoryList::iterator newEnd = std::remove_if(fHistoryList.begin(),
+		fHistoryList.end(), PointerInList(itemsToRemove));
+
+	fHistoryList.erase(newEnd, fHistoryList.end());
+
+	// 3. Delete items
+	for (size_t i = 0; i < itemsToRemove.size(); i++) {
+		delete itemsToRemove[i];
+	}
+
+	_ScheduleSave();
 	fGeneration++;
 
 	return true;

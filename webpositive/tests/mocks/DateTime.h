@@ -1,112 +1,45 @@
-/*
- * Copyright 2024 Haiku, Inc. All rights reserved.
- * Distributed under the terms of the MIT License.
- */
+#ifndef _DATETIME_H
+#define _DATETIME_H
 
-#ifndef DATE_TIME_H
-#define DATE_TIME_H
-
+#include <time.h>
 #include <SupportDefs.h>
 
 class BMessage;
 
-class BDate {
-public:
-	BDate() : fYear(0), fMonth(0), fDay(0) {}
-	BDate(int year, int month, int day) : fYear(year), fMonth(month), fDay(day) {}
-
-	int Year() const { return fYear; }
-	int Month() const { return fMonth; }
-	int Day() const { return fDay; }
-
-	void AddDays(int days) {
-		// Mock implementation: Very simple add
-		fDay += days;
-	}
-
-	bool operator<(const BDate& other) const {
-		if (fYear != other.fYear) return fYear < other.fYear;
-		if (fMonth != other.fMonth) return fMonth < other.fMonth;
-		return fDay < other.fDay;
-	}
-
-	bool operator==(const BDate& other) const {
-		return fYear == other.fYear && fMonth == other.fMonth && fDay == other.fDay;
-	}
-
-    BString LongDayName() const { return "Monday"; }
-
-private:
-	int fYear;
-	int fMonth;
-	int fDay;
+enum time_type {
+    B_LOCAL_TIME
 };
 
-class BTime {
+class BDate {
 public:
-	BTime() : fHour(0), fMinute(0), fSecond(0) {}
-	BTime(int hour, int minute, int second) : fHour(hour), fMinute(minute), fSecond(second) {}
-
-	bool operator<(const BTime& other) const {
-		if (fHour != other.fHour) return fHour < other.fHour;
-		if (fMinute != other.fMinute) return fMinute < other.fMinute;
-		return fSecond < other.fSecond;
-	}
-
-	bool operator==(const BTime& other) const {
-		return fHour == other.fHour && fMinute == other.fMinute && fSecond == other.fSecond;
-	}
-
-private:
-	int fHour;
-	int fMinute;
-	int fSecond;
+    void AddDays(int32 days) {}
 };
 
 class BDateTime {
 public:
-	BDateTime() {}
-	BDateTime(const BDate& date, const BTime& time) : fDate(date), fTime(time) {}
-	BDateTime(const BMessage* message) {}
+    BDateTime() : fTime(0) {}
+    BDateTime(const BDateTime& other) : fTime(other.fTime) {}
+    BDateTime(const void* archive) : fTime(0) {} // Mock archive constructor
+    BDateTime(const BMessage* archive) : fTime(0) {}
 
-	status_t Archive(BMessage* archive) const { return B_OK; }
+    static BDateTime CurrentDateTime(time_type type) {
+        BDateTime dt;
+        dt.fTime = time(NULL);
+        return dt;
+    }
 
-	void SetDate(const BDate& date) { fDate = date; }
-	void SetTime(const BTime& time) { fTime = time; }
+    time_t Time_t() const { return fTime; }
+    void SetTime_t(time_t t) { fTime = t; }
 
-	BDate Date() const { return fDate; }
-	BDate& Date() { return fDate; } // Return ref for non-const
-	BTime Time() const { return fTime; }
+    bool operator<(const BDateTime& other) const { return fTime < other.fTime; }
+    bool operator==(const BDateTime& other) const { return fTime == other.fTime; }
 
-    // Add Time_t
-    time_t Time_t() const { return 0; }
+    status_t Archive(BMessage* archive) const { return B_OK; } // Mock Archive
 
-	bool operator<(const BDateTime& other) const {
-		if (fDate < other.fDate) return true;
-		if (other.fDate < fDate) return false;
-		return fTime < other.fTime;
-	}
-
-	bool operator==(const BDateTime& other) const {
-		return fDate == other.fDate && fTime == other.fTime;
-	}
-
-	bool operator!=(const BDateTime& other) const {
-		return !(*this == other);
-	}
-
-	static BDateTime CurrentDateTime(int32 type) {
-		return BDateTime(BDate(2024, 1, 1), BTime(12, 0, 0));
-	}
+    BDate Date() { return BDate(); }
 
 private:
-	BDate fDate;
-	BTime fTime;
+    time_t fTime;
 };
 
-enum time_type {
-	B_LOCAL_TIME,
-	B_GMT_TIME
-};
-
-#endif // DATE_TIME_H
+#endif

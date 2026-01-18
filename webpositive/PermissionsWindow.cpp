@@ -385,8 +385,6 @@ PermissionsWindow::_ClearSiteData(const char* domain)
 		// RemoveUrl takes a lock internally? Let's check BrowsingHistory.
 		// Assuming we should just call RemoveUrl outside the loop if it locks.
 
-		for (size_t i = 0; i < urlsToRemove.size(); i++) {
-			history->RemoveUrl(urlsToRemove[i]);
-		}
+		history->RemoveUrls(urlsToRemove);
 	}
 }
