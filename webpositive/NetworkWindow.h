@@ -7,9 +7,43 @@
 
 #include <Window.h>
 #include <String.h>
+#include <StringItem.h>
+
+#include <deque>
+#include <map>
 
 class BListView;
 class BButton;
+
+class NetworkRequestItem : public BStringItem {
+public:
+	NetworkRequestItem(const char* text, const char* url)
+		:
+		BStringItem(text),
+		fUrl(url),
+		fIsPending(true)
+	{
+	}
+
+	const BString& Url() const
+	{
+		return fUrl;
+	}
+
+	bool IsPending() const
+	{
+		return fIsPending;
+	}
+
+	void SetPending(bool pending)
+	{
+		fIsPending = pending;
+	}
+
+private:
+	BString fUrl;
+	bool fIsPending;
+};
 
 enum {
 	ADD_NETWORK_REQUEST = 'anrq',
@@ -27,6 +61,7 @@ public:
 private:
 	BListView* fRequestListView;
 	BButton* fClearButton;
+	std::map<BString, std::deque<NetworkRequestItem*> > fPendingRequests;
 };
 
 #endif // NETWORK_WINDOW_H

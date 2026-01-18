@@ -50,6 +50,7 @@ NetworkWindow::NetworkWindow(BRect frame)
 
 NetworkWindow::~NetworkWindow()
 {
+	fPendingRequests.clear();
 	int32 count = fRequestListView->CountItems();
 	for (int32 i = count - 1; i >= 0; i--)
 		delete fRequestListView->RemoveItem(i);
@@ -65,9 +66,24 @@ NetworkWindow::MessageReceived(BMessage* message)
 			if (message->FindString("url", &url) == B_OK) {
 				BString displayText;
 				displayText.SetToFormat("[Pending] %s (Headers: N/A)", url.String());
-				fRequestListView->AddItem(new BStringItem(displayText));
-				if (fRequestListView->CountItems() > 500)
+				NetworkRequestItem* item = new NetworkRequestItem(displayText, url);
+				fRequestListView->AddItem(item);
+				fPendingRequests[url].push_back(item);
+
+				if (fRequestListView->CountItems() > 500) {
+					NetworkRequestItem* oldItem
+						= (NetworkRequestItem*)fRequestListView->ItemAt(0);
+					if (oldItem->IsPending()) {
+						std::deque<NetworkRequestItem*>& list
+							= fPendingRequests[oldItem->Url()];
+						if (!list.empty() && list.front() == oldItem) {
+							list.pop_front();
+							if (list.empty())
+								fPendingRequests.erase(oldItem->Url());
+						}
+					}
 					delete fRequestListView->RemoveItem(0);
+				}
 				fRequestListView->ScrollTo(fRequestListView->CountItems() - 1);
 			}
 			break;
@@ -79,26 +95,30 @@ NetworkWindow::MessageReceived(BMessage* message)
 			if (message->FindString("url", &url) == B_OK &&
 				message->FindString("status", &status) == B_OK) {
 
-				// Construct the expected "Pending" string to match exactly
-				BString pendingText;
-				pendingText.SetToFormat("[Pending] %s (Headers: N/A)", url.String());
+				std::map<BString, std::deque<NetworkRequestItem*> >::iterator it
+					= fPendingRequests.find(url);
+				if (it != fPendingRequests.end() && !it->second.empty()) {
+					NetworkRequestItem* item = it->second.back();
 
-				// Find item with exact pending text and update it
-				for (int32 i = fRequestListView->CountItems() - 1; i >= 0; i--) {
-					BStringItem* item = (BStringItem*)fRequestListView->ItemAt(i);
-					if (item->Text() == pendingText) {
-						BString displayText;
-						displayText.SetToFormat("[%s] %s (Headers: N/A)", status.String(), url.String());
-						item->SetText(displayText);
-						fRequestListView->InvalidateItem(i);
-						break; // Assume last one is the relevant one
-					}
+					BString displayText;
+					displayText.SetToFormat("[%s] %s (Headers: N/A)",
+						status.String(), url.String());
+					item->SetText(displayText);
+					item->SetPending(false);
+
+					fRequestListView->InvalidateItem(
+						fRequestListView->IndexOf(item));
+
+					it->second.pop_back();
+					if (it->second.empty())
+						fPendingRequests.erase(it);
 				}
 			}
 			break;
 		}
 		case CLEAR_NETWORK_REQUESTS:
 		{
+			fPendingRequests.clear();
 			int32 count = fRequestListView->CountItems();
 			for (int32 i = count - 1; i >= 0; i--)
 				delete fRequestListView->RemoveItem(i);
