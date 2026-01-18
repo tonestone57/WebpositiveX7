@@ -36,6 +36,8 @@
 
 #include <OS.h>
 #include <Alert.h>
+#include <TranslatorFormats.h>
+#include <TranslationUtils.h>
 #include <Application.h>
 #include <Bitmap.h>
 #include <Button.h>
@@ -342,6 +344,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fPermissionsWindow(NULL),
 	fNetworkWindow(NULL),
 	fIsBypassingCache(false),
+	fIsPrivate(privateWindow),
 	fMemoryPressureRunner(NULL),
 	fButtonResetRunner(NULL)
 {
@@ -609,6 +612,18 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	if (!fAppSettings->GetValue(kSettingsKeyShowHomeButton, true))
 		fHomeButton->Hide();
 
+	fDownloadsButton = new BIconButton("Downloads", NULL, new BMessage(SHOW_DOWNLOAD_WINDOW));
+	fDownloadsButton->SetIcon(209); // Using existing icon resource ID, hopefully exists or placeholder
+	fDownloadsButton->TrimIcon();
+	if (!fAppSettings->GetValue(kSettingsKeyShowDownloadsButton, false))
+		fDownloadsButton->Hide();
+
+	fBookmarksButton = new BIconButton("Bookmarks", NULL, new BMessage(SHOW_BOOKMARKS));
+	fBookmarksButton->SetIcon(208); // Placeholder ID
+	fBookmarksButton->TrimIcon();
+	if (!fAppSettings->GetValue(kSettingsKeyShowBookmarksButton, true))
+		fBookmarksButton->Hide();
+
 	// URL input group
 	fURLInputGroup = new URLInputGroup(new BMessage(GOTO_URL));
 	if (privateWindow)
@@ -670,6 +685,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 			.Add(fForwardButton)
 			.Add(fStopButton)
 			.Add(fHomeButton)
+			.Add(fDownloadsButton)
+			.Add(fBookmarksButton)
 			.Add(fURLInputGroup)
 			.SetInsets(kInsetSpacing, kInsetSpacing, kInsetSpacing,
 				kInsetSpacing)
@@ -1852,6 +1869,18 @@ BrowserWindow::MessageReceived(BMessage* message)
 					fHomeButton->Show();
 				else
 					fHomeButton->Hide();
+			} else if (name == kSettingsKeyShowDownloadsButton
+				&& message->FindBool("value", &flag) == B_OK) {
+				if (flag)
+					fDownloadsButton->Show();
+				else
+					fDownloadsButton->Hide();
+			} else if (name == kSettingsKeyShowBookmarksButton
+				&& message->FindBool("value", &flag) == B_OK) {
+				if (flag)
+					fBookmarksButton->Show();
+				else
+					fBookmarksButton->Hide();
 			} else if (name == kSettingsShowBookmarkBar
 				&& message->FindBool("value", &flag) == B_OK) {
 				_ShowBookmarkBar(flag);
@@ -2169,6 +2198,40 @@ BrowserWindow::SetCurrentWebView(BWebView* webView)
 		fURLInputGroup->TextView()->GetSelection(&selectionStart,
 			&selectionEnd);
 		userData->SetURLInputSelection(selectionStart, selectionEnd);
+
+		// Capture Preview
+		if (CurrentWebView() && !CurrentWebView()->IsHidden()) {
+			BBitmap* tempPreview = new BBitmap(CurrentWebView()->Bounds(), B_RGB32);
+			if (tempPreview->InitCheck() == B_OK) {
+				// Use BScreen to read content if visible
+				if (CurrentWebView()->Window()) {
+					BScreen screen(CurrentWebView()->Window());
+					BRect screenRect = CurrentWebView()->ConvertToScreen(CurrentWebView()->Bounds());
+					if (screen.ReadBitmap(tempPreview, false, &screenRect) == B_OK) {
+						// Scale down to save memory
+						BRect thumbRect(0, 0, 200, 150);
+						BBitmap* thumbnail = new BBitmap(thumbRect, B_RGB32, true);
+						if (thumbnail->IsValid()) {
+							BView* thumbView = new BView(thumbRect, "thumb", B_FOLLOW_NONE, B_WILL_DRAW);
+							thumbnail->AddChild(thumbView);
+							thumbnail->Lock();
+							thumbView->SetHighColor(B_TRANSPARENT_32_BIT);
+							thumbView->FillRect(thumbRect);
+							thumbView->SetDrawingMode(B_OP_COPY);
+							thumbView->DrawBitmap(tempPreview, tempPreview->Bounds(), thumbRect, B_FILTER_BITMAP_BILINEAR);
+							thumbView->Sync();
+							thumbnail->Unlock();
+							thumbnail->RemoveChild(thumbView);
+							delete thumbView;
+
+							userData->SetPreview(thumbnail);
+						}
+						delete thumbnail;
+					}
+				}
+			}
+			delete tempPreview;
+		}
 	}
 
 	BWebWindow::SetCurrentWebView(webView);
@@ -2269,6 +2332,9 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 		url = _NewTabURL(isNewWindow);
 
 	if (url.Length() > 0) {
+		// Try loading favicon from cache for initial state
+		_LoadFavicon(url, webView);
+
 		if (lazy) {
 			_SetPageIcon(webView, NULL); // Ensure userData exists
 			PageUserData* userData = static_cast<PageUserData*>(webView->GetUserData());
@@ -2647,7 +2713,8 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 	bool allowPopups = true;
 	float zoom = 1.0;
 	bool forceDesktop = false;
-	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop);
+	BString customUserAgent;
+	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop, customUserAgent);
 
 	if (view) {
 		// Apply Per-Site Zoom
@@ -3208,7 +3275,7 @@ BrowserWindow::_TabChanged(int32 index)
 
 
 void
-BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon)
+BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon, bool save)
 {
 	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
 	if (userData == NULL) {
@@ -3220,6 +3287,11 @@ BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon)
 	// The PageUserData makes a copy of the icon, which we pass on to
 	// the TabManager for display in the respective tab.
 	userData->SetPageIcon(icon);
+
+	if (save && icon) {
+		_SaveFavicon(view->MainFrameURL(), icon);
+	}
+
 	fTabManager->SetTabIcon(view, userData->PageIcon());
 	if (view == CurrentWebView())
 		fURLInputGroup->SetPageIcon(icon);
@@ -3794,5 +3866,95 @@ BrowserWindow::_UpdateToolbarPlacement()
 		int32 tabIndex = layout->IndexOfItem(fTabGroup);
 		int32 insertIndex = (tabIndex >= 0) ? tabIndex + 1 : 2;
 		layout->AddItem(fNavigationGroup, insertIndex);
+	}
+}
+
+
+status_t
+BrowserWindow::_GetFaviconPath(const BString& url, BPath& path)
+{
+	if (url.Length() == 0)
+		return B_BAD_VALUE;
+
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
+		return B_ERROR;
+
+	path.Append(kApplicationName);
+	path.Append("Favicons");
+
+	if (create_directory(path.Path(), 0777) != B_OK)
+		return B_ERROR;
+
+	BUrl parsedUrl(url);
+	if (!parsedUrl.IsValid() || parsedUrl.Host().Length() == 0)
+		return B_BAD_VALUE;
+
+	BString filename(parsedUrl.Host());
+	// Sanitize filename
+	filename.ReplaceAll('/', '_');
+	filename.ReplaceAll(':', '_');
+
+	path.Append(filename.String());
+	return B_OK;
+}
+
+
+void
+BrowserWindow::_SaveFavicon(const BString& url, const BBitmap* icon)
+{
+	if (icon == NULL || fIsPrivate)
+		return;
+
+	BPath path;
+	if (_GetFaviconPath(url, path) != B_OK)
+		return;
+
+	// Use clone + ImportBits logic instead of new BBitmap(icon)
+	BBitmap* saveIcon = new BBitmap(icon->Bounds(), B_RGBA32);
+	if (saveIcon->ImportBits(icon->Bits(), icon->BitsLength(), icon->BytesPerRow(), 0, icon->ColorSpace()) != B_OK) {
+		delete saveIcon;
+		return;
+	}
+
+	BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+	if (file.InitCheck() == B_OK) {
+		int32 width = saveIcon->Bounds().IntegerWidth() + 1;
+		int32 height = saveIcon->Bounds().IntegerHeight() + 1;
+		file.Write(&width, sizeof(width));
+		file.Write(&height, sizeof(height));
+		file.Write(saveIcon->Bits(), saveIcon->BitsLength());
+	}
+	delete saveIcon;
+}
+
+
+void
+BrowserWindow::_LoadFavicon(const BString& url, BWebView* view)
+{
+	if (view == NULL) return;
+
+	// Don't overwrite existing icon
+	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+	if (userData && userData->PageIcon())
+		return;
+
+	BPath path;
+	if (_GetFaviconPath(url, path) != B_OK)
+		return;
+
+	BFile file(path.Path(), B_READ_ONLY);
+	if (file.InitCheck() == B_OK) {
+		int32 width, height;
+		if (file.Read(&width, sizeof(width)) == sizeof(width) &&
+			file.Read(&height, sizeof(height)) == sizeof(height)) {
+
+			if (width > 0 && width < 256 && height > 0 && height < 256) {
+				BBitmap* icon = new BBitmap(BRect(0, 0, width - 1, height - 1), B_RGBA32);
+				if (file.Read(icon->Bits(), icon->BitsLength()) == icon->BitsLength()) {
+					_SetPageIcon(view, icon, false); // Don't save back to disk
+				}
+				delete icon;
+			}
+		}
 	}
 }
