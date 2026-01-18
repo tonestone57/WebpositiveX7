@@ -336,7 +336,7 @@ BrowserApp::ReadyToRun()
 		} else {
 			// otherwise, restore previous session
 			BMessage archivedWindow;
-			for (int i = 0; fSession->FindMessage("window", i, &archivedWindow)
+			for (int32 i = 0; fSession->FindMessage("window", i, &archivedWindow)
 				== B_OK; i++) {
 				BRect frame = archivedWindow.FindRect("window frame");
 				uint32 workspaces = B_CURRENT_WORKSPACE;
@@ -550,7 +550,7 @@ BrowserApp::QuitRequested()
 	if (ret == B_OK) {
 		fSession->AddMessage("window", &windowMessage);
 	} else {
-		for (int i = 0; BWindow* window = WindowAt(i); i++) {
+		for (int32 i = 0; BWindow* window = WindowAt(i); i++) {
 			BrowserWindow* webWindow = dynamic_cast<BrowserWindow*>(window);
 			if (!webWindow)
 				continue;
@@ -661,7 +661,7 @@ BrowserApp::_FindWindowOnCurrentWorkspace()
 	BrowserWindow* windowOnCurrentWorkspace = NULL;
 	uint32 workspace = 1 << current_workspace();
 
-	for (int i = 0; BWindow* window = WindowAt(i); i++) {
+	for (int32 i = 0; BWindow* window = WindowAt(i); i++) {
 		BrowserWindow* webWindow = dynamic_cast<BrowserWindow*>(window);
 		if (webWindow == NULL)
 			continue;
@@ -798,7 +798,7 @@ BrowserApp::_SaveSession()
 	SettingsMessage autoSaveSession(B_USER_SETTINGS_DIRECTORY,
 		sessionStorePath.String());
 
-	for (int i = 0; BWindow* window = WindowAt(i); i++) {
+	for (int32 i = 0; BWindow* window = WindowAt(i); i++) {
 		BrowserWindow* webWindow = dynamic_cast<BrowserWindow*>(window);
 		if (!webWindow)
 			continue;
