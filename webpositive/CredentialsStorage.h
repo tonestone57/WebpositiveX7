@@ -61,9 +61,6 @@ private:
 	virtual						~CredentialsStorage();
 
 			void				_LoadSettings();
-			void				_SaveSettings() const;
-			bool				_OpenSettingsFile(BFile& file,
-									uint32 mode) const;
 
 private:
 			typedef HashMap<HashString, Credentials> CredentialMap;

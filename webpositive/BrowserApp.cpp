@@ -583,6 +583,7 @@ BrowserApp::QuitRequested()
 	}
 	if (fSettingsWindow->Lock()) {
 		fSettings->SetValue("settings window frame", fSettingsWindow->Frame());
+		fSettingsWindow->PrepareToQuit();
 		fSettingsWindow->Unlock();
 	}
 	if (fConsoleWindow->Lock()) {

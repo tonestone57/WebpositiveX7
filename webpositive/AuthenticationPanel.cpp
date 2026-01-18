@@ -19,6 +19,7 @@
 #include <StringView.h>
 #include <TextControl.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <MessageRunner.h>
 
@@ -160,6 +161,13 @@ AuthenticationPanel::_TogglePasswordVisibility()
 		m_hidePasswordCheckBox->Value() == B_CONTROL_ON);
 	m_passwordTextControl->SetText(text.String());
 	m_passwordTextControl->TextView()->Select(selectionStart, selectionEnd);
+
+	// Securely clear the temporary copy
+	if (text.Length() > 0) {
+		char* ptr = text.LockBuffer(text.Length());
+		memset(ptr, 0, text.Length());
+		text.UnlockBuffer(0);
+	}
 }
 
 
@@ -285,6 +293,10 @@ bool AuthenticationPanel::getAuthentication(const BString& text,
 
 	user = m_usernameTextControl->Text();
 	pass = m_passwordTextControl->Text();
+
+	// Clear sensitive data from controls
+	m_passwordTextControl->SetText("");
+
 	if (rememberCredentials)
 		*rememberCredentials = m_rememberCredentialsCheckBox->Value()
 			== B_CONTROL_ON;

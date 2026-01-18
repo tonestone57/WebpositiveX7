@@ -13,6 +13,7 @@
 #include <Entry.h>
 #include <File.h>
 #include <FindDirectory.h>
+#include <KeyStore.h>
 #include <Message.h>
 #include <Path.h>
 
@@ -52,6 +53,11 @@ Credentials::Credentials(const BMessage* archive)
 
 Credentials::~Credentials()
 {
+	if (fPassword.Length() > 0) {
+		char* ptr = fPassword.LockBuffer(fPassword.Length());
+		memset(ptr, 0, fPassword.Length());
+		fPassword.UnlockBuffer(0);
+	}
 }
 
 
@@ -135,7 +141,6 @@ CredentialsStorage::CredentialsStorage(bool persistent)
 
 CredentialsStorage::~CredentialsStorage()
 {
-	_SaveSettings();
 }
 
 
@@ -172,7 +177,16 @@ CredentialsStorage::PutCredentials(const HashString& key,
 {
 	BAutolock _(this);
 
-	return fCredentialMap.Put(key, credentials);
+	status_t status = fCredentialMap.Put(key, credentials);
+	if (status != B_OK)
+		return status;
+
+	if (fPersistent) {
+		BKeyStore keyStore;
+		return keyStore.SetPassword("WebPositive", key.GetString(),
+			credentials.Password(), credentials.Username());
+	}
+	return B_OK;
 }
 
 
@@ -192,8 +206,10 @@ CredentialsStorage::RemoveCredentials(const HashString& key)
 
 	if (fCredentialMap.ContainsKey(key)) {
 		fCredentialMap.Remove(key);
-		if (fPersistent)
-			_SaveSettings();
+		if (fPersistent) {
+			BKeyStore keyStore;
+			keyStore.RemovePassword("WebPositive", key.GetString());
+		}
 	}
 }
 
@@ -209,59 +225,46 @@ CredentialsStorage::_LoadSettings()
 
 	fSettingsLoaded = true;
 
-	BFile settingsFile;
-	if (_OpenSettingsFile(settingsFile, B_READ_ONLY)) {
-		BMessage settingsArchive;
-		settingsArchive.Unflatten(&settingsFile);
-		BMessage credentialsArchive;
-		for (int32 i = 0; settingsArchive.FindMessage("credentials", i,
-				&credentialsArchive) == B_OK; i++) {
-			BString key;
-			if (credentialsArchive.FindString("key", &key) == B_OK) {
-				Credentials credentials(&credentialsArchive);
-				fCredentialMap.Put(key.String(), credentials);
+	BKeyStore keyStore;
+	BMessage passwords;
+	if (keyStore.GetKeyring("WebPositive", &passwords) == B_OK) {
+		BMessage passwordMsg;
+		for (int32 i = 0; passwords.FindMessage("password", i, &passwordMsg) == B_OK; i++) {
+			const char* identifier;
+			const char* password;
+			const char* secondaryInfo;
+			if (passwordMsg.FindString("identifier", &identifier) == B_OK
+				&& passwordMsg.FindString("password", &password) == B_OK
+				&& passwordMsg.FindString("secondaryInfo", &secondaryInfo) == B_OK) {
+
+				Credentials credentials(secondaryInfo, password);
+				fCredentialMap.Put(identifier, credentials);
 			}
 		}
 	}
-}
 
-
-void
-CredentialsStorage::_SaveSettings() const
-{
-	BFile settingsFile;
-	if (_OpenSettingsFile(settingsFile,
-			B_CREATE_FILE | B_ERASE_FILE | B_WRITE_ONLY)) {
-		BMessage settingsArchive;
-		BMessage credentialsArchive;
-		CredentialMap::Iterator iterator = fCredentialMap.GetIterator();
-		while (iterator.HasNext()) {
-			const CredentialMap::Entry& entry = iterator.Next();
-			if (entry.value.Archive(&credentialsArchive) != B_OK
-				|| credentialsArchive.AddString("key",
-					entry.key.GetString()) != B_OK) {
-				break;
-			}
-			if (settingsArchive.AddMessage("credentials",
-					&credentialsArchive) != B_OK) {
-				break;
-			}
-			credentialsArchive.MakeEmpty();
-		}
-		settingsArchive.Flatten(&settingsFile);
-	}
-}
-
-
-bool
-CredentialsStorage::_OpenSettingsFile(BFile& file, uint32 mode) const
-{
+	// Migration from legacy flat file
 	BPath path;
-	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK
-		|| path.Append(kApplicationName) != B_OK
-		|| path.Append("CredentialsStorage") != B_OK) {
-		return false;
-	}
-	return file.SetTo(path.Path(), mode) == B_OK;
-}
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK
+		&& path.Append(kApplicationName) == B_OK
+		&& path.Append("CredentialsStorage") == B_OK) {
 
+		BFile file(path.Path(), B_READ_ONLY);
+		if (file.InitCheck() == B_OK) {
+			BMessage settingsArchive;
+			if (settingsArchive.Unflatten(&file) == B_OK) {
+				BMessage credentialsArchive;
+				for (int32 i = 0; settingsArchive.FindMessage("credentials", i, &credentialsArchive) == B_OK; i++) {
+					BString key;
+					if (credentialsArchive.FindString("key", &key) == B_OK) {
+						Credentials credentials(&credentialsArchive);
+						PutCredentials(key.String(), credentials);
+					}
+				}
+			}
+			// Remove legacy file after successful migration attempt
+			BEntry entry(path.Path());
+			entry.Remove();
+		}
+	}
+}
