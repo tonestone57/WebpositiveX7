@@ -23,7 +23,6 @@ public:
 		virtual	void			UpdateTabScrollability(bool canScrollLeft,
 									bool canScrollRight) = 0;
 		virtual	void			SetToolTip(const BString& text) = 0;
-		virtual const BBitmap*	GetPreview(int32 index) = 0;
 	};
 
 public:
@@ -82,7 +81,6 @@ private:
 			void				_UpdateTabVisibility();
 			float				_AvailableWidthForTabs() const;
 			void				_SendFakeMouseMoved();
-			void				_UpdatePreview(BPoint where);
 
 private:
 			TabView*			fLastMouseEventTab;
@@ -91,7 +89,6 @@ private:
 			TabView*			fSelectedTab;
 			Controller*			fController;
 			int32				fFirstVisibleTabIndex;
-			BWindow*			fPreviewWindow;
 };
 
 #endif // TAB_CONTAINER_VIEW_H

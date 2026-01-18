@@ -62,7 +62,6 @@ public:
 	const	BString&			TabLabel(int32);
 			void				SetTabIcon(const BView* containedView,
 									const BBitmap* icon);
-	const	BBitmap*			GetPreview(int32 tabIndex) const;
 			void				SetCloseButtonsAvailable(bool available);
 
 			void				MoveTab(int32 fromIndex, int32 toIndex);
