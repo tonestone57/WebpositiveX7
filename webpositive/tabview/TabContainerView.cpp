@@ -40,7 +40,8 @@ TabContainerView::TabContainerView(Controller* controller)
 	fClickCount(0),
 	fSelectedTab(NULL),
 	fController(controller),
-	fFirstVisibleTabIndex(0)
+	fFirstVisibleTabIndex(0),
+	fPreviewWindow(NULL)
 {
 	SetFlags(Flags() | B_WILL_DRAW | B_FULL_UPDATE_ON_RESIZE);
 	SetViewColor(B_TRANSPARENT_COLOR);
@@ -51,6 +52,13 @@ TabContainerView::TabContainerView(Controller* controller)
 
 TabContainerView::~TabContainerView()
 {
+	if (fPreviewWindow && !fPreviewWindow->IsHidden())
+		fPreviewWindow->Quit();
+	// Since fPreviewWindow is a BWindow, Quit() deletes it.
+	// If it was just hidden, we still need to clean it up.
+	// But BWindow auto-destructs on Quit().
+	// To be safe, if we own it we should Quit it.
+	// BWindow::Quit() handles deletion.
 }
 
 
@@ -401,6 +409,52 @@ TabContainerView::MaxFirstVisibleTabIndex() const
 }
 
 
+void
+TabContainerView::_UpdatePreview(BPoint where)
+{
+	TabView* tab = _TabAt(where);
+	if (tab == NULL) {
+		if (fPreviewWindow && !fPreviewWindow->IsHidden())
+			fPreviewWindow->Hide();
+		return;
+	}
+
+	int32 index = IndexOf(tab);
+	if (index < 0) return;
+
+	const BBitmap* preview = fController->GetPreview(index);
+	if (preview == NULL) {
+		if (fPreviewWindow && !fPreviewWindow->IsHidden())
+			fPreviewWindow->Hide();
+		return;
+	}
+
+	if (fPreviewWindow == NULL) {
+		fPreviewWindow = new BWindow(BRect(0, 0, 200, 150), "TabPreview",
+			B_BORDERED_WINDOW_LOOK, B_FLOATING_ALL_WINDOW_FEEL,
+			B_NOT_MOVABLE | B_NOT_CLOSABLE | B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE | B_AVOID_FOCUS);
+		BView* view = new BView(fPreviewWindow->Bounds(), "preview", B_FOLLOW_ALL, B_WILL_DRAW);
+		fPreviewWindow->AddChild(view);
+	}
+
+	// Update content (always, even if visible, to allow scrubbing)
+	BView* view = fPreviewWindow->ChildAt(0);
+	if (view->LockLooper()) {
+		view->SetViewBitmap(preview);
+		view->Invalidate();
+		view->UnlockLooper();
+	}
+
+	if (fPreviewWindow->IsHidden()) {
+		// Position below tab
+		BPoint screenPoint = ConvertToScreen(where);
+		// Center horizontally on mouse, place below tab
+		fPreviewWindow->MoveTo(screenPoint.x - 100, screenPoint.y + 20);
+		fPreviewWindow->Show();
+	}
+}
+
+
 bool
 TabContainerView::CanScrollLeft() const
 {
@@ -449,6 +503,8 @@ void
 TabContainerView::_MouseMoved(BPoint where, uint32 _transit,
 	const BMessage* dragMessage)
 {
+	_UpdatePreview(where);
+
 	TabView* tab = _TabAt(where);
 	if (fMouseDown) {
 		uint32 transit = tab == fLastMouseEventTab
