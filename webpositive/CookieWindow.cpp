@@ -465,19 +465,14 @@ CookieWindow::_DeleteCookies()
 
 	// A domain was selected in the domain list
 	if (prevRow == NULL) {
-		while (true) {
-			// Clear the first cookie continuously
-			row = (CookieRow*)fCookies->RowAt(0);
-
-			if (row == NULL)
-				break;
-
+		int32 count = fCookies->CountRows();
+		for (int32 i = 0; i < count; i++) {
+			row = (CookieRow*)fCookies->RowAt(i);
 			BPrivate::Network::BNetworkCookie& cookie = row->Cookie();
 			cookie.SetExpirationDate(0);
 			fCookieJar.AddCookie(cookie);
-			fCookies->RemoveRow(row);
-			delete row;
 		}
+		fCookies->Clear();
 	}
 
 	PostMessage(COOKIE_REFRESH);
