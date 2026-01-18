@@ -25,6 +25,7 @@ public:
 	virtual						~PermissionsWindow();
 
 	virtual	void				MessageReceived(BMessage* message);
+	virtual void				WindowActivated(bool active);
 	virtual	bool				QuitRequested();
 	virtual void				Show();
 

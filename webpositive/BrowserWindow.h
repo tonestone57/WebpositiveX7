@@ -126,6 +126,7 @@ enum {
 	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb',
 	TOGGLE_LOAD_IMAGES				= 'tgli',
 	INSPECT_ELEMENT					= 'insp',
+	RESET_BUTTON_STATE				= 'rsts',
 
 	EXPORT_BOOKMARKS							= 'exbm',
 	IMPORT_BOOKMARKS							= 'imbm',
@@ -304,6 +305,7 @@ private:
 			bool				fMenusRunning;
 			BRect				fNonFullscreenWindowFrame;
 			BMessageRunner*		fPulseRunner;
+			BMessageRunner*		fButtonResetRunner;
 			uint32				fVisibleInterfaceElements;
 			bigtime_t			fLastMouseMovedTime;
 			BPoint				fLastMousePos;
