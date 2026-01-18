@@ -129,9 +129,23 @@ PermissionsWindow::MessageReceived(BMessage* message)
 		{
 			BString domain = fAddDomainControl->Text();
 			if (domain.Length() > 0) {
-				fDomainList->AddItem(new BStringItem(domain));
-				fAddDomainControl->SetText("");
-				_SavePermissions();
+				// Check for duplicates
+				bool exists = false;
+				for (int32 i = 0; i < fDomainList->CountItems(); i++) {
+					PermissionItem* item = dynamic_cast<PermissionItem*>(fDomainList->ItemAt(i));
+					if (item && item->Text() == domain) {
+						exists = true;
+						fDomainList->Select(i);
+						break;
+					}
+				}
+
+				if (!exists) {
+					// Use default settings
+					fDomainList->AddItem(new PermissionItem(domain, true, true, false, 1.0, false));
+					fAddDomainControl->SetText("");
+					_SavePermissions();
+				}
 			}
 			break;
 		}
@@ -212,6 +226,15 @@ PermissionsWindow::Show()
 {
 	_LoadPermissions();
 	BWindow::Show();
+}
+
+
+void
+PermissionsWindow::WindowActivated(bool active)
+{
+	if (active)
+		_LoadPermissions();
+	BWindow::WindowActivated(active);
 }
 
 
