@@ -370,13 +370,19 @@ PermissionsWindow::_ClearSiteData(const char* domain)
 		int32 count = history->CountItems();
 		std::vector<BString> urlsToRemove;
 		for (int32 i = 0; i < count; i++) {
-			BrowsingHistoryItem item = history->HistoryItemAt(i);
-			BUrl url(item.URL());
+			const BrowsingHistoryItem* item = history->HistoryItemAt(i);
+			if (!item)
+				continue;
+
+			if (item->URL().IFindFirst(targetDomain) < 0)
+				continue;
+
+			BUrl url(item->URL());
 			if (url.Host() == targetDomain ||
 				(url.Host().EndsWith(targetDomain) &&
 				 url.Host().Length() > targetDomain.Length() &&
 				 url.Host()[url.Host().Length() - targetDomain.Length() - 1] == '.')) {
-				urlsToRemove.push_back(item.URL());
+				urlsToRemove.push_back(item->URL());
 			}
 		}
 
