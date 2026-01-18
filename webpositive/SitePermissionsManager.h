@@ -25,6 +25,7 @@ public:
 		bool popups;
 		float zoom;
 		bool forceDesktop;
+		BString customUserAgent;
 	};
 
 	void UpdatePermission(const PermissionEntry& entry);

@@ -12,6 +12,7 @@
 #include <new>
 
 #include "BrowserWindow.h" // For message constants
+#include "PageUserData.h"
 
 #include <Application.h>
 #include <AbstractLayoutItem.h>
@@ -396,6 +397,11 @@ public:
 		fManager->GetTabContainerView()->SetToolTip(
 			reinterpret_cast<BToolTip*>(NULL));
 		fManager->GetTabContainerView()->SetToolTip(fCurrentToolTip.String());
+	}
+
+	virtual const BBitmap* GetPreview(int32 index)
+	{
+		return fManager->GetPreview(index);
 	}
 
 	void CloseTab(int32 index);
@@ -1034,6 +1040,19 @@ TabManager::TabLabel(int32 tabIndex)
 		return tab->Label();
 	else
 		return kEmptyString;
+}
+
+const BBitmap*
+TabManager::GetPreview(int32 tabIndex) const
+{
+	BView* view = ViewForTab(tabIndex);
+	BWebView* webView = dynamic_cast<BWebView*>(view);
+	if (webView) {
+		PageUserData* data = static_cast<PageUserData*>(webView->GetUserData());
+		if (data)
+			return data->Preview();
+	}
+	return NULL;
 }
 
 void

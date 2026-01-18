@@ -223,7 +223,7 @@ private:
 			void				_TabChanged(int32 index);
 
 			void				_SetPageIcon(BWebView* view,
-									const BBitmap* icon);
+									const BBitmap* icon, bool save = true);
 
 			void				_UpdateHistoryMenu();
 			void				_UpdateClipboardItems();
@@ -249,6 +249,10 @@ private:
 
 			void				_ReopenClosedTab();
 			void				_UpdateRecentlyClosedMenu();
+
+			status_t			_GetFaviconPath(const BString& url, BPath& path);
+			void				_SaveFavicon(const BString& url, const BBitmap* icon);
+			void				_LoadFavicon(const BString& url, BWebView* view);
 
 			void				_CheckMemoryPressure();
 			void				_DiscardBackgroundTabs();
@@ -282,6 +286,8 @@ private:
 			BIconButton*		fForwardButton;
 			BIconButton*		fStopButton;
 			BIconButton*		fHomeButton;
+			BIconButton*		fDownloadsButton;
+			BIconButton*		fBookmarksButton;
 			URLInputGroup*		fURLInputGroup;
 			BStringView*		fStatusText;
 			BStatusBar*			fLoadingProgressBar;
@@ -350,6 +356,7 @@ private:
 			PermissionsWindow*	fPermissionsWindow;
 			NetworkWindow*		fNetworkWindow;
 			bool				fIsBypassingCache;
+			bool				fIsPrivate;
 
 			BMessageRunner*		fMemoryPressureRunner;
 };

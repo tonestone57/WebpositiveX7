@@ -59,6 +59,8 @@ enum {
 	MSG_AUTO_HIDE_INTERFACE_BEHAVIOR_CHANGED	= 'ahic',
 	MSG_AUTO_HIDE_POINTER_BEHAVIOR_CHANGED		= 'ahpc',
 	MSG_SHOW_HOME_BUTTON_CHANGED				= 'shbc',
+	MSG_SHOW_DOWNLOADS_BUTTON_CHANGED			= 'sdbc',
+	MSG_SHOW_BOOKMARKS_BUTTON_CHANGED			= 'sbbc',
 
 	MSG_STANDARD_FONT_CHANGED					= 'stfc',
 	MSG_SERIF_FONT_CHANGED						= 'sefc',
@@ -288,6 +290,20 @@ SettingsWindow::MessageReceived(BMessage* message)
 		case MSG_SHOW_HOME_BUTTON_CHANGED:
 			fSettings->SetValue(kSettingsKeyShowHomeButton,
 				fShowHomeButton->Value() == B_CONTROL_ON);
+			fSettings->Save();
+			_ValidateControlsEnabledStatus();
+			break;
+
+		case MSG_SHOW_DOWNLOADS_BUTTON_CHANGED:
+			fSettings->SetValue(kSettingsKeyShowDownloadsButton,
+				fShowDownloadsButton->Value() == B_CONTROL_ON);
+			fSettings->Save();
+			_ValidateControlsEnabledStatus();
+			break;
+
+		case MSG_SHOW_BOOKMARKS_BUTTON_CHANGED:
+			fSettings->SetValue(kSettingsKeyShowBookmarksButton,
+				fShowBookmarksButton->Value() == B_CONTROL_ON);
 			fSettings->Save();
 			_ValidateControlsEnabledStatus();
 			break;
@@ -529,6 +545,16 @@ SettingsWindow::_CreateGeneralPage(float spacing)
 		new BMessage(MSG_SHOW_HOME_BUTTON_CHANGED));
 	fShowHomeButton->SetValue(B_CONTROL_ON);
 
+	fShowDownloadsButton = new BCheckBox("show downloads button",
+		B_TRANSLATE("Show downloads button"),
+		new BMessage(MSG_SHOW_DOWNLOADS_BUTTON_CHANGED));
+	fShowDownloadsButton->SetValue(B_CONTROL_OFF);
+
+	fShowBookmarksButton = new BCheckBox("show bookmarks button",
+		B_TRANSLATE("Show bookmarks button"),
+		new BMessage(MSG_SHOW_BOOKMARKS_BUTTON_CHANGED));
+	fShowBookmarksButton->SetValue(B_CONTROL_ON);
+
 	fLowRAMModeCheckBox = new BCheckBox("low ram mode",
 		B_TRANSLATE("Low RAM mode (freeze background tabs)"),
 		new BMessage(MSG_LOW_RAM_MODE_CHANGED));
@@ -570,6 +596,8 @@ SettingsWindow::_CreateGeneralPage(float spacing)
 		.Add(fAutoHideInterfaceInFullscreenMode)
 		.Add(fAutoHidePointer)
 		.Add(fShowHomeButton)
+		.Add(fShowDownloadsButton)
+		.Add(fShowBookmarksButton)
 		.Add(fLowRAMModeCheckBox)
 		.Add(fEnableGPUCheckBox)
 		.Add(BSpaceLayoutItem::CreateVerticalStrut(spacing))
@@ -753,6 +781,12 @@ SettingsWindow::_CanApplySettings() const
 	canApply = canApply || ((fShowHomeButton->Value() == B_CONTROL_ON)
 		!= fSettings->GetValue(kSettingsKeyShowHomeButton, true));
 
+	canApply = canApply || ((fShowDownloadsButton->Value() == B_CONTROL_ON)
+		!= fSettings->GetValue(kSettingsKeyShowDownloadsButton, false));
+
+	canApply = canApply || ((fShowBookmarksButton->Value() == B_CONTROL_ON)
+		!= fSettings->GetValue(kSettingsKeyShowBookmarksButton, true));
+
 	canApply = canApply || ((fLowRAMModeCheckBox->Value() == B_CONTROL_ON)
 		!= fSettings->GetValue(kSettingsKeyLowRAMMode, false));
 
@@ -846,6 +880,10 @@ SettingsWindow::_ApplySettings()
 		fAutoHidePointer->Value() == B_CONTROL_ON);
 	fSettings->SetValue(kSettingsKeyShowHomeButton,
 		fShowHomeButton->Value() == B_CONTROL_ON);
+	fSettings->SetValue(kSettingsKeyShowDownloadsButton,
+		fShowDownloadsButton->Value() == B_CONTROL_ON);
+	fSettings->SetValue(kSettingsKeyShowBookmarksButton,
+		fShowBookmarksButton->Value() == B_CONTROL_ON);
 	fSettings->SetValue(kSettingsKeyLowRAMMode,
 		fLowRAMModeCheckBox->Value() == B_CONTROL_ON);
 	fSettings->SetValue(kSettingsKeyEnableGPU,
@@ -925,6 +963,10 @@ SettingsWindow::_RevertSettings()
 		fSettings->GetValue(kSettingsKeyAutoHidePointer, false));
 	fShowHomeButton->SetValue(
 		fSettings->GetValue(kSettingsKeyShowHomeButton, true));
+	fShowDownloadsButton->SetValue(
+		fSettings->GetValue(kSettingsKeyShowDownloadsButton, false));
+	fShowBookmarksButton->SetValue(
+		fSettings->GetValue(kSettingsKeyShowBookmarksButton, true));
 	fLowRAMModeCheckBox->SetValue(
 		fSettings->GetValue(kSettingsKeyLowRAMMode, false));
 	fEnableGPUCheckBox->SetValue(

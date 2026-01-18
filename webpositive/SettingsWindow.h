@@ -93,6 +93,8 @@ private:
 			BCheckBox*			fAutoHideInterfaceInFullscreenMode;
 			BCheckBox*			fAutoHidePointer;
 			BCheckBox*			fShowHomeButton;
+			BCheckBox*			fShowDownloadsButton;
+			BCheckBox*			fShowBookmarksButton;
 
 			FontSelectionView*	fStandardFontView;
 			FontSelectionView*	fSerifFontView;
