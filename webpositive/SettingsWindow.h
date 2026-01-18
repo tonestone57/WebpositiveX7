@@ -8,7 +8,6 @@
 
 #include <Window.h>
 
-#include <memory>
 
 class BButton;
 class BCheckBox;
@@ -97,10 +96,10 @@ private:
 			BCheckBox*			fShowDownloadsButton;
 			BCheckBox*			fShowBookmarksButton;
 
-			std::unique_ptr<FontSelectionView>	fStandardFontView;
-			std::unique_ptr<FontSelectionView>	fSerifFontView;
-			std::unique_ptr<FontSelectionView>	fSansSerifFontView;
-			std::unique_ptr<FontSelectionView>	fFixedFontView;
+			FontSelectionView*	fStandardFontView;
+			FontSelectionView*	fSerifFontView;
+			FontSelectionView*	fSansSerifFontView;
+			FontSelectionView*	fFixedFontView;
 
 			BCheckBox*			fUseProxyCheckBox;
 			BTextControl*		fProxyAddressControl;

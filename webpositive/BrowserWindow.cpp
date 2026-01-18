@@ -1930,6 +1930,19 @@ BrowserWindow::MessageReceived(BMessage* message)
 					fInspectDomBuffer = "";
 					fInspectDomExpectedChunks = atoi(text.String() + strlen("INSPECT_DOM_START:"));
 					fInspectDomReceivedChunks = 0;
+
+					// Preallocate buffer to avoid frequent reallocations.
+					// JS side uses 2048 chars per chunk.
+					// Cap at 20MB to match the hard limit enforced below.
+					int32 estimatedSize = fInspectDomExpectedChunks * 2048;
+					if (estimatedSize > 20 * 1024 * 1024)
+						estimatedSize = 20 * 1024 * 1024;
+
+					if (estimatedSize > 0) {
+						fInspectDomBuffer.LockBuffer(estimatedSize);
+						fInspectDomBuffer.UnlockBuffer(0);
+					}
+
 					break; // Don't show in console
 				} else if (text.StartsWith("INSPECT_DOM_CHUNK:")) {
 					// Format: INSPECT_DOM_CHUNK:index:content

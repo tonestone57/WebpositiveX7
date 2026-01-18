@@ -129,13 +129,13 @@ SettingsWindow::SettingsWindow(BRect frame, SettingsMessage* settings)
 	tabView->AddTab(_CreateFontsPage(spacing));
 	tabView->AddTab(_CreateProxyPage(spacing));
 
-	_SetupFontSelectionView(fStandardFontView.get(),
+	_SetupFontSelectionView(fStandardFontView,
 		new BMessage(MSG_STANDARD_FONT_CHANGED));
-	_SetupFontSelectionView(fSerifFontView.get(),
+	_SetupFontSelectionView(fSerifFontView,
 		new BMessage(MSG_SERIF_FONT_CHANGED));
-	_SetupFontSelectionView(fSansSerifFontView.get(),
+	_SetupFontSelectionView(fSansSerifFontView,
 		new BMessage(MSG_SANS_SERIF_FONT_CHANGED));
-	_SetupFontSelectionView(fFixedFontView.get(),
+	_SetupFontSelectionView(fFixedFontView,
 		new BMessage(MSG_FIXED_FONT_CHANGED));
 
 	fApplyButton->MakeDefault(true);
@@ -156,10 +156,14 @@ SettingsWindow::SettingsWindow(BRect frame, SettingsMessage* settings)
 
 SettingsWindow::~SettingsWindow()
 {
-	RemoveHandler(fStandardFontView.get());
-	RemoveHandler(fSerifFontView.get());
-	RemoveHandler(fSansSerifFontView.get());
-	RemoveHandler(fFixedFontView.get());
+	RemoveHandler(fStandardFontView);
+	delete fStandardFontView;
+	RemoveHandler(fSerifFontView);
+	delete fSerifFontView;
+	RemoveHandler(fSansSerifFontView);
+	delete fSansSerifFontView;
+	RemoveHandler(fFixedFontView);
+	delete fFixedFontView;
 	delete fOpenFilePanel;
 }
 
@@ -615,15 +619,15 @@ SettingsWindow::_CreateGeneralPage(float spacing)
 BView*
 SettingsWindow::_CreateFontsPage(float spacing)
 {
-	fStandardFontView.reset(new FontSelectionView("standard",
-		B_TRANSLATE("Standard font:"), true, be_plain_font));
+	fStandardFontView = new FontSelectionView("standard",
+		B_TRANSLATE("Standard font:"), true, be_plain_font);
 	BFont defaultSerifFont = _FindDefaultSerifFont();
-	fSerifFontView.reset(new FontSelectionView("serif",
-		B_TRANSLATE("Serif font:"), true, &defaultSerifFont));
-	fSansSerifFontView.reset(new FontSelectionView("sans serif",
-		B_TRANSLATE("Sans serif font:"), true, be_plain_font));
-	fFixedFontView.reset(new FontSelectionView("fixed",
-		B_TRANSLATE("Fixed font:"), true, be_fixed_font));
+	fSerifFontView = new FontSelectionView("serif",
+		B_TRANSLATE("Serif font:"), true, &defaultSerifFont);
+	fSansSerifFontView = new FontSelectionView("sans serif",
+		B_TRANSLATE("Sans serif font:"), true, be_plain_font);
+	fFixedFontView = new FontSelectionView("fixed",
+		B_TRANSLATE("Fixed font:"), true, be_fixed_font);
 
 	fStandardSizesSpinner = new BSpinner("standard font size",
 		B_TRANSLATE("Default standard font size:"),
