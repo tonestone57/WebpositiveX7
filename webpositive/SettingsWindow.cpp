@@ -1182,5 +1182,5 @@ SettingsWindow::_FindDefaultSerifFont() const
 uint32
 SettingsWindow::_ProxyPort() const
 {
-	return atoul(fProxyPortControl->Text());
+	return strtoul(fProxyPortControl->Text(), NULL, 10);
 }
