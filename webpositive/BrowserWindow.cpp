@@ -76,6 +76,7 @@
 #include <Url.h>
 
 #include <map>
+#include <vector>
 #include <algorithm>
 #include <stdio.h>
 
@@ -195,6 +196,50 @@ layoutItemFor(BView* view)
 	BLayout* layout = view->Parent()->GetLayout();
 	int32 index = layout->IndexOfView(view);
 	return layout->ItemAt(index);
+}
+
+
+struct SyncParams {
+	BPath path;
+	BReference<BPrivate::Network::BUrlContext> context;
+};
+
+
+static status_t
+ExportProfileThread(void* data)
+{
+	SyncParams* params = (SyncParams*)data;
+	status_t status = Sync::ExportProfile(params->path, params->context->GetCookieJar());
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to export profile"));
+		errorMsg << ": " << strerror(status);
+		BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go();
+	}
+
+	delete params;
+	return B_OK;
+}
+
+
+static status_t
+ImportProfileThread(void* data)
+{
+	SyncParams* params = (SyncParams*)data;
+	status_t status = Sync::ImportProfile(params->path, params->context->GetCookieJar());
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to import profile"));
+		errorMsg << ": " << strerror(status);
+		BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go();
+	}
+
+	delete params;
+	return B_OK;
 }
 
 
@@ -1143,13 +1188,23 @@ BrowserWindow::MessageReceived(BMessage* message)
 				&& message->FindString("name", &name) == B_OK) {
 				BPath path(&ref);
 				path.Append(name);
-				status_t status = Sync::ExportProfile(path, fContext->GetCookieJar());
-				if (status != B_OK) {
-					BString errorMsg(B_TRANSLATE("Failed to export profile"));
-					errorMsg << ": " << strerror(status);
-					BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
-						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go();
+
+				SyncParams* params = new(std::nothrow) SyncParams;
+				if (params) {
+					params->path = path;
+					params->context = fContext;
+
+					thread_id thread = spawn_thread(ExportProfileThread,
+						"Export Profile", B_NORMAL_PRIORITY, params);
+					if (thread >= 0)
+						resume_thread(thread);
+					else {
+						delete params;
+						BString errorMsg(B_TRANSLATE("Failed to start export thread"));
+						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+							errorMsg.String(), B_TRANSLATE("OK"));
+						alert->Go();
+					}
 				}
 			}
 			break;
@@ -1160,16 +1215,24 @@ BrowserWindow::MessageReceived(BMessage* message)
 			entry_ref ref;
 			if (message->FindRef("refs", &ref) == B_OK) {
 				BPath path(&ref);
-				status_t status = Sync::ImportProfile(path, fContext->GetCookieJar());
-				if (status != B_OK) {
-					BString errorMsg(B_TRANSLATE("Failed to import profile"));
-					errorMsg << ": " << strerror(status);
-					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
-						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go();
+
+				SyncParams* params = new(std::nothrow) SyncParams;
+				if (params) {
+					params->path = path;
+					params->context = fContext;
+
+					thread_id thread = spawn_thread(ImportProfileThread,
+						"Import Profile", B_NORMAL_PRIORITY, params);
+					if (thread >= 0)
+						resume_thread(thread);
+					else {
+						delete params;
+						BString errorMsg(B_TRANSLATE("Failed to start import thread"));
+						BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+							errorMsg.String(), B_TRANSLATE("OK"));
+						alert->Go();
+					}
 				}
-				// Refresh cookies?
-				// Refresh bookmarks?
 			}
 			break;
 		}
@@ -1901,6 +1964,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 					fInspectDomBuffer = "";
 					fInspectDomExpectedChunks = atoi(text.String() + strlen("INSPECT_DOM_START:"));
 					fInspectDomReceivedChunks = 0;
+					// Preallocate buffer to avoid reallocations. 2048 is the chunk size in JS.
+					if (fInspectDomExpectedChunks > 0) {
+						fInspectDomBuffer.LockBuffer(fInspectDomExpectedChunks * 2048 + 1024);
+						fInspectDomBuffer.UnlockBuffer(0);
+					}
 					break; // Don't show in console
 				} else if (text.StartsWith("INSPECT_DOM_CHUNK:")) {
 					// Format: INSPECT_DOM_CHUNK:index:content
@@ -2072,32 +2140,34 @@ BrowserWindow::MenusBeginning()
 					}
 
 					// Grouping (Color)
-					// Prevent duplication by removing existing "Set tab color" menu
+					// Check if "Set tab color" menu exists
+					bool colorMenuExists = false;
 					for (int32 i = 0; i < viewMenu->CountItems(); i++) {
 						BMenuItem* item = viewMenu->ItemAt(i);
 						if (strcmp(item->Label(), B_TRANSLATE("Set tab color")) == 0) {
-							viewMenu->RemoveItem(i);
-							delete item;
+							colorMenuExists = true;
 							break;
 						}
 					}
 
-					BMenu* colorMenu = new BMenu(B_TRANSLATE("Set tab color"));
-					const char* kColorNames[] = {"None", "Red", "Green", "Blue", "Yellow"};
-					rgb_color kColors[] = {
-						ui_color(B_PANEL_BACKGROUND_COLOR),
-						{255, 100, 100, 255},
-						{100, 255, 100, 255},
-						{100, 100, 255, 255},
-						{255, 255, 100, 255}
-					};
+					if (!colorMenuExists) {
+						BMenu* colorMenu = new BMenu(B_TRANSLATE("Set tab color"));
+						const char* kColorNames[] = {"None", "Red", "Green", "Blue", "Yellow"};
+						rgb_color kColors[] = {
+							ui_color(B_PANEL_BACKGROUND_COLOR),
+							{255, 100, 100, 255},
+							{100, 255, 100, 255},
+							{100, 100, 255, 255},
+							{255, 255, 100, 255}
+						};
 
-					for (size_t i = 0; i < sizeof(kColorNames)/sizeof(char*); i++) {
-						BMessage* colorMsg = new BMessage(SET_TAB_COLOR);
-						colorMsg->AddColor("color", kColors[i]);
-						colorMenu->AddItem(new BMenuItem(kColorNames[i], colorMsg));
+						for (size_t i = 0; i < sizeof(kColorNames)/sizeof(char*); i++) {
+							BMessage* colorMsg = new BMessage(SET_TAB_COLOR);
+							colorMsg->AddColor("color", kColors[i]);
+							colorMenu->AddItem(new BMenuItem(kColorNames[i], colorMsg));
+						}
+						viewMenu->AddItem(colorMenu);
 					}
-					viewMenu->AddItem(colorMenu);
 				}
 			}
 		}
@@ -2413,31 +2483,45 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 
 	// Ad-Block List
 	if (fAppSettings->GetValue(kSettingsKeyBlockAds, false)) {
-		static const char* kBlockedDomains[] = {
-			"doubleclick.net",
-			"googlesyndication.com",
-			"google-analytics.com",
-			"adservice.google.com",
-			"facebook.net",
-			"connect.facebook.net",
-			NULL
-		};
+		static std::vector<BString> sBlockedDomains;
+		static bool sInitialized = false;
+		if (!sInitialized) {
+			const char* kDomains[] = {
+				"adservice.google.com",
+				"connect.facebook.net",
+				"doubleclick.net",
+				"facebook.net",
+				"google-analytics.com",
+				"googlesyndication.com",
+				NULL
+			};
+			for (int i = 0; kDomains[i]; i++)
+				sBlockedDomains.push_back(kDomains[i]);
+			// Already sorted in initializer, but ensure it for binary search
+			std::sort(sBlockedDomains.begin(), sBlockedDomains.end());
+			sInitialized = true;
+		}
 
 		BUrl checkUrl(url);
 		if (checkUrl.IsValid()) {
 			BString host = checkUrl.Host();
 			host.ToLower();
-			for (int i = 0; kBlockedDomains[i]; i++) {
-				// Check if host matches exactly or ends with .domain
-				if (host == kBlockedDomains[i]) {
-					if (view)
-						view->LoadURL("about:blank");
-					return;
-				}
 
+			// Binary search for exact match
+			if (std::binary_search(sBlockedDomains.begin(), sBlockedDomains.end(), host)) {
+				if (view)
+					view->LoadURL("about:blank");
+				return;
+			}
+
+			// Suffix check: Iterate.
+			// Optimization: We only check domains that are shorter than host
+			for (size_t i = 0; i < sBlockedDomains.size(); i++) {
+				const BString& domain = sBlockedDomains[i];
 				int32 hostLen = host.Length();
-				int32 domainLen = strlen(kBlockedDomains[i]);
-				if (hostLen >= domainLen + 1 && host.EndsWith(kBlockedDomains[i])) {
+				int32 domainLen = domain.Length();
+
+				if (hostLen > domainLen && host.EndsWith(domain)) {
 					if (host.ByteAt(hostLen - domainLen - 1) == '.') {
 						if (view)
 							view->LoadURL("about:blank");
@@ -3191,9 +3275,10 @@ BrowserWindow::_ShutdownTab(int32 index)
 	// webView pointer is still valid here, as RemoveTab only removed it from layout
 	if (webView == CurrentWebView())
 		SetCurrentWebView(NULL);
-	if (webView != NULL)
+	if (webView != NULL) {
 		webView->Shutdown();
-	else
+		delete webView;
+	} else
 		delete view;
 }
 
