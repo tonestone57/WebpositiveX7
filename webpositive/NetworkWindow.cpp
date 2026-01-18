@@ -23,7 +23,8 @@ NetworkWindow::NetworkWindow(BRect frame)
 	:
 	BWindow(frame, B_TRANSLATE("Network Inspector (Page Loads)"), B_TITLED_WINDOW,
 		B_NORMAL_WINDOW_FEEL, B_AUTO_UPDATE_SIZE_LIMITS
-			| B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE)
+			| B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE),
+	fQuitting(false)
 {
 	SetLayout(new BGroupLayout(B_VERTICAL, 0.0));
 
@@ -133,7 +134,17 @@ NetworkWindow::MessageReceived(BMessage* message)
 bool
 NetworkWindow::QuitRequested()
 {
+	if (fQuitting)
+		return true;
+
 	if (!IsHidden())
 		Hide();
 	return false;
+}
+
+
+void
+NetworkWindow::PrepareToQuit()
+{
+	fQuitting = true;
 }

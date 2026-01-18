@@ -335,13 +335,16 @@ BrowsingHistory::ImportHistory(const BPath& path)
 			// Item does not exist, add it
 			BrowsingHistoryItem* newItem = new(std::nothrow) BrowsingHistoryItem(item);
 			if (newItem) {
+				bool pushed = false;
 				try {
 					DefaultInstance()->fHistoryList.push_back(newItem);
+					pushed = true;
 					DefaultInstance()->fHistoryMap[newItem->URL()] = newItem;
 					importedCount++;
 				} catch (...) {
 					// In case of allocation error in the map
-					DefaultInstance()->fHistoryList.pop_back();
+					if (pushed)
+						DefaultInstance()->fHistoryList.pop_back();
 					delete newItem;
 					// Continue to next item
 				}

@@ -58,10 +58,13 @@ public:
 	virtual void MessageReceived(BMessage* message);
 	virtual bool QuitRequested();
 
+	void PrepareToQuit();
+
 private:
 	BListView* fRequestListView;
 	BButton* fClearButton;
 	std::map<BString, std::deque<NetworkRequestItem*> > fPendingRequests;
+	bool fQuitting;
 };
 
 #endif // NETWORK_WINDOW_H
