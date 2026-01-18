@@ -299,13 +299,18 @@ CookieWindow::_BuildDomainList()
 
 	BPrivate::Network::BNetworkCookieJar::Iterator it = fCookieJar.GetIterator();
 
+	// First pass: group cookies by domain.
+	// This avoids checking if the domain is already in the list for every cookie.
 	const BPrivate::Network::BNetworkCookie* cookie;
 	while ((cookie = it.Next()) != NULL) {
-		BString domain = cookie->Domain();
-		if (fCookieMap.find(domain) == fCookieMap.end())
-			_AddDomain(domain, false, domainItemMap);
+		fCookieMap[cookie->Domain()].push_back(*cookie);
+	}
 
-		fCookieMap[domain].push_back(*cookie);
+	// Second pass: add domains to the list.
+	std::map<BString, std::vector<BPrivate::Network::BNetworkCookie> >::iterator
+		mapIt;
+	for (mapIt = fCookieMap.begin(); mapIt != fCookieMap.end(); mapIt++) {
+		_AddDomain(mapIt->first, false, domainItemMap);
 	}
 
 	int i = 1;
