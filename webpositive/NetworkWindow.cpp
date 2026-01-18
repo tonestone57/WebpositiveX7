@@ -19,11 +19,12 @@
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "Network Window"
 
-NetworkWindow::NetworkWindow(BRect frame)
+NetworkWindow::NetworkWindow(BRect frame, BMessenger target)
 	:
 	BWindow(frame, B_TRANSLATE("Network Inspector (Page Loads)"), B_TITLED_WINDOW,
 		B_NORMAL_WINDOW_FEEL, B_AUTO_UPDATE_SIZE_LIMITS
 			| B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE),
+	fTarget(target),
 	fQuitting(false)
 {
 	SetLayout(new BGroupLayout(B_VERTICAL, 0.0));
@@ -134,8 +135,10 @@ NetworkWindow::MessageReceived(BMessage* message)
 bool
 NetworkWindow::QuitRequested()
 {
-	if (fQuitting)
+	if (fQuitting) {
+		fTarget.SendMessage(NETWORK_WINDOW_QUIT);
 		return true;
+	}
 
 	if (!IsHidden())
 		Hide();

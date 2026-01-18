@@ -62,11 +62,13 @@ private:
 	BString fCustomUserAgent;
 };
 
-PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCookieJar& jar)
+PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCookieJar& jar,
+	BMessenger target)
 	:
 	BWindow(frame, "Site Permissions", B_TITLED_WINDOW,
 		B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS),
 	fCookieJar(jar),
+	fTarget(target),
 	fQuitting(false)
 {
 	SetLayout(new BGroupLayout(B_VERTICAL));
@@ -211,8 +213,10 @@ PermissionsWindow::MessageReceived(BMessage* message)
 bool
 PermissionsWindow::QuitRequested()
 {
-	if (fQuitting)
+	if (fQuitting) {
+		fTarget.SendMessage(PERMISSIONS_WINDOW_QUIT);
 		return true;
+	}
 
 	if (!IsHidden()) {
 		_ClearPermissions();

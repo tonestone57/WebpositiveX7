@@ -129,6 +129,8 @@ enum {
 	TOGGLE_LOAD_IMAGES				= 'tgli',
 	INSPECT_ELEMENT					= 'insp',
 	RESET_BUTTON_STATE				= 'rsts',
+	PERMISSIONS_WINDOW_QUIT			= 'pmwq',
+	NETWORK_WINDOW_QUIT				= 'nmwq',
 
 	EXPORT_BOOKMARKS							= 'exbm',
 	IMPORT_BOOKMARKS							= 'imbm',

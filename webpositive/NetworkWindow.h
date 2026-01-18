@@ -6,6 +6,7 @@
 #define NETWORK_WINDOW_H
 
 #include <Window.h>
+#include <Messenger.h>
 #include <String.h>
 #include <StringItem.h>
 
@@ -53,7 +54,7 @@ enum {
 
 class NetworkWindow : public BWindow {
 public:
-	NetworkWindow(BRect frame);
+	NetworkWindow(BRect frame, BMessenger target);
 	virtual ~NetworkWindow();
 	virtual void MessageReceived(BMessage* message);
 	virtual bool QuitRequested();
@@ -64,6 +65,7 @@ private:
 	BListView* fRequestListView;
 	BButton* fClearButton;
 	std::map<BString, std::deque<NetworkRequestItem*> > fPendingRequests;
+	BMessenger fTarget;
 	bool fQuitting;
 };
 

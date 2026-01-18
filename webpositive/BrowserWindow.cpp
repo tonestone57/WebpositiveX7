@@ -1405,11 +1405,15 @@ BrowserWindow::MessageReceived(BMessage* message)
 				else
 					fNetworkWindow->Activate();
 			} else {
-				fNetworkWindow = new NetworkWindow(BRect(150, 150, 600, 500));
+				fNetworkWindow = new NetworkWindow(BRect(150, 150, 600, 500), BMessenger(this));
 				fNetworkWindow->Show();
 			}
 			break;
 		}
+
+		case NETWORK_WINDOW_QUIT:
+			fNetworkWindow = NULL;
+			break;
 
 		case TOGGLE_FULLSCREEN:
 			ToggleFullscreen();
@@ -1661,11 +1665,15 @@ BrowserWindow::MessageReceived(BMessage* message)
 					fPermissionsWindow->Activate();
 			} else {
 				fPermissionsWindow = new PermissionsWindow(BRect(100, 100, 400, 400),
-					fContext->GetCookieJar());
+					fContext->GetCookieJar(), BMessenger(this));
 				fPermissionsWindow->Show();
 			}
 			break;
 		}
+
+		case PERMISSIONS_WINDOW_QUIT:
+			fPermissionsWindow = NULL;
+			break;
 
 		case CLOSE_TAB:
 			if (fTabManager->CountTabs() > 1) {

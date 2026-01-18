@@ -46,7 +46,8 @@ enum {
 	INIT = 'init',
 	OPEN_DOWNLOADS_FOLDER = 'odnf',
 	REMOVE_FINISHED_DOWNLOADS = 'rmfd',
-	REMOVE_MISSING_DOWNLOADS = 'rmmd'
+	REMOVE_MISSING_DOWNLOADS = 'rmmd',
+	REMOVE_DOWNLOAD_VIEW = 'rmdv'
 };
 
 
@@ -346,6 +347,20 @@ DownloadWindow::MessageReceived(BMessage* message)
 			else
 				_SaveSettings();
 			break;
+
+		case REMOVE_DOWNLOAD_VIEW:
+		{
+			DownloadProgressView* view = NULL;
+			if (message->FindPointer("view", (void**)&view) == B_OK) {
+				if (view->Download())
+					fDownloadsMap.erase(view->Download());
+				view->RemoveSelf();
+				delete view;
+				_ValidateButtonStatus();
+				_SaveSettings();
+			}
+			break;
+		}
 
 		case SETTINGS_VALUE_CHANGED:
 		{

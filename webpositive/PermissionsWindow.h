@@ -21,7 +21,8 @@ namespace Network {
 
 class PermissionsWindow : public BWindow {
 public:
-								PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCookieJar& jar);
+								PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCookieJar& jar,
+									BMessenger target);
 	virtual						~PermissionsWindow();
 
 	virtual	void				MessageReceived(BMessage* message);
@@ -40,6 +41,7 @@ private:
 private:
 			BPrivate::Network::BNetworkCookieJar& fCookieJar;
 
+			BMessenger			fTarget;
 			bool				fQuitting;
 			BListView*			fDomainList;
 			BCheckBox*			fJSEnabled;

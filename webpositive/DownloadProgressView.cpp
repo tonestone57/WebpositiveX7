@@ -52,6 +52,7 @@ enum {
 	RESTART_DOWNLOAD		= 'rsdn',
 	CANCEL_DOWNLOAD			= 'cndn',
 	REMOVE_DOWNLOAD			= 'rmdn',
+	REMOVE_DOWNLOAD_VIEW    = 'rmdv',
 	COPY_URL_TO_CLIPBOARD	= 'curl',
 	OPEN_CONTAINING_FOLDER	= 'opfd',
 	MIME_TYPE_SET			= 'mtsn',
@@ -593,10 +594,9 @@ DownloadProgressView::MessageReceived(BMessage* message)
 
 		case REMOVE_DOWNLOAD:
 		{
-			Window()->PostMessage(SAVE_SETTINGS);
-			RemoveSelf();
-			delete this;
-			// TOAST!
+			BMessage removeMsg(REMOVE_DOWNLOAD_VIEW);
+			removeMsg.AddPointer("view", this);
+			Window()->PostMessage(&removeMsg);
 			return;
 		}
 
