@@ -17,7 +17,7 @@ echo "--------------------------------"
 
 # Compile BrowsingHistoryItemTest (new)
 echo "Compiling BrowsingHistoryItemTest..."
-g++ $INCLUDES BrowsingHistoryItemTest.cpp -o BrowsingHistoryItemTest
+g++ BrowsingHistoryItemTest.cpp mocks/File.cpp -o BrowsingHistoryItemTest -I./mocks -lstdc++
 if [ $? -eq 0 ]; then
     echo "Running BrowsingHistoryItemTest..."
     ./BrowsingHistoryItemTest
