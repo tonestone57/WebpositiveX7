@@ -126,8 +126,7 @@ DownloadWindow::DownloadWindow(BRect frame, bool visible,
 		B_AUTO_UPDATE_SIZE_LIMITS | B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE),
 	fMinimizeOnClose(false),
 	fQuitting(false),
-	fSettingsDirty(false),
-	fSaveSettingsRunner(NULL)
+	fSettingsDirty(false)
 {
 	SetPulseRate(1000000);
 
@@ -198,8 +197,7 @@ DownloadWindow::DownloadWindow(BRect frame, bool visible,
 
 DownloadWindow::~DownloadWindow()
 {
-	delete fSaveSettingsRunner;
-	fSaveSettingsRunner = NULL;
+	fSaveSettingsRunner.reset();
 
 	// Only necessary to save the current progress of unfinished downloads:
 	if (fSettingsDirty)
@@ -581,13 +579,13 @@ DownloadWindow::_ScheduleSaveSettings()
 {
 	fSettingsDirty = true;
 
-	if (fSaveSettingsRunner != NULL)
+	if (fSaveSettingsRunner.get() != NULL)
 		return;
 
 	BMessage message(SAVE_SETTINGS);
 	message.AddBool("perform_save", true);
-	fSaveSettingsRunner = new(std::nothrow) BMessageRunner(BMessenger(this),
-		&message, 2000000, 1);
+	fSaveSettingsRunner.reset(new(std::nothrow) BMessageRunner(BMessenger(this),
+		&message, 2000000, 1));
 }
 
 
@@ -619,8 +617,7 @@ _SaveSettingsThread(void* data)
 void
 DownloadWindow::_PerformSaveSettings(bool wait)
 {
-	delete fSaveSettingsRunner;
-	fSaveSettingsRunner = NULL;
+	fSaveSettingsRunner.reset();
 	fSettingsDirty = false;
 
 	BMessage* message = new BMessage();

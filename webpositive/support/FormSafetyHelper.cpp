@@ -22,15 +22,14 @@ FormSafetyHelper::FormSafetyHelper(BrowserWindow* window)
 	fFormCheckPending(false),
 	fForceClose(false),
 	fTabsToCheck(0),
-	fDirtyTabs(0),
-	fFormCheckTimeoutRunner(NULL)
+	fDirtyTabs(0)
 {
 }
 
 
 FormSafetyHelper::~FormSafetyHelper()
 {
-	delete fFormCheckTimeoutRunner;
+	fFormCheckTimeoutRunner.reset();
 }
 
 
@@ -100,8 +99,7 @@ FormSafetyHelper::QuitRequested()
 
 	// Wait up to 1 second for results
 	BMessage msg(CHECK_FORM_DIRTY_TIMEOUT);
-	delete fFormCheckTimeoutRunner;
-	fFormCheckTimeoutRunner = new BMessageRunner(BMessenger(fWindow), &msg, 1000000, 1);
+	fFormCheckTimeoutRunner.reset(new BMessageRunner(BMessenger(fWindow), &msg, 1000000, 1));
 
 	return false;
 }
@@ -138,8 +136,7 @@ FormSafetyHelper::StatusChanged(const BString& statusText, BWebView* view)
 void
 FormSafetyHelper::_CheckFormDirtyFinished()
 {
-	delete fFormCheckTimeoutRunner;
-	fFormCheckTimeoutRunner = NULL;
+	fFormCheckTimeoutRunner.reset();
 	fFormCheckPending = false;
 
 	if (fDirtyTabs > 0) {

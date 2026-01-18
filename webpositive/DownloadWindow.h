@@ -12,6 +12,8 @@
 #include <String.h>
 #include <Window.h>
 
+#include <memory>
+
 class BButton;
 class BFile;
 class BGroupLayout;
@@ -61,7 +63,7 @@ private:
 			bool				fMinimizeOnClose;
 			bool				fQuitting;
 			bool				fSettingsDirty;
-			BMessageRunner*		fSaveSettingsRunner;
+			std::unique_ptr<BMessageRunner>		fSaveSettingsRunner;
 };
 
 #endif // DOWNLOAD_WINDOW_H

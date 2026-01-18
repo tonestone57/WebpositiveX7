@@ -14,6 +14,8 @@
 #include <PopUpMenu.h>
 #include <Size.h>
 
+#include <memory>
+
 
 class BEntry;
 
@@ -44,8 +46,9 @@ private:
 	node_ref						fNodeRef;
 	std::map<ino_t, BPrivate::IconMenuItem*>	fItemsMap;
 	BMenu*							fOverflowMenu;
-	// True if fOverflowMenu is currently added to BookmarkBar
-	bool							fOverflowMenuAdded;
+	// Owner pointer for when the menu is NOT attached to the bar.
+	// When attached, the BMenuBar owns it.
+	std::unique_ptr<BMenu>			fOverflowMenuOwner;
 	BPopUpMenu*						fPopUpMenu;
 	int32 							fSelectedItemIndex;
 };
