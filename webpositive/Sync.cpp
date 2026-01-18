@@ -15,6 +15,8 @@
 #include <String.h>
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /*static*/ status_t
 Sync::ExportProfile(const BPath& folder,
@@ -114,63 +116,84 @@ Sync::ImportCookies(const BPath& path,
 
 	off_t size;
 	file.GetSize(&size);
-	BString content;
-	char* buffer = content.LockBuffer(size);
-	file.Read(buffer, size);
-	content.UnlockBuffer(size);
+	// Optimize: allocate raw buffer to avoid BString allocations
+	char* buffer = new(std::nothrow) char[size + 1];
+	if (buffer == NULL)
+		return B_NO_MEMORY;
 
-	// Parse lines
-	int32 pos = 0;
-	while (pos < content.Length()) {
-		int32 nextPos = content.FindFirst("\n", pos);
-		if (nextPos < 0) nextPos = content.Length();
+	if (file.Read(buffer, size) != size) {
+		delete[] buffer;
+		return B_IO_ERROR;
+	}
+	buffer[size] = '\0';
 
-		BString line;
-		content.CopyInto(line, pos, nextPos - pos);
-		pos = nextPos + 1;
+	char* cursor = buffer;
+	char* end = buffer + size;
 
-		if (line.IsEmpty() || (line.StartsWith("#") && !line.StartsWith("#HttpOnly_")))
+	while (cursor < end && *cursor) {
+		char* lineStart = cursor;
+		// Find end of line
+		char* lineEnd = strchr(cursor, '\n');
+		if (lineEnd) {
+			*lineEnd = '\0';
+			cursor = lineEnd + 1;
+		} else {
+			// Last line
+			cursor = end;
+			lineEnd = end;
+		}
+
+		if (lineEnd - lineStart == 0)
 			continue;
 
+		// Check for comment
 		bool httpOnly = false;
-		if (line.StartsWith("#HttpOnly_")) {
-			httpOnly = true;
-			line.Remove(0, 10); // Remove "#HttpOnly_"
+		if (*lineStart == '#') {
+			if (strncmp(lineStart, "#HttpOnly_", 10) == 0) {
+				httpOnly = true;
+				lineStart += 10;
+			} else {
+				continue;
+			}
 		}
 
 		// Split by tab
 		// domain flag path secure expiration name value
-		// Netscape format usually has 7 fields.
+		char* parts[7];
+		int partCount = 0;
+		char* token = lineStart;
 
-		// Simple splitter
-		BString parts[7];
-		int32 currentPart = 0;
-		int32 linePos = 0;
-		while (currentPart < 7) {
-			int32 tabPos = line.FindFirst("\t", linePos);
-			if (tabPos < 0) {
-				if (currentPart == 6) // Last part
-					line.CopyInto(parts[currentPart], linePos, line.Length() - linePos);
+		while (partCount < 7) {
+			parts[partCount++] = token;
+			char* tab = strchr(token, '\t');
+			if (tab && tab < lineEnd) {
+				*tab = '\0';
+				token = tab + 1;
+			} else {
+				// Ensure last token is valid
+				if (token >= lineEnd && partCount < 7) {
+					// Missing fields
+					partCount--;
+				}
 				break;
 			}
-			line.CopyInto(parts[currentPart], linePos, tabPos - linePos);
-			linePos = tabPos + 1;
-			currentPart++;
 		}
 
-		if (currentPart >= 6) { // At least Name and Value
+		if (partCount >= 7) {
 			BPrivate::Network::BNetworkCookie cookie(parts[5], parts[6]);
 			cookie.SetDomain(parts[0]);
 			cookie.SetPath(parts[2]);
-			cookie.SetSecure(parts[3] == "TRUE");
+			cookie.SetSecure(strcmp(parts[3], "TRUE") == 0);
 			cookie.SetHttpOnly(httpOnly);
 
 			// Expiration is time_t
-			time_t exp = (time_t)strtoll(parts[4].String(), NULL, 10);
+			time_t exp = (time_t)strtoll(parts[4], NULL, 10);
 			cookie.SetExpirationDate(exp);
 
 			cookieJar.AddCookie(cookie);
 		}
 	}
+
+	delete[] buffer;
 	return B_OK;
 }
