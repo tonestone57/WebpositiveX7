@@ -287,17 +287,10 @@ DownloadWindow::MessageReceived(BMessage* message)
 					&download)) != B_OK)
 				break;
 
-			for (int32 i = fDownloadViewsLayout->CountItems() - 1;
-					BLayoutItem* item = fDownloadViewsLayout->ItemAt(i); i--) {
-				DownloadProgressView* view = dynamic_cast<DownloadProgressView*>(
-					item->View());
-				if (!view)
-					continue;
-				if (view->Download() == download) {
-					view->DownloadStarted(message);
-					break;
-				}
-			}
+			std::map<BWebDownload*, DownloadProgressView*>::iterator it
+				= fDownloadsMap.find(download);
+			if (it != fDownloadsMap.end())
+				it->second->DownloadStarted(message);
 			break;
 		}
 		case B_DOWNLOAD_PROGRESS:
@@ -307,17 +300,10 @@ DownloadWindow::MessageReceived(BMessage* message)
 					&download)) != B_OK)
 				break;
 
-			for (int32 i = fDownloadViewsLayout->CountItems() - 1;
-					BLayoutItem* item = fDownloadViewsLayout->ItemAt(i); i--) {
-				DownloadProgressView* view = dynamic_cast<DownloadProgressView*>(
-					item->View());
-				if (!view)
-					continue;
-				if (view->Download() == download) {
-					view->DownloadProgress(message);
-					break;
-				}
-			}
+			std::map<BWebDownload*, DownloadProgressView*>::iterator it
+				= fDownloadsMap.find(download);
+			if (it != fDownloadsMap.end())
+				it->second->DownloadProgress(message);
 			break;
 		}
 		case B_DOWNLOAD_REMOVED:
@@ -399,17 +385,7 @@ DownloadWindow::DownloadsInProgress()
 	if (!Lock())
 		return downloadsInProgress;
 
-	for (int32 i = fDownloadViewsLayout->CountItems() - 1;
-			BLayoutItem* item = fDownloadViewsLayout->ItemAt(i); i--) {
-		DownloadProgressView* view = dynamic_cast<DownloadProgressView*>(
-			item->View());
-		if (!view)
-			continue;
-		if (view->Download() != NULL) {
-			downloadsInProgress = true;
-			break;
-		}
-	}
+	downloadsInProgress = !fDownloadsMap.empty();
 
 	Unlock();
 
@@ -446,6 +422,8 @@ DownloadWindow::_DownloadStarted(BWebDownload* download)
 			continue;
 		if (view->URL() == download->URL()) {
 			index = i;
+			if (view->Download())
+				fDownloadsMap.erase(view->Download());
 			view->RemoveSelf();
 			delete view;
 			continue;
@@ -463,6 +441,7 @@ DownloadWindow::_DownloadStarted(BWebDownload* download)
 		return;
 	}
 	fDownloadViewsLayout->AddView(index, view);
+	fDownloadsMap[download] = view;
 
 	// Scroll new download into view
 	if (BScrollBar* scrollBar = fDownloadsScrollView->ScrollBar(B_VERTICAL)) {
@@ -492,26 +471,18 @@ DownloadWindow::_DownloadStarted(BWebDownload* download)
 void
 DownloadWindow::_DownloadFinished(BWebDownload* download)
 {
-	int32 finishedCount = 0;
-	int32 missingCount = 0;
-	for (int32 i = 0;
-			BLayoutItem* item = fDownloadViewsLayout->ItemAt(i); i++) {
-		DownloadProgressView* view = dynamic_cast<DownloadProgressView*>(
-			item->View());
-		if (!view)
-			continue;
-		if (download && view->Download() == download) {
-			view->DownloadFinished();
-			finishedCount++;
-			continue;
+	if (download) {
+		std::map<BWebDownload*, DownloadProgressView*>::iterator it
+			= fDownloadsMap.find(download);
+		if (it != fDownloadsMap.end()) {
+			it->second->DownloadFinished();
+			fDownloadsMap.erase(it);
 		}
-		if (view->IsFinished())
-			finishedCount++;
-		if (view->IsMissing())
-			missingCount++;
 	}
-	fRemoveFinishedButton->SetEnabled(finishedCount > 0);
-	fRemoveMissingButton->SetEnabled(missingCount > 0);
+
+	// Recalculate button status
+	_ValidateButtonStatus();
+
 	if (download)
 		_SaveSettings();
 }
@@ -528,6 +499,8 @@ DownloadWindow::_RemoveFinishedDownloads()
 		if (!view)
 			continue;
 		if (view->IsFinished()) {
+			if (view->Download())
+				fDownloadsMap.erase(view->Download());
 			view->RemoveSelf();
 			delete view;
 		} else if (view->IsMissing())
@@ -550,6 +523,8 @@ DownloadWindow::_RemoveMissingDownloads()
 		if (!view)
 			continue;
 		if (view->IsMissing()) {
+			if (view->Download())
+				fDownloadsMap.erase(view->Download());
 			view->RemoveSelf();
 			delete view;
 		} else if (view->IsFinished())

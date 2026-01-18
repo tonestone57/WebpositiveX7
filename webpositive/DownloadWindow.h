@@ -7,6 +7,8 @@
 #define DOWNLOAD_WINDOW_H
 
 
+#include <map>
+
 #include <String.h>
 #include <Window.h>
 
@@ -47,6 +49,7 @@ private:
 			bool				_OpenSettingsFile(BFile& file, uint32 mode);
 
 private:
+			std::map<BWebDownload*, DownloadProgressView*> fDownloadsMap;
 			BScrollView*		fDownloadsScrollView;
 			BGroupLayout*		fDownloadViewsLayout;
 			BButton*			fRemoveFinishedButton;
