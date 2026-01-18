@@ -1659,6 +1659,34 @@ BrowserWindow::MessageReceived(BMessage* message)
 				PostMessage(B_QUIT_REQUESTED);
 			break;
 
+		case CLOSE_OTHER_TABS:
+		{
+			int32 index;
+			if (message->FindInt32("tab index", &index) == B_OK) {
+				// Close tabs from end to start to avoid index shifting problems
+				// Skip the target tab
+				for (int32 i = fTabManager->CountTabs() - 1; i >= 0; i--) {
+					if (i != index)
+						_ShutdownTab(i);
+				}
+				_UpdateTabGroupVisibility();
+			}
+			break;
+		}
+
+		case CLOSE_TABS_TO_RIGHT:
+		{
+			int32 index;
+			if (message->FindInt32("tab index", &index) == B_OK) {
+				// Close tabs from end down to index + 1
+				for (int32 i = fTabManager->CountTabs() - 1; i > index; i--) {
+					_ShutdownTab(i);
+				}
+				_UpdateTabGroupVisibility();
+			}
+			break;
+		}
+
 		case SELECT_TAB:
 		{
 			int32 index;

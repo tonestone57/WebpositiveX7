@@ -121,6 +121,8 @@ enum {
 	PIN_TAB							= 'ptab',
 	UNPIN_TAB						= 'uptb',
 	CLOSE_TAB						= 'cltb',
+	CLOSE_OTHER_TABS				= 'clot',
+	CLOSE_TABS_TO_RIGHT				= 'cltr',
 	TOGGLE_TOOLBAR_BOTTOM			= 'ttbb',
 	TOGGLE_LOAD_IMAGES				= 'tgli',
 	INSPECT_ELEMENT					= 'insp',
