@@ -33,7 +33,8 @@ public:
 		fIsDownloadRestart(false),
 		fHttpsUpgraded(false),
 		fIsLazy(false),
-		fIsDiscarded(false)
+		fIsDiscarded(false),
+		fPreview(NULL)
 	{
 	}
 
@@ -41,6 +42,7 @@ public:
 	{
 		delete fPageIcon;
 		delete fPageIconLarge;
+		delete fPreview;
 	}
 
 	void SetFocusedView(BView* focusedView)
@@ -194,6 +196,20 @@ public:
 		return fIsDiscarded;
 	}
 
+	void SetPreview(const BBitmap* bitmap)
+	{
+		delete fPreview;
+		if (bitmap)
+			fPreview = new BBitmap(bitmap);
+		else
+			fPreview = NULL;
+	}
+
+	const BBitmap* Preview() const
+	{
+		return fPreview;
+	}
+
 private:
 	BView*		fFocusedView;
 	BBitmap*	fPageIcon;
@@ -208,6 +224,7 @@ private:
 	BString		fPendingURL;
 	bool		fIsLazy;
 	bool		fIsDiscarded;
+	BBitmap*	fPreview;
 };
 
 

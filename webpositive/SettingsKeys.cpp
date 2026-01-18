@@ -20,6 +20,8 @@ const char* kSettingsKeyAutoHideInterfaceInFullscreenMode
 	= "auto hide interface in full screen mode";
 const char* kSettingsKeyAutoHidePointer = "auto hide pointer";
 const char* kSettingsKeyShowHomeButton = "show home button";
+const char* kSettingsKeyShowDownloadsButton = "show downloads button";
+const char* kSettingsKeyShowBookmarksButton = "show bookmarks button";
 const char* kSettingsKeyToolbarBottom = "toolbar bottom";
 const char* kSettingsKeyAutoHideBookmarkBar = "auto hide bookmark bar";
 
