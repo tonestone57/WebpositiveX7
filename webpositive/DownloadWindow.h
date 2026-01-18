@@ -9,6 +9,7 @@
 
 #include <map>
 
+#include <memory>
 #include <String.h>
 #include <Window.h>
 
@@ -61,7 +62,7 @@ private:
 			bool				fMinimizeOnClose;
 			bool				fQuitting;
 			bool				fSettingsDirty;
-			BMessageRunner*		fSaveSettingsRunner;
+			std::unique_ptr<BMessageRunner> fSaveSettingsRunner;
 };
 
 #endif // DOWNLOAD_WINDOW_H

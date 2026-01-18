@@ -348,7 +348,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fMemoryPressureRunner(NULL),
 	fButtonResetRunner(NULL)
 {
-	fFormSafetyHelper = new FormSafetyHelper(this);
+	fFormSafetyHelper.reset(new FormSafetyHelper(this));
 
 	// Begin listening to settings changes and read some current values.
 	fAppSettings->AddListener(BMessenger(this));
@@ -378,7 +378,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	newTabMessage->AddString("url", "");
 	newTabMessage->AddPointer("window", this);
 	newTabMessage->AddBool("select", true);
-	fTabManager = new TabManager(BMessenger(this), newTabMessage);
+	fTabManager.reset(new TabManager(BMessenger(this), newTabMessage));
 
 	// Menu
 #if INTEGRATE_MENU_INTO_TAB_BAR
@@ -728,8 +728,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	else
 		_ShowBookmarkBar(false);
 
-	fSavePanel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this), NULL, 0,
-		false);
+	fSavePanel.reset(new BFilePanel(B_SAVE_PANEL, new BMessenger(this), NULL, 0,
+		false));
 
 	// Layout
 	BGroupView* topView = new BGroupView(B_VERTICAL, 0.0);
@@ -828,7 +828,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	unmodified.MakeEmpty();
 
 	BMessage memMsg(CHECK_MEMORY_PRESSURE);
-	fMemoryPressureRunner = new BMessageRunner(BMessenger(this), &memMsg, 30000000); // 30 seconds
+	fMemoryPressureRunner.reset(new BMessageRunner(BMessenger(this), &memMsg, 30000000)); // 30 seconds
 
 	be_app->PostMessage(WINDOW_OPENED);
 }
@@ -837,12 +837,6 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 BrowserWindow::~BrowserWindow()
 {
 	fAppSettings->RemoveListener(BMessenger(this));
-	delete fTabManager;
-	delete fPulseRunner;
-	delete fButtonResetRunner;
-	delete fMemoryPressureRunner;
-	delete fSavePanel;
-	delete fFormSafetyHelper;
 	if (fPermissionsWindow) {
 		fPermissionsWindow->PrepareToQuit();
 		fPermissionsWindow->Quit();
@@ -1967,8 +1961,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case RESET_BUTTON_STATE:
 		{
-			delete fButtonResetRunner;
-			fButtonResetRunner = NULL;
+			fButtonResetRunner.reset();
 
 			BButton* button = NULL;
 			if (message->FindPointer("button", (void**)&button) == B_OK) {
@@ -2479,32 +2472,42 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 
 	// Ad-Block List
 	if (fAppSettings->GetValue(kSettingsKeyBlockAds, false)) {
-		static const char* kBlockedDomains[] = {
-			"doubleclick.net",
-			"googlesyndication.com",
-			"google-analytics.com",
-			"adservice.google.com",
-			"facebook.net",
-			"connect.facebook.net",
-			NULL
-		};
+		static const std::vector<BString> kBlockedDomains = [] {
+			std::vector<BString> domains;
+			domains.push_back("adservice.google.com");
+			domains.push_back("connect.facebook.net");
+			domains.push_back("doubleclick.net");
+			domains.push_back("facebook.net");
+			domains.push_back("google-analytics.com");
+			domains.push_back("googlesyndication.com");
+			std::sort(domains.begin(), domains.end());
+			return domains;
+		}();
 
 		BUrl checkUrl(url);
 		if (checkUrl.IsValid()) {
 			BString host = checkUrl.Host();
 			host.ToLower();
-			for (int i = 0; kBlockedDomains[i]; i++) {
-				// Check if host matches exactly or ends with .domain
-				if (host == kBlockedDomains[i]) {
-					if (view)
-						view->LoadURL("about:blank");
-					return;
-				}
 
-				int32 hostLen = host.Length();
-				int32 domainLen = strlen(kBlockedDomains[i]);
-				if (hostLen >= domainLen + 1 && host.EndsWith(kBlockedDomains[i])) {
-					if (host.ByteAt(hostLen - domainLen - 1) == '.') {
+			// Binary search for exact match
+			if (std::binary_search(kBlockedDomains.begin(), kBlockedDomains.end(), host)) {
+				if (view)
+					view->LoadURL("about:blank");
+				return;
+			}
+
+			// Check for subdomain match (e.g. ad.doubleclick.net)
+			// This is still O(N) in worst case unless we optimize domain tree, but N is small (6).
+			// With larger list, a trie or reversed domain sort would be better.
+			// Given the constraint "sorted vector and binary search", exact match is fast.
+			// For suffix match, we can lower_bound to find potential candidates.
+
+			// Simple suffix check for now as per previous logic, but using vector
+			for (const auto& domain : kBlockedDomains) {
+				if (host.EndsWith(domain)) {
+					int32 hostLen = host.Length();
+					int32 domainLen = domain.Length();
+					if (hostLen > domainLen && host.ByteAt(hostLen - domainLen - 1) == '.') {
 						if (view)
 							view->LoadURL("about:blank");
 						return;
@@ -3258,10 +3261,13 @@ BrowserWindow::_ShutdownTab(int32 index)
 	// webView pointer is still valid here, as RemoveTab only removed it from layout
 	if (webView == CurrentWebView())
 		SetCurrentWebView(NULL);
-	if (webView != NULL)
+
+	if (webView != NULL) {
 		webView->Shutdown();
-	else
+		delete webView;
+	} else {
 		delete view;
+	}
 }
 
 
@@ -3556,10 +3562,9 @@ BrowserWindow::_SetAutoHideInterfaceInFullscreen(bool doIt)
 
 	if (fAutoHideInterfaceInFullscreenMode) {
 		BMessage message(CHECK_AUTO_HIDE_INTERFACE);
-		fPulseRunner = new BMessageRunner(BMessenger(this), &message, 300000);
+		fPulseRunner.reset(new BMessageRunner(BMessenger(this), &message, 300000));
 	} else {
-		delete fPulseRunner;
-		fPulseRunner = NULL;
+		fPulseRunner.reset();
 		_ShowInterface(true);
 	}
 }
@@ -3656,8 +3661,7 @@ BrowserWindow::_EnsureProgressBarHidden()
 void
 BrowserWindow::_InvokeButtonVisibly(BButton* button)
 {
-	delete fButtonResetRunner;
-	fButtonResetRunner = NULL;
+	fButtonResetRunner.reset();
 
 	button->SetValue(B_CONTROL_ON);
 	// UpdateIfNeeded(); // Usually handled by window loop, removing unless critical
@@ -3665,7 +3669,7 @@ BrowserWindow::_InvokeButtonVisibly(BButton* button)
 
 	BMessage message(RESET_BUTTON_STATE);
 	message.AddPointer("button", button);
-	fButtonResetRunner = new BMessageRunner(BMessenger(this), &message, 50000, 1);
+	fButtonResetRunner.reset(new BMessageRunner(BMessenger(this), &message, 50000, 1));
 }
 
 

@@ -13,6 +13,7 @@
 #include <NodeMonitor.h>
 #include <PopUpMenu.h>
 #include <Size.h>
+#include <memory>
 
 
 class BEntry;
@@ -46,7 +47,7 @@ private:
 	BMenu*							fOverflowMenu;
 	// True if fOverflowMenu is currently added to BookmarkBar
 	bool							fOverflowMenuAdded;
-	BPopUpMenu*						fPopUpMenu;
+	std::unique_ptr<BPopUpMenu>		fPopUpMenu;
 	int32 							fSelectedItemIndex;
 };
 
