@@ -50,8 +50,8 @@ NetworkWindow::NetworkWindow(BRect frame)
 
 NetworkWindow::~NetworkWindow()
 {
-	int count = fRequestListView->CountItems();
-	for (int i = count - 1; i >= 0; i--)
+	int32 count = fRequestListView->CountItems();
+	for (int32 i = count - 1; i >= 0; i--)
 		delete fRequestListView->RemoveItem(i);
 }
 
@@ -97,8 +97,8 @@ NetworkWindow::MessageReceived(BMessage* message)
 		}
 		case CLEAR_NETWORK_REQUESTS:
 		{
-			int count = fRequestListView->CountItems();
-			for (int i = count - 1; i >= 0; i--)
+			int32 count = fRequestListView->CountItems();
+			for (int32 i = count - 1; i >= 0; i--)
 				delete fRequestListView->RemoveItem(i);
 			break;
 		}

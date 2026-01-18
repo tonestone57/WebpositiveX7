@@ -77,8 +77,8 @@ ConsoleWindow::ConsoleWindow(BRect frame)
 
 ConsoleWindow::~ConsoleWindow()
 {
-	int count = fMessagesListView->CountItems();
-	for (int i = count - 1; i >= 0; i--)
+	int32 count = fMessagesListView->CountItems();
+	for (int32 i = count - 1; i >= 0; i--)
 		delete fMessagesListView->RemoveItem(i);
 }
 
@@ -129,8 +129,8 @@ ConsoleWindow::MessageReceived(BMessage* message)
 		case CLEAR_CONSOLE_MESSAGES:
 		{
 			fPreviousText = "";
-			int count = fMessagesListView->CountItems();
-			for (int i = count - 1; i >= 0; i--)
+			int32 count = fMessagesListView->CountItems();
+			for (int32 i = count - 1; i >= 0; i--)
 				delete fMessagesListView->RemoveItem(i);
 			break;
 		}

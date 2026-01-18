@@ -287,7 +287,7 @@ CookieWindow::QuitRequested()
 void
 CookieWindow::_EmptyDomainList()
 {
-	for (int i = fDomains->FullListCountItems() - 1; i >= 0; i--) {
+	for (int32 i = fDomains->FullListCountItems() - 1; i >= 0; i--) {
 		delete fDomains->FullListItemAt(i);
 	}
 	fDomains->MakeEmpty();
@@ -373,8 +373,8 @@ CookieWindow::_BuildDomainList()
 
 	delete rootNode;
 
-	int i = 0;
-	int firstNotEmpty = i;
+	int32 i = 0;
+	int32 firstNotEmpty = i;
 	// Collapse empty items to keep the list short
 	while (i < fDomains->FullListCountItems())
 	{
@@ -384,9 +384,9 @@ CookieWindow::_BuildDomainList()
 				// The item has no cookies, and only a single child. We can
 				// remove it and move its child one level up in the tree.
 
-				int count = fDomains->CountItemsUnder(item, false);
-				int index = fDomains->FullListIndexOf(item) + 1;
-				for (int j = 0; j < count; j++) {
+				int32 count = fDomains->CountItemsUnder(item, false);
+				int32 index = fDomains->FullListIndexOf(item) + 1;
+				for (int32 j = 0; j < count; j++) {
 					BListItem* child = fDomains->FullListItemAt(index + j);
 					child->SetOutlineLevel(child->OutlineLevel() - 1);
 				}
