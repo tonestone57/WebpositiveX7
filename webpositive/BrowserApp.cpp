@@ -44,7 +44,10 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <signal.h>
+#include <string.h>
 #include <unistd.h>
+
+#include <OS.h>
 
 #include "BrowserWindow.h"
 #include "BrowsingHistory.h"
@@ -72,29 +75,52 @@ static const uint32 AUTO_SAVE_SESSION = 'assn';
 static char sCrashLogPath[B_PATH_NAME_LENGTH];
 
 
+// Signal-safe integer to string conversion
+static void write_int(int fd, const char* label, long long value)
+{
+	if (label) write(fd, label, strlen(label));
+	char buffer[32];
+	int i = 0;
+	bool neg = value < 0;
+	unsigned long long v = neg ? -value : value;
+	if (v == 0) buffer[i++] = '0';
+	while (v > 0) {
+		buffer[i++] = (v % 10) + '0';
+		v /= 10;
+	}
+	if (neg) buffer[i++] = '-';
+	// Reverse
+	char rev[32];
+	for (int j = 0; j < i; j++) rev[j] = buffer[i - 1 - j];
+	write(fd, rev, i);
+	write(fd, "\n", 1);
+}
+
 void crash_handler(int sig)
 {
 	int fd = open(sCrashLogPath, O_WRONLY | O_CREAT | O_APPEND, 0644);
 	if (fd >= 0) {
 		const char* msg = "WebPositive Internal Crash: Signal Caught\n";
-		write(fd, msg, 42);
-		char sigNum[16];
-		// Simple integer to string conversion safe for signal handler
-		int len = 0;
-		int temp = sig;
-		if (temp == 0) sigNum[len++] = '0';
-		else {
-			char buffer[16];
-			int i = 0;
-			while (temp > 0) {
-				buffer[i++] = (temp % 10) + '0';
-				temp /= 10;
-			}
-			while (i > 0) sigNum[len++] = buffer[--i];
+		write(fd, msg, strlen(msg));
+
+		write_int(fd, "Signal: ", sig);
+
+		// System Info
+		system_info info;
+		if (get_system_info(&info) == B_OK) {
+			write_int(fd, "CPU Count: ", info.cpu_count);
+
+			write(fd, "Used Memory (pages): ", 21);
+			write_int(fd, NULL, (long long)info.used_pages);
+			write(fd, "Max Memory (pages): ", 20);
+			write_int(fd, NULL, (long long)info.max_pages);
+
+			write_int(fd, "Kernel Version: ", info.kernel_version);
 		}
-		sigNum[len++] = '\n';
-		write(fd, "Signal: ", 8);
-		write(fd, sigNum, len);
+
+		// Note: Detailed stack trace requires debugger or non-signal-safe calls.
+		// The debugger() call below will invoke the system debugger for interactive analysis.
+
 		close(fd);
 	}
 	debugger("WebPositive Internal Crash: Signal Caught");

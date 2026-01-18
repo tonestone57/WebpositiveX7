@@ -136,7 +136,8 @@ CookieWindow::CookieWindow(BRect frame,
 		B_NORMAL_WINDOW_FEEL,
 		B_AUTO_UPDATE_SIZE_LIMITS | B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE),
 	fQuitting(false),
-	fCookieJar(jar)
+	fCookieJar(jar),
+	fLastCookieCount(0)
 {
 	BGroupLayout* root = new BGroupLayout(B_HORIZONTAL, 0.0);
 	SetLayout(root);
@@ -308,13 +309,18 @@ CookieWindow::_EmptyDomainList()
 void
 CookieWindow::_BuildDomainList()
 {
-	// NOTE: This function is called every time the window is shown. Attempts to
-	// optimize this by caching the list and only rebuilding it when the cookie
-	// jar has changed have been unsuccessful. The BNetworkCookieJar API does not
-	// provide an efficient way to track changes. A simple cookie count is not
-	// enough, as it won't detect changes to existing cookies (e.g. value or
-	// expiration date). A more robust solution would require changes to the
-	// BNetworkCookieJar API itself.
+	// Optimization: check if cookie count changed.
+	// This is a heuristic and might miss updates to existing cookies, but covers
+	// the common case of showing the window when nothing happened.
+	size_t currentCount = 0;
+	BPrivate::Network::BNetworkCookieJar::Iterator countIt = fCookieJar.GetIterator();
+	while (countIt.Next() != NULL)
+		currentCount++;
+
+	if (currentCount == fLastCookieCount && !fDomains->IsEmpty())
+		return;
+
+	fLastCookieCount = currentCount;
 
 	_EmptyDomainList();
 

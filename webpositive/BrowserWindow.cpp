@@ -36,6 +36,8 @@
 
 #include <OS.h>
 #include <Alert.h>
+#include <TranslatorFormats.h>
+#include <TranslationUtils.h>
 #include <Application.h>
 #include <Bitmap.h>
 #include <Button.h>
@@ -76,6 +78,7 @@
 #include <Url.h>
 
 #include <map>
+#include <vector>
 #include <algorithm>
 #include <stdio.h>
 
@@ -195,6 +198,50 @@ layoutItemFor(BView* view)
 	BLayout* layout = view->Parent()->GetLayout();
 	int32 index = layout->IndexOfView(view);
 	return layout->ItemAt(index);
+}
+
+
+struct SyncParams {
+	BPath path;
+	BReference<BPrivate::Network::BUrlContext> context;
+};
+
+
+static status_t
+ExportProfileThread(void* data)
+{
+	SyncParams* params = (SyncParams*)data;
+	status_t status = Sync::ExportProfile(params->path, params->context->GetCookieJar());
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to export profile"));
+		errorMsg << ": " << strerror(status);
+		BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go();
+	}
+
+	delete params;
+	return B_OK;
+}
+
+
+static status_t
+ImportProfileThread(void* data)
+{
+	SyncParams* params = (SyncParams*)data;
+	status_t status = Sync::ImportProfile(params->path, params->context->GetCookieJar());
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to import profile"));
+		errorMsg << ": " << strerror(status);
+		BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go();
+	}
+
+	delete params;
+	return B_OK;
 }
 
 
@@ -342,6 +389,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fPermissionsWindow(NULL),
 	fNetworkWindow(NULL),
 	fIsBypassingCache(false),
+	fIsPrivate(privateWindow),
 	fMemoryPressureRunner(NULL),
 	fButtonResetRunner(NULL)
 {
@@ -1143,13 +1191,23 @@ BrowserWindow::MessageReceived(BMessage* message)
 				&& message->FindString("name", &name) == B_OK) {
 				BPath path(&ref);
 				path.Append(name);
-				status_t status = Sync::ExportProfile(path, fContext->GetCookieJar());
-				if (status != B_OK) {
-					BString errorMsg(B_TRANSLATE("Failed to export profile"));
-					errorMsg << ": " << strerror(status);
-					BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
-						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go();
+
+				SyncParams* params = new(std::nothrow) SyncParams;
+				if (params) {
+					params->path = path;
+					params->context = fContext;
+
+					thread_id thread = spawn_thread(ExportProfileThread,
+						"Export Profile", B_NORMAL_PRIORITY, params);
+					if (thread >= 0)
+						resume_thread(thread);
+					else {
+						delete params;
+						BString errorMsg(B_TRANSLATE("Failed to start export thread"));
+						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+							errorMsg.String(), B_TRANSLATE("OK"));
+						alert->Go();
+					}
 				}
 			}
 			break;
@@ -1160,16 +1218,24 @@ BrowserWindow::MessageReceived(BMessage* message)
 			entry_ref ref;
 			if (message->FindRef("refs", &ref) == B_OK) {
 				BPath path(&ref);
-				status_t status = Sync::ImportProfile(path, fContext->GetCookieJar());
-				if (status != B_OK) {
-					BString errorMsg(B_TRANSLATE("Failed to import profile"));
-					errorMsg << ": " << strerror(status);
-					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
-						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go();
+
+				SyncParams* params = new(std::nothrow) SyncParams;
+				if (params) {
+					params->path = path;
+					params->context = fContext;
+
+					thread_id thread = spawn_thread(ImportProfileThread,
+						"Import Profile", B_NORMAL_PRIORITY, params);
+					if (thread >= 0)
+						resume_thread(thread);
+					else {
+						delete params;
+						BString errorMsg(B_TRANSLATE("Failed to start import thread"));
+						BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+							errorMsg.String(), B_TRANSLATE("OK"));
+						alert->Go();
+					}
 				}
-				// Refresh cookies?
-				// Refresh bookmarks?
 			}
 			break;
 		}
@@ -1901,6 +1967,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 					fInspectDomBuffer = "";
 					fInspectDomExpectedChunks = atoi(text.String() + strlen("INSPECT_DOM_START:"));
 					fInspectDomReceivedChunks = 0;
+					// Preallocate buffer to avoid reallocations. 2048 is the chunk size in JS.
+					if (fInspectDomExpectedChunks > 0) {
+						fInspectDomBuffer.LockBuffer(fInspectDomExpectedChunks * 2048 + 1024);
+						fInspectDomBuffer.UnlockBuffer(0);
+					}
 					break; // Don't show in console
 				} else if (text.StartsWith("INSPECT_DOM_CHUNK:")) {
 					// Format: INSPECT_DOM_CHUNK:index:content
@@ -2072,32 +2143,34 @@ BrowserWindow::MenusBeginning()
 					}
 
 					// Grouping (Color)
-					// Prevent duplication by removing existing "Set tab color" menu
+					// Check if "Set tab color" menu exists
+					bool colorMenuExists = false;
 					for (int32 i = 0; i < viewMenu->CountItems(); i++) {
 						BMenuItem* item = viewMenu->ItemAt(i);
 						if (strcmp(item->Label(), B_TRANSLATE("Set tab color")) == 0) {
-							viewMenu->RemoveItem(i);
-							delete item;
+							colorMenuExists = true;
 							break;
 						}
 					}
 
-					BMenu* colorMenu = new BMenu(B_TRANSLATE("Set tab color"));
-					const char* kColorNames[] = {"None", "Red", "Green", "Blue", "Yellow"};
-					rgb_color kColors[] = {
-						ui_color(B_PANEL_BACKGROUND_COLOR),
-						{255, 100, 100, 255},
-						{100, 255, 100, 255},
-						{100, 100, 255, 255},
-						{255, 255, 100, 255}
-					};
+					if (!colorMenuExists) {
+						BMenu* colorMenu = new BMenu(B_TRANSLATE("Set tab color"));
+						const char* kColorNames[] = {"None", "Red", "Green", "Blue", "Yellow"};
+						rgb_color kColors[] = {
+							ui_color(B_PANEL_BACKGROUND_COLOR),
+							{255, 100, 100, 255},
+							{100, 255, 100, 255},
+							{100, 100, 255, 255},
+							{255, 255, 100, 255}
+						};
 
-					for (size_t i = 0; i < sizeof(kColorNames)/sizeof(char*); i++) {
-						BMessage* colorMsg = new BMessage(SET_TAB_COLOR);
-						colorMsg->AddColor("color", kColors[i]);
-						colorMenu->AddItem(new BMenuItem(kColorNames[i], colorMsg));
+						for (size_t i = 0; i < sizeof(kColorNames)/sizeof(char*); i++) {
+							BMessage* colorMsg = new BMessage(SET_TAB_COLOR);
+							colorMsg->AddColor("color", kColors[i]);
+							colorMenu->AddItem(new BMenuItem(kColorNames[i], colorMsg));
+						}
+						viewMenu->AddItem(colorMenu);
 					}
-					viewMenu->AddItem(colorMenu);
 				}
 			}
 		}
@@ -2169,6 +2242,40 @@ BrowserWindow::SetCurrentWebView(BWebView* webView)
 		fURLInputGroup->TextView()->GetSelection(&selectionStart,
 			&selectionEnd);
 		userData->SetURLInputSelection(selectionStart, selectionEnd);
+
+		// Capture Preview
+		if (CurrentWebView() && !CurrentWebView()->IsHidden()) {
+			BBitmap* tempPreview = new BBitmap(CurrentWebView()->Bounds(), B_RGB32);
+			if (tempPreview->InitCheck() == B_OK) {
+				// Use BScreen to read content if visible
+				if (CurrentWebView()->Window()) {
+					BScreen screen(CurrentWebView()->Window());
+					BRect screenRect = CurrentWebView()->ConvertToScreen(CurrentWebView()->Bounds());
+					if (screen.ReadBitmap(tempPreview, false, &screenRect) == B_OK) {
+						// Scale down to save memory
+						BRect thumbRect(0, 0, 200, 150);
+						BBitmap* thumbnail = new BBitmap(thumbRect, B_RGB32, true);
+						if (thumbnail->IsValid()) {
+							BView* thumbView = new BView(thumbRect, "thumb", B_FOLLOW_NONE, B_WILL_DRAW);
+							thumbnail->AddChild(thumbView);
+							thumbnail->Lock();
+							thumbView->SetHighColor(B_TRANSPARENT_32_BIT);
+							thumbView->FillRect(thumbRect);
+							thumbView->SetDrawingMode(B_OP_COPY);
+							thumbView->DrawBitmap(tempPreview, tempPreview->Bounds(), thumbRect, B_FILTER_BITMAP_BILINEAR);
+							thumbView->Sync();
+							thumbnail->Unlock();
+							thumbnail->RemoveChild(thumbView);
+							delete thumbView;
+
+							userData->SetPreview(thumbnail);
+						}
+						delete thumbnail;
+					}
+				}
+			}
+			delete tempPreview;
+		}
 	}
 
 	BWebWindow::SetCurrentWebView(webView);
@@ -2269,6 +2376,9 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 		url = _NewTabURL(isNewWindow);
 
 	if (url.Length() > 0) {
+		// Try loading favicon from cache for initial state
+		_LoadFavicon(url, webView);
+
 		if (lazy) {
 			_SetPageIcon(webView, NULL); // Ensure userData exists
 			PageUserData* userData = static_cast<PageUserData*>(webView->GetUserData());
@@ -2413,31 +2523,45 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 
 	// Ad-Block List
 	if (fAppSettings->GetValue(kSettingsKeyBlockAds, false)) {
-		static const char* kBlockedDomains[] = {
-			"doubleclick.net",
-			"googlesyndication.com",
-			"google-analytics.com",
-			"adservice.google.com",
-			"facebook.net",
-			"connect.facebook.net",
-			NULL
-		};
+		static std::vector<BString> sBlockedDomains;
+		static bool sInitialized = false;
+		if (!sInitialized) {
+			const char* kDomains[] = {
+				"adservice.google.com",
+				"connect.facebook.net",
+				"doubleclick.net",
+				"facebook.net",
+				"google-analytics.com",
+				"googlesyndication.com",
+				NULL
+			};
+			for (int i = 0; kDomains[i]; i++)
+				sBlockedDomains.push_back(kDomains[i]);
+			// Already sorted in initializer, but ensure it for binary search
+			std::sort(sBlockedDomains.begin(), sBlockedDomains.end());
+			sInitialized = true;
+		}
 
 		BUrl checkUrl(url);
 		if (checkUrl.IsValid()) {
 			BString host = checkUrl.Host();
 			host.ToLower();
-			for (int i = 0; kBlockedDomains[i]; i++) {
-				// Check if host matches exactly or ends with .domain
-				if (host == kBlockedDomains[i]) {
-					if (view)
-						view->LoadURL("about:blank");
-					return;
-				}
 
+			// Binary search for exact match
+			if (std::binary_search(sBlockedDomains.begin(), sBlockedDomains.end(), host)) {
+				if (view)
+					view->LoadURL("about:blank");
+				return;
+			}
+
+			// Suffix check: Iterate.
+			// Optimization: We only check domains that are shorter than host
+			for (size_t i = 0; i < sBlockedDomains.size(); i++) {
+				const BString& domain = sBlockedDomains[i];
 				int32 hostLen = host.Length();
-				int32 domainLen = strlen(kBlockedDomains[i]);
-				if (hostLen >= domainLen + 1 && host.EndsWith(kBlockedDomains[i])) {
+				int32 domainLen = domain.Length();
+
+				if (hostLen > domainLen && host.EndsWith(domain)) {
 					if (host.ByteAt(hostLen - domainLen - 1) == '.') {
 						if (view)
 							view->LoadURL("about:blank");
@@ -2647,7 +2771,8 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 	bool allowPopups = true;
 	float zoom = 1.0;
 	bool forceDesktop = false;
-	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop);
+	BString customUserAgent;
+	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop, customUserAgent);
 
 	if (view) {
 		// Apply Per-Site Zoom
@@ -3191,9 +3316,10 @@ BrowserWindow::_ShutdownTab(int32 index)
 	// webView pointer is still valid here, as RemoveTab only removed it from layout
 	if (webView == CurrentWebView())
 		SetCurrentWebView(NULL);
-	if (webView != NULL)
+	if (webView != NULL) {
 		webView->Shutdown();
-	else
+		delete webView;
+	} else
 		delete view;
 }
 
@@ -3208,7 +3334,7 @@ BrowserWindow::_TabChanged(int32 index)
 
 
 void
-BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon)
+BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon, bool save)
 {
 	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
 	if (userData == NULL) {
@@ -3220,6 +3346,11 @@ BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon)
 	// The PageUserData makes a copy of the icon, which we pass on to
 	// the TabManager for display in the respective tab.
 	userData->SetPageIcon(icon);
+
+	if (save && icon) {
+		_SaveFavicon(view->MainFrameURL(), icon);
+	}
+
 	fTabManager->SetTabIcon(view, userData->PageIcon());
 	if (view == CurrentWebView())
 		fURLInputGroup->SetPageIcon(icon);
@@ -3794,5 +3925,95 @@ BrowserWindow::_UpdateToolbarPlacement()
 		int32 tabIndex = layout->IndexOfItem(fTabGroup);
 		int32 insertIndex = (tabIndex >= 0) ? tabIndex + 1 : 2;
 		layout->AddItem(fNavigationGroup, insertIndex);
+	}
+}
+
+
+status_t
+BrowserWindow::_GetFaviconPath(const BString& url, BPath& path)
+{
+	if (url.Length() == 0)
+		return B_BAD_VALUE;
+
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
+		return B_ERROR;
+
+	path.Append(kApplicationName);
+	path.Append("Favicons");
+
+	if (create_directory(path.Path(), 0777) != B_OK)
+		return B_ERROR;
+
+	BUrl parsedUrl(url);
+	if (!parsedUrl.IsValid() || parsedUrl.Host().Length() == 0)
+		return B_BAD_VALUE;
+
+	BString filename(parsedUrl.Host());
+	// Sanitize filename
+	filename.ReplaceAll('/', '_');
+	filename.ReplaceAll(':', '_');
+
+	path.Append(filename.String());
+	return B_OK;
+}
+
+
+void
+BrowserWindow::_SaveFavicon(const BString& url, const BBitmap* icon)
+{
+	if (icon == NULL || fIsPrivate)
+		return;
+
+	BPath path;
+	if (_GetFaviconPath(url, path) != B_OK)
+		return;
+
+	// Use clone + ImportBits logic instead of new BBitmap(icon)
+	BBitmap* saveIcon = new BBitmap(icon->Bounds(), B_RGBA32);
+	if (saveIcon->ImportBits(icon->Bits(), icon->BitsLength(), icon->BytesPerRow(), 0, icon->ColorSpace()) != B_OK) {
+		delete saveIcon;
+		return;
+	}
+
+	BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+	if (file.InitCheck() == B_OK) {
+		int32 width = saveIcon->Bounds().IntegerWidth() + 1;
+		int32 height = saveIcon->Bounds().IntegerHeight() + 1;
+		file.Write(&width, sizeof(width));
+		file.Write(&height, sizeof(height));
+		file.Write(saveIcon->Bits(), saveIcon->BitsLength());
+	}
+	delete saveIcon;
+}
+
+
+void
+BrowserWindow::_LoadFavicon(const BString& url, BWebView* view)
+{
+	if (view == NULL) return;
+
+	// Don't overwrite existing icon
+	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+	if (userData && userData->PageIcon())
+		return;
+
+	BPath path;
+	if (_GetFaviconPath(url, path) != B_OK)
+		return;
+
+	BFile file(path.Path(), B_READ_ONLY);
+	if (file.InitCheck() == B_OK) {
+		int32 width, height;
+		if (file.Read(&width, sizeof(width)) == sizeof(width) &&
+			file.Read(&height, sizeof(height)) == sizeof(height)) {
+
+			if (width > 0 && width < 256 && height > 0 && height < 256) {
+				BBitmap* icon = new BBitmap(BRect(0, 0, width - 1, height - 1), B_RGBA32);
+				if (file.Read(icon->Bits(), icon->BitsLength()) == icon->BitsLength()) {
+					_SetPageIcon(view, icon, false); // Don't save back to disk
+				}
+				delete icon;
+			}
+		}
 	}
 }

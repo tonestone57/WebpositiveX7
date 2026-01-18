@@ -45,6 +45,9 @@ private:
 			BCheckBox*			fJSEnabled;
 			BCheckBox*			fCookiesEnabled;
 			BCheckBox*			fPopupsEnabled;
+			BCheckBox*			fForceDesktopCheckBox;
+			BTextControl*		fZoomControl;
+			BTextControl*		fUserAgentControl;
 			BTextControl*		fAddDomainControl;
 			BButton*			fAddButton;
 			BButton*			fRemoveButton;
