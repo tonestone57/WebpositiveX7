@@ -537,9 +537,9 @@ DownloadProgressView::MessageReceived(BMessage* message)
 			// in a fresh context.
 			// BrowserWindow handles closing the new window if the download
 			// restarts successfully.
-			BMessage* request = new BMessage(RESTART_DOWNLOAD_IN_WINDOW);
-			request->AddString("url", fURL);
-			be_app->PostMessage(request);
+			BMessage request(RESTART_DOWNLOAD_IN_WINDOW);
+			request.AddString("url", fURL);
+			be_app->PostMessage(&request);
 			break;
 		}
 

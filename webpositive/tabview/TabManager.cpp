@@ -1077,6 +1077,7 @@ TabManager::MoveTab(int32 fromIndex, int32 toIndex)
 
 	BLayoutItem* item = fCardLayout->RemoveItem(fromIndex);
 	if (item) {
-		fCardLayout->AddItem(toIndex, item);
+		if (!fCardLayout->AddItem(toIndex, item))
+			delete item;
 	}
 }
