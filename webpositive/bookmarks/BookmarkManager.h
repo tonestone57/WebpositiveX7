@@ -10,6 +10,8 @@
 #include <Path.h>
 #include <String.h>
 
+class BMessage;
+
 class BookmarkManager {
 public:
 	static status_t GetBookmarkPath(BPath& path);

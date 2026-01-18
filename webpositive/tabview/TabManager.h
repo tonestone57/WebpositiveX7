@@ -7,6 +7,7 @@
 #define TAB_MANAGER_H
 
 #include <Messenger.h>
+#include <String.h>
 #include <TabView.h>
 
 enum {
