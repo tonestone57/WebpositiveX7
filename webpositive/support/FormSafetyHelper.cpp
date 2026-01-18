@@ -78,7 +78,7 @@ FormSafetyHelper::QuitRequested()
 	);
 
 	TabManager* tabManager = fWindow->GetTabManager();
-	for (int i = 0; i < tabManager->CountTabs(); i++) {
+	for (int32 i = 0; i < tabManager->CountTabs(); i++) {
 		BWebView* view = dynamic_cast<BWebView*>(tabManager->ViewForTab(i));
 		if (view == NULL)
 			continue;

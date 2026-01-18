@@ -1959,7 +1959,7 @@ BrowserWindow::Archive(BMessage* archive, bool deep) const
 	if (status == B_OK)
 		status = archive->AddUInt32("window workspaces", Workspaces());
 
-	for (int i = 0; i < fTabManager->CountTabs(); i++) {
+	for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
 		BWebView* view = dynamic_cast<BWebView*>(fTabManager->ViewForTab(i));
 		if (view == NULL) {
 			continue;
@@ -3569,7 +3569,7 @@ BrowserWindow::_InvokeButtonVisibly(BButton* button)
 	button->SetValue(B_CONTROL_ON);
 	UpdateIfNeeded();
 	button->Invoke();
-	snooze(1000);
+	snooze(50000);
 	button->SetValue(B_CONTROL_OFF);
 }
 

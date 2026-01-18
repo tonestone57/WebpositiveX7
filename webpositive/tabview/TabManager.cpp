@@ -259,8 +259,8 @@ public:
 			case MSG_OPEN_TAB_MENU:
 			{
 				BPopUpMenu* tabMenu = new BPopUpMenu("tab menu", true, false);
-				int tabCount = fTabContainerView->GetLayout()->CountItems();
-				for (int i = 0; i < tabCount; i++) {
+				int32 tabCount = fTabContainerView->GetLayout()->CountItems();
+				for (int32 i = 0; i < tabCount; i++) {
 					TabView* tab = fTabContainerView->TabAt(i);
 					if (tab != NULL) {
 						BMenuItem* item = new(std::nothrow)

@@ -888,7 +888,7 @@ SettingsWindow::_RevertSettings()
 	BMenu* searchMenu = fSearchPageMenu->Menu();
 	int32 itemCount = searchMenu->CountItems() - 2;
 		// Ignore the two last items: separator and "custom"
-	for (int i = 0; i < itemCount; i++) {
+	for (int32 i = 0; i < itemCount; i++) {
 		BMenuItem* item = searchMenu->ItemAt(i);
 		BMessage* message = item->Message();
 		if (message->FindString("searchstring") == searchPage) {
