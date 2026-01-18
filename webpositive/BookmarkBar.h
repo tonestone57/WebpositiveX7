@@ -7,6 +7,7 @@
 
 
 #include <map>
+#include <memory>
 
 #include <MenuBar.h>
 #include <Node.h>
@@ -46,7 +47,7 @@ private:
 	BMenu*							fOverflowMenu;
 	// True if fOverflowMenu is currently added to BookmarkBar
 	bool							fOverflowMenuAdded;
-	BPopUpMenu*						fPopUpMenu;
+	std::unique_ptr<BPopUpMenu>		fPopUpMenu;
 	int32 							fSelectedItemIndex;
 };
 

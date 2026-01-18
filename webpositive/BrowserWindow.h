@@ -32,6 +32,7 @@
 #include "WebWindow.h"
 
 #include <deque>
+#include <memory>
 #include <DateTime.h>
 #include <Messenger.h>
 #include <String.h>
@@ -298,14 +299,14 @@ private:
 			BButton*			fFindNextButton;
 			BButton*			fFindCloseButton;
 			BCheckBox*			fFindCaseSensitiveCheckBox;
-			TabManager*			fTabManager;
+			std::unique_ptr<TabManager> fTabManager;
 
 			bool				fIsFullscreen;
 			bool				fInterfaceVisible;
 			bool				fMenusRunning;
 			BRect				fNonFullscreenWindowFrame;
-			BMessageRunner*		fPulseRunner;
-			BMessageRunner*		fButtonResetRunner;
+			std::unique_ptr<BMessageRunner> fPulseRunner;
+			std::unique_ptr<BMessageRunner> fButtonResetRunner;
 			uint32				fVisibleInterfaceElements;
 			bigtime_t			fLastMouseMovedTime;
 			BPoint				fLastMousePos;
@@ -327,7 +328,7 @@ private:
 			BMenuItem*			fBookmarkBarMenuItem;
 			BMenuItem*			fAutoHideBookmarkBarMenuItem;
 			BookmarkBar*		fBookmarkBar;
-			BFilePanel*			fSavePanel;
+			std::unique_ptr<BFilePanel> fSavePanel;
 
 			bool				fDarkMode;
 			BMenuItem*			fDarkModeMenuItem;
@@ -345,13 +346,13 @@ private:
 
 			class TabSearchWindow* fTabSearchWindow;
 
-			FormSafetyHelper*	fFormSafetyHelper;
+			std::unique_ptr<FormSafetyHelper> fFormSafetyHelper;
 
 			PermissionsWindow*	fPermissionsWindow;
 			NetworkWindow*		fNetworkWindow;
 			bool				fIsBypassingCache;
 
-			BMessageRunner*		fMemoryPressureRunner;
+			std::unique_ptr<BMessageRunner> fMemoryPressureRunner;
 };
 
 
