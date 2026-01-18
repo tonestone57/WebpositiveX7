@@ -354,6 +354,7 @@ private:
 			PermissionsWindow*	fPermissionsWindow;
 			NetworkWindow*		fNetworkWindow;
 			bool				fIsBypassingCache;
+			bool				fIsPrivate;
 
 			BMessageRunner*		fMemoryPressureRunner;
 };

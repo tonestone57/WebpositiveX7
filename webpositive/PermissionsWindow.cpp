@@ -32,8 +32,8 @@ enum {
 
 class PermissionItem : public BStringItem {
 public:
-	PermissionItem(const char* text, bool js, bool cookies, bool popups, float zoom, bool forceDesktop)
-		: BStringItem(text), fJS(js), fCookies(cookies), fPopups(popups), fZoom(zoom), fForceDesktop(forceDesktop) {}
+	PermissionItem(const char* text, bool js, bool cookies, bool popups, float zoom, bool forceDesktop, const char* ua)
+		: BStringItem(text), fJS(js), fCookies(cookies), fPopups(popups), fZoom(zoom), fForceDesktop(forceDesktop), fCustomUserAgent(ua) {}
 
 	void SetJS(bool enable) { fJS = enable; }
 	bool JS() const { return fJS; }
@@ -50,12 +50,16 @@ public:
 	void SetForceDesktop(bool enable) { fForceDesktop = enable; }
 	bool ForceDesktop() const { return fForceDesktop; }
 
+	void SetCustomUserAgent(const char* ua) { fCustomUserAgent = ua; }
+	const char* CustomUserAgent() const { return fCustomUserAgent.String(); }
+
 private:
 	bool fJS;
 	bool fCookies;
 	bool fPopups;
 	float fZoom;
 	bool fForceDesktop;
+	BString fCustomUserAgent;
 };
 
 PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCookieJar& jar)
@@ -84,6 +88,7 @@ PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCoo
 	fForceDesktopCheckBox = new BCheckBox("Force Desktop Mode", new BMessage(MSG_SAVE_PERMISSIONS));
 
 	fZoomControl = new BTextControl("zoom", "Zoom:", "1.0", new BMessage(MSG_SAVE_PERMISSIONS));
+	fUserAgentControl = new BTextControl("ua", "User Agent:", "", new BMessage(MSG_SAVE_PERMISSIONS));
 
 	// Default state (disabled until domain selected)
 	fJSEnabled->SetEnabled(false);
@@ -91,6 +96,7 @@ PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCoo
 	fPopupsEnabled->SetEnabled(false);
 	fForceDesktopCheckBox->SetEnabled(false);
 	fZoomControl->SetEnabled(false);
+	fUserAgentControl->SetEnabled(false);
 
 	AddChild(BGroupLayoutBuilder(B_VERTICAL, 10)
 		.Add(new BScrollView("scroll", fDomainList, 0, false, true))
@@ -104,6 +110,7 @@ PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCoo
 		.Add(fPopupsEnabled)
 		.Add(fForceDesktopCheckBox)
 		.Add(fZoomControl)
+		.Add(fUserAgentControl)
 		.Add(fClearDataButton)
 		.SetInsets(10)
 	);
@@ -142,7 +149,7 @@ PermissionsWindow::MessageReceived(BMessage* message)
 
 				if (!exists) {
 					// Use default settings
-					fDomainList->AddItem(new PermissionItem(domain, true, true, false, 1.0, false));
+					fDomainList->AddItem(new PermissionItem(domain, true, true, false, 1.0, false, ""));
 					fAddDomainControl->SetText("");
 					_SavePermissions();
 				}
@@ -171,6 +178,7 @@ PermissionsWindow::MessageReceived(BMessage* message)
 					item->SetCookies(fCookiesEnabled->Value() == B_CONTROL_ON);
 					item->SetPopups(fPopupsEnabled->Value() == B_CONTROL_ON);
 					item->SetForceDesktop(fForceDesktopCheckBox->Value() == B_CONTROL_ON);
+					item->SetCustomUserAgent(fUserAgentControl->Text());
 					float zoom = atof(fZoomControl->Text());
 					if (zoom < 0.1) zoom = 0.1;
 					if (zoom > 10.0) zoom = 10.0;
@@ -276,13 +284,15 @@ PermissionsWindow::_LoadPermissions()
 				bool popups = false;
 				float zoom = 1.0;
 				bool forceDesktop = false;
+				BString userAgent;
 				domainMsg.FindBool("js", &js);
 				domainMsg.FindBool("cookies", &cookies);
 				domainMsg.FindBool("popups", &popups);
 				domainMsg.FindFloat("zoom", &zoom);
 				domainMsg.FindBool("forceDesktop", &forceDesktop);
+				domainMsg.FindString("customUserAgent", &userAgent);
 
-				PermissionItem* item = new PermissionItem(domain, js, cookies, popups, zoom, forceDesktop);
+				PermissionItem* item = new PermissionItem(domain, js, cookies, popups, zoom, forceDesktop, userAgent.String());
 				fDomainList->AddItem(item);
 			}
 		}
@@ -312,6 +322,7 @@ PermissionsWindow::_SavePermissions()
 		entry.popups = item->Popups();
 		entry.zoom = item->Zoom();
 		entry.forceDesktop = item->ForceDesktop();
+		entry.customUserAgent = item->CustomUserAgent();
 
 		SitePermissionsManager::Instance()->UpdatePermission(entry);
 	}
@@ -332,6 +343,7 @@ PermissionsWindow::_UpdateFields()
 	fPopupsEnabled->SetEnabled(hasSelection);
 	fForceDesktopCheckBox->SetEnabled(hasSelection);
 	fZoomControl->SetEnabled(hasSelection);
+	fUserAgentControl->SetEnabled(hasSelection);
 	fClearDataButton->SetEnabled(hasSelection);
 
 	if (hasSelection) {
@@ -341,6 +353,7 @@ PermissionsWindow::_UpdateFields()
 			fCookiesEnabled->SetValue(item->Cookies() ? B_CONTROL_ON : B_CONTROL_OFF);
 			fPopupsEnabled->SetValue(item->Popups() ? B_CONTROL_ON : B_CONTROL_OFF);
 			fForceDesktopCheckBox->SetValue(item->ForceDesktop() ? B_CONTROL_ON : B_CONTROL_OFF);
+			fUserAgentControl->SetText(item->CustomUserAgent());
 			BString zoomStr;
 			zoomStr << item->Zoom();
 			fZoomControl->SetText(zoomStr.String());
