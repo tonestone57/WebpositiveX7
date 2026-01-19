@@ -121,6 +121,8 @@ PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCoo
 
 PermissionsWindow::~PermissionsWindow()
 {
+	if (fTarget.IsValid())
+		fTarget.SendMessage(PERMISSIONS_WINDOW_CLOSED);
 }
 
 
@@ -226,6 +228,13 @@ void
 PermissionsWindow::PrepareToQuit()
 {
 	fQuitting = true;
+}
+
+
+void
+PermissionsWindow::SetTarget(const BMessenger& target)
+{
+	fTarget = target;
 }
 
 

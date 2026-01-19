@@ -22,14 +22,14 @@ FormSafetyHelper::FormSafetyHelper(BrowserWindow* window)
 	fFormCheckPending(false),
 	fForceClose(false),
 	fTabsToCheck(0),
-	fDirtyTabs(0)
+	fDirtyTabs(0),
+	fFormCheckTimeoutRunner(NULL)
 {
 }
 
 
 FormSafetyHelper::~FormSafetyHelper()
 {
-	fFormCheckTimeoutRunner.reset();
 }
 
 
@@ -72,7 +72,7 @@ FormSafetyHelper::QuitRequested()
 		"            if (dirty) break;"
 		"        }"
 		"    } catch(e) {}"
-		"    window.status = 'WebPositive:FormDirty:' + (dirty ? 'true' : 'false');"
+		"    console.log('WebPositive:FormDirty:' + (dirty ? 'true' : 'false'));"
 		"})();"
 	);
 
@@ -117,11 +117,11 @@ FormSafetyHelper::MessageReceived(BMessage* message)
 
 
 void
-FormSafetyHelper::StatusChanged(const BString& statusText, BWebView* view)
+FormSafetyHelper::ConsoleMessage(const BString& message)
 {
-	if (statusText.Compare("WebPositive:FormDirty:", 22) == 0) {
+	if (message.Compare("WebPositive:FormDirty:", 22) == 0) {
 		if (fFormCheckPending) {
-			if (strncmp(statusText.String() + 22, "true", 4) == 0)
+			if (strncmp(message.String() + 22, "true", 4) == 0)
 				fDirtyTabs++;
 
 			fTabsToCheck--;

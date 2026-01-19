@@ -22,7 +22,7 @@ public:
 
 			bool				QuitRequested();
 			void				MessageReceived(BMessage* message);
-			void				StatusChanged(const BString& status, BWebView* view);
+			void				ConsoleMessage(const BString& message);
 
 			bool				IsFormCheckPending() const { return fFormCheckPending; }
 			bool				IsForceClose() const { return fForceClose; }

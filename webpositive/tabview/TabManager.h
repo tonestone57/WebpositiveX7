@@ -10,6 +10,8 @@
 #include <String.h>
 #include <TabView.h>
 
+#include <memory>
+
 enum {
 	TAB_CHANGED = 'tcha',
 	CLOSE_TAB = 'cltb'
@@ -75,7 +77,7 @@ private:
 			TabContainerView*	fTabContainerView;
 			BView*				fContainerView;
 			BCardLayout*		fCardLayout;
-			TabManagerController* fController;
+			std::unique_ptr<TabManagerController> fController;
 
 			BMessenger			fTarget;
 };

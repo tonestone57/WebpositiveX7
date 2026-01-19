@@ -264,13 +264,10 @@ public:
 				for (int32 i = 0; i < tabCount; i++) {
 					TabView* tab = fTabContainerView->TabAt(i);
 					if (tab != NULL) {
-						BMenuItem* item = new(std::nothrow)
-							BMenuItem(tab->Label(), NULL);
-						if (item != NULL) {
-							tabMenu->AddItem(item);
-							if (i == fTabContainerView->SelectedTabIndex())
-								item->SetMarked(true);
-						}
+						BMenuItem* item = new BMenuItem(tab->Label(), NULL);
+						tabMenu->AddItem(item);
+						if (i == fTabContainerView->SelectedTabIndex())
+							item->SetMarked(true);
 					}
 				}
 
@@ -876,7 +873,6 @@ TabManager::TabManager(const BMessenger& target, BMessage* newTabMessage)
 
 TabManager::~TabManager()
 {
-	delete fController;
 }
 
 

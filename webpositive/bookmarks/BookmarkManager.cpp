@@ -228,18 +228,16 @@ BookmarkManager::CreateBookmarkFromMessage(BMessage* message)
 	ssize_t largeIconSize = 0;
 	if (originatorData.FindData("largeIcon", B_RGBA32_TYPE,
 			&largeIconData, &largeIconSize) == B_OK) {
-		largeIcon = new(std::nothrow) BBitmap(BRect(0, 0, 31, 31),
+		largeIcon = new BBitmap(BRect(0, 0, 31, 31),
 			B_RGBA32);
-		if (largeIcon != NULL) {
-			if (largeIcon->InitCheck() == B_OK
-				&& largeIcon->BitsLength() == largeIconSize) {
-				// Use new ImportBits signature
-				largeIcon->ImportBits(largeIconData, largeIconSize, 0, 0,
-					B_RGBA32);
-			} else {
-				delete largeIcon;
-				largeIcon = NULL;
-			}
+		if (largeIcon->InitCheck() == B_OK
+			&& largeIcon->BitsLength() == largeIconSize) {
+			// Use new ImportBits signature
+			largeIcon->ImportBits(largeIconData, largeIconSize, 0, 0,
+				B_RGBA32);
+		} else {
+			delete largeIcon;
+			largeIcon = NULL;
 		}
 	}
 

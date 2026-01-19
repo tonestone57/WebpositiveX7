@@ -210,8 +210,7 @@ BrowsingHistory::ImportHistory(const BPath& path)
 	off_t size;
 	file.GetSize(&size);
 	// Optimize: raw buffer for manual parsing
-	char* buffer = new(std::nothrow) char[size + 1];
-	if (!buffer) return B_NO_MEMORY;
+	char* buffer = new char[size + 1];
 
 	if (file.Read(buffer, size) != size) {
 		delete[] buffer;
@@ -334,21 +333,19 @@ BrowsingHistory::ImportHistory(const BPath& path)
 		if (DefaultInstance()->fHistoryMap.find(item.URL())
 				== DefaultInstance()->fHistoryMap.end()) {
 			// Item does not exist, add it
-			BrowsingHistoryItem* newItem = new(std::nothrow) BrowsingHistoryItem(item);
-			if (newItem) {
-				bool pushed = false;
-				try {
-					DefaultInstance()->fHistoryList.push_back(newItem);
-					pushed = true;
-					DefaultInstance()->fHistoryMap[newItem->URL()] = newItem;
-					importedCount++;
-				} catch (...) {
-					// In case of allocation error in the map
-					if (pushed)
-						DefaultInstance()->fHistoryList.pop_back();
-					delete newItem;
-					// Continue to next item
-				}
+			BrowsingHistoryItem* newItem = new BrowsingHistoryItem(item);
+			bool pushed = false;
+			try {
+				DefaultInstance()->fHistoryList.push_back(newItem);
+				pushed = true;
+				DefaultInstance()->fHistoryMap[newItem->URL()] = newItem;
+				importedCount++;
+			} catch (...) {
+				// In case of allocation error in the map
+				if (pushed)
+					DefaultInstance()->fHistoryList.pop_back();
+				delete newItem;
+				// Continue to next item
 			}
 		}
 	}
@@ -577,9 +574,7 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 		return true;
 	}
 
-	BrowsingHistoryItem* newItem = new(std::nothrow) BrowsingHistoryItem(item);
-	if (!newItem)
-		return false;
+	BrowsingHistoryItem* newItem = new BrowsingHistoryItem(item);
 
 	try {
 		HistoryList::iterator listIt = std::lower_bound(fHistoryList.begin(),
@@ -718,11 +713,9 @@ BrowsingHistory::_LoadSettings()
 			if (oldestAllowedDateTime < item.DateTime()) {
 				// Bulk load: create item and push back, sort later
 				if (fHistoryMap.find(item.URL()) == fHistoryMap.end()) {
-					BrowsingHistoryItem* newItem = new(std::nothrow) BrowsingHistoryItem(item);
-					if (newItem) {
-						fHistoryList.push_back(newItem);
-						fHistoryMap[newItem->URL()] = newItem;
-					}
+					BrowsingHistoryItem* newItem = new BrowsingHistoryItem(item);
+					fHistoryList.push_back(newItem);
+					fHistoryMap[newItem->URL()] = newItem;
 				}
 			}
 			historyItemArchive.MakeEmpty();
@@ -753,16 +746,13 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 			historyItemArchive.MakeEmpty();
 		}
 
-		BAutolock _(sSaveLock);
+		BAutolock _(&sSaveLock);
 		sIsShuttingDown = true;
 		_SaveToDisk(&settingsArchive);
 		return;
 	}
 
-	SaveContext* context = new(std::nothrow) SaveContext();
-	if (context == NULL)
-		return;
-
+	SaveContext* context = new SaveContext();
 	context->maxAge = fMaxHistoryItemAge;
 
 	try {
@@ -806,7 +796,7 @@ BrowsingHistory::_SaveHistoryThread(void* cookie)
 		historyItemArchive.MakeEmpty();
 	}
 
-	BAutolock _(sSaveLock);
+	BAutolock _(&sSaveLock);
 
 	if (sIsShuttingDown) {
 		delete context;
@@ -831,7 +821,7 @@ BrowsingHistory::_ScheduleSave()
 		return;
 
 	BMessage message(SAVE_HISTORY);
-	fSaveRunner = new(std::nothrow) BMessageRunner(BMessenger(this),
+	fSaveRunner = new BMessageRunner(BMessenger(this),
 		&message, 2000000, 1);
 }
 

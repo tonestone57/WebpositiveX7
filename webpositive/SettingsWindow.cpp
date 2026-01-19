@@ -105,8 +105,6 @@ SettingsWindow::SettingsWindow(BRect frame, SettingsMessage* settings)
 	fRevertButton = new BButton(B_TRANSLATE("Revert"),
 		new BMessage(MSG_REVERT));
 
-	fOpenFilePanel = NULL;
-
 	float spacing = be_control_look->DefaultItemSpacing();
 
 	BTabView* tabView = new BTabView("settings pages", B_WIDTH_FROM_LABEL);
@@ -164,7 +162,6 @@ SettingsWindow::~SettingsWindow()
 	delete fSansSerifFontView;
 	RemoveHandler(fFixedFontView);
 	delete fFixedFontView;
-	delete fOpenFilePanel;
 }
 
 
@@ -192,7 +189,7 @@ SettingsWindow::MessageReceived(BMessage* message)
 			_ChooseDownloadFolder(message);
 			break;
 		case MSG_HANDLE_DOWNLOAD_FOLDER:
-			_HandleDownloadPanelResult(fOpenFilePanel, message);
+			_HandleDownloadPanelResult(fOpenFilePanel.get(), message);
 			fSettings->SetValue(kSettingsKeyDownloadPath,
 				fDownloadFolderControl->Text());
 			fSettings->Save();
@@ -1075,8 +1072,8 @@ SettingsWindow::_ChooseDownloadFolder(const BMessage* message)
 {
 	if (fOpenFilePanel == NULL) {
 		BMessenger target(this);
-		fOpenFilePanel = new (std::nothrow) BFilePanel(B_OPEN_PANEL,
-			&target, NULL, B_DIRECTORY_NODE);
+		fOpenFilePanel.reset(new BFilePanel(B_OPEN_PANEL,
+			&target, NULL, B_DIRECTORY_NODE));
 	}
 	BMessage panelMessage(MSG_HANDLE_DOWNLOAD_FOLDER);
 	fOpenFilePanel->SetMessage(&panelMessage);

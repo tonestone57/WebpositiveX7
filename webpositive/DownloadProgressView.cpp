@@ -593,10 +593,9 @@ DownloadProgressView::MessageReceived(BMessage* message)
 
 		case REMOVE_DOWNLOAD:
 		{
-			Window()->PostMessage(SAVE_SETTINGS);
-			RemoveSelf();
-			delete this;
-			// TOAST!
+			BMessage msg(REMOVE_DOWNLOAD_VIEW);
+			msg.AddPointer("view", this);
+			Window()->PostMessage(&msg);
 			return;
 		}
 

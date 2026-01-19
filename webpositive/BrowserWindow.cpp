@@ -78,6 +78,7 @@
 #include <Url.h>
 
 #include <map>
+#include <vector>
 #include <algorithm>
 #include <stdio.h>
 
@@ -1411,10 +1412,15 @@ BrowserWindow::MessageReceived(BMessage* message)
 					fNetworkWindow->Activate();
 			} else {
 				fNetworkWindow = new NetworkWindow(BRect(150, 150, 600, 500));
+				fNetworkWindow->SetTarget(BMessenger(this));
 				fNetworkWindow->Show();
 			}
 			break;
 		}
+
+		case NETWORK_WINDOW_CLOSED:
+			fNetworkWindow = NULL;
+			break;
 
 		case TOGGLE_FULLSCREEN:
 			ToggleFullscreen();
@@ -1667,10 +1673,15 @@ BrowserWindow::MessageReceived(BMessage* message)
 			} else {
 				fPermissionsWindow = new PermissionsWindow(BRect(100, 100, 400, 400),
 					fContext->GetCookieJar());
+				fPermissionsWindow->SetTarget(BMessenger(this));
 				fPermissionsWindow->Show();
 			}
 			break;
 		}
+
+		case PERMISSIONS_WINDOW_CLOSED:
+			fPermissionsWindow = NULL;
+			break;
 
 		case CLOSE_TAB:
 			if (fTabManager->CountTabs() > 1) {
@@ -1917,6 +1928,19 @@ BrowserWindow::MessageReceived(BMessage* message)
 			BString text;
 			if (message->FindString("string", &text) == B_OK) {
 				const char* kOpenPrivatePrefix = "OPEN_IN_PRIVATE_WINDOW:";
+				if (text.StartsWith(kOpenPrivatePrefix)) {
+					BString url = text;
+					url.RemoveFirst(kOpenPrivatePrefix);
+					BMessage* newPrivateWindowMessage = new BMessage(NEW_WINDOW);
+					newPrivateWindowMessage->AddString("url", url);
+					newPrivateWindowMessage->AddBool("private", true);
+					be_app->PostMessage(newPrivateWindowMessage);
+					break;
+				}
+				if (text.StartsWith("WebPositive:FormDirty:")) {
+					fFormSafetyHelper->ConsoleMessage(text);
+					break;
+				}
 				if (text.StartsWith(kOpenPrivatePrefix)) {
 					BString url = text;
 					url.RemoveFirst(kOpenPrivatePrefix);
@@ -2200,7 +2224,7 @@ BrowserWindow::SetCurrentWebView(BWebView* webView)
 		PageUserData* userData = static_cast<PageUserData*>(
 			CurrentWebView()->GetUserData());
 		if (userData == NULL) {
-			userData = new PageUserData(CurrentFocus());
+		userData = new PageUserData(CurrentFocus());
 			CurrentWebView()->SetUserData(userData);
 		}
 		userData->SetFocusedView(CurrentFocus());
@@ -2491,32 +2515,42 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 
 	// Ad-Block List
 	if (fAppSettings->GetValue(kSettingsKeyBlockAds, false)) {
-		static const char* kBlockedDomains[] = {
-			"doubleclick.net",
-			"googlesyndication.com",
-			"google-analytics.com",
-			"adservice.google.com",
-			"facebook.net",
-			"connect.facebook.net",
-			NULL
-		};
+		static const std::vector<BString> kBlockedDomains = [] {
+			std::vector<BString> domains;
+			domains.push_back("adservice.google.com");
+			domains.push_back("connect.facebook.net");
+			domains.push_back("doubleclick.net");
+			domains.push_back("facebook.net");
+			domains.push_back("google-analytics.com");
+			domains.push_back("googlesyndication.com");
+			std::sort(domains.begin(), domains.end());
+			return domains;
+		}();
 
 		BUrl checkUrl(url);
 		if (checkUrl.IsValid()) {
 			BString host = checkUrl.Host();
 			host.ToLower();
-			for (int i = 0; kBlockedDomains[i]; i++) {
-				// Check if host matches exactly or ends with .domain
-				if (host == kBlockedDomains[i]) {
-					if (view)
-						view->LoadURL("about:blank");
-					return;
-				}
 
-				int32 hostLen = host.Length();
-				int32 domainLen = strlen(kBlockedDomains[i]);
-				if (hostLen >= domainLen + 1 && host.EndsWith(kBlockedDomains[i])) {
-					if (host.ByteAt(hostLen - domainLen - 1) == '.') {
+			// Binary search for exact match
+			if (std::binary_search(kBlockedDomains.begin(), kBlockedDomains.end(), host)) {
+				if (view)
+					view->LoadURL("about:blank");
+				return;
+			}
+
+			// Check for subdomain match (e.g. ad.doubleclick.net)
+			// This is still O(N) in worst case unless we optimize domain tree, but N is small (6).
+			// With larger list, a trie or reversed domain sort would be better.
+			// Given the constraint "sorted vector and binary search", exact match is fast.
+			// For suffix match, we can lower_bound to find potential candidates.
+
+			// Simple suffix check for now as per previous logic, but using vector
+			for (const auto& domain : kBlockedDomains) {
+				if (host.EndsWith(domain)) {
+					int32 hostLen = host.Length();
+					int32 domainLen = domain.Length();
+					if (hostLen > domainLen && host.ByteAt(hostLen - domainLen - 1) == '.') {
 						if (view)
 							view->LoadURL("about:blank");
 						return;
@@ -3270,12 +3304,11 @@ BrowserWindow::_ShutdownTab(int32 index)
 	// webView pointer is still valid here, as RemoveTab only removed it from layout
 	if (webView == CurrentWebView())
 		SetCurrentWebView(NULL);
-	if (webView != NULL) {
+
+	if (webView != NULL)
 		webView->Shutdown();
-		delete webView;
-	} else {
-		delete view;
-	}
+
+	delete view;
 }
 
 
@@ -3293,9 +3326,7 @@ BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon, bool save)
 {
 	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
 	if (userData == NULL) {
-		userData = new(std::nothrow) PageUserData(NULL);
-		if (userData == NULL)
-			return;
+		userData = new PageUserData(NULL);
 		view->SetUserData(userData);
 	}
 	// The PageUserData makes a copy of the icon, which we pass on to

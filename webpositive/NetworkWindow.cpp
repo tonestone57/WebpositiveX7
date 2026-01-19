@@ -4,6 +4,7 @@
  */
 
 #include "NetworkWindow.h"
+#include "BrowserWindow.h"
 
 #include <Button.h>
 #include <Catalog.h>
@@ -51,6 +52,9 @@ NetworkWindow::NetworkWindow(BRect frame)
 
 NetworkWindow::~NetworkWindow()
 {
+	if (fTarget.IsValid())
+		fTarget.SendMessage(NETWORK_WINDOW_CLOSED);
+
 	fPendingRequests.clear();
 	int32 count = fRequestListView->CountItems();
 	for (int32 i = count - 1; i >= 0; i--)
@@ -140,6 +144,13 @@ NetworkWindow::QuitRequested()
 	if (!IsHidden())
 		Hide();
 	return false;
+}
+
+
+void
+NetworkWindow::SetTarget(const BMessenger& target)
+{
+	fTarget = target;
 }
 
 

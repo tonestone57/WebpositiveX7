@@ -117,9 +117,7 @@ Sync::ImportCookies(const BPath& path,
 	off_t size;
 	file.GetSize(&size);
 	// Optimize: allocate raw buffer to avoid BString allocations
-	char* buffer = new(std::nothrow) char[size + 1];
-	if (buffer == NULL)
-		return B_NO_MEMORY;
+	char* buffer = new char[size + 1];
 
 	if (file.Read(buffer, size) != size) {
 		delete[] buffer;
