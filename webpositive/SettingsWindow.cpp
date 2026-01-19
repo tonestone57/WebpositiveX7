@@ -1072,7 +1072,7 @@ SettingsWindow::_ChooseDownloadFolder(const BMessage* message)
 {
 	if (fOpenFilePanel == NULL) {
 		BMessenger target(this);
-		fOpenFilePanel.reset(new (std::nothrow) BFilePanel(B_OPEN_PANEL,
+		fOpenFilePanel.reset(new BFilePanel(B_OPEN_PANEL,
 			&target, NULL, B_DIRECTORY_NODE));
 	}
 	BMessage panelMessage(MSG_HANDLE_DOWNLOAD_FOLDER);
