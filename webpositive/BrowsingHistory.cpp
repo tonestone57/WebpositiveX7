@@ -753,7 +753,7 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 			historyItemArchive.MakeEmpty();
 		}
 
-		BAutolock _(sSaveLock);
+		BAutolock _(&sSaveLock);
 		sIsShuttingDown = true;
 		_SaveToDisk(&settingsArchive);
 		return;
@@ -806,7 +806,7 @@ BrowsingHistory::_SaveHistoryThread(void* cookie)
 		historyItemArchive.MakeEmpty();
 	}
 
-	BAutolock _(sSaveLock);
+	BAutolock _(&sSaveLock);
 
 	if (sIsShuttingDown) {
 		delete context;

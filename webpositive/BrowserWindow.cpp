@@ -1927,12 +1927,20 @@ BrowserWindow::MessageReceived(BMessage* message)
 		{
 			BString text;
 			if (message->FindString("string", &text) == B_OK) {
-				if (text.Compare("WebPositive:FormDirty:", 22) == 0) {
-					fFormSafetyHelper->StatusChanged(text, CurrentWebView());
+				const char* kOpenPrivatePrefix = "OPEN_IN_PRIVATE_WINDOW:";
+				if (text.StartsWith(kOpenPrivatePrefix)) {
+					BString url = text;
+					url.RemoveFirst(kOpenPrivatePrefix);
+					BMessage* newPrivateWindowMessage = new BMessage(NEW_WINDOW);
+					newPrivateWindowMessage->AddString("url", url);
+					newPrivateWindowMessage->AddBool("private", true);
+					be_app->PostMessage(newPrivateWindowMessage);
 					break;
 				}
-
-				const char* kOpenPrivatePrefix = "OPEN_IN_PRIVATE_WINDOW:";
+				if (text.StartsWith("WebPositive:FormDirty:")) {
+					fFormSafetyHelper->ConsoleMessage(text);
+					break;
+				}
 				if (text.StartsWith(kOpenPrivatePrefix)) {
 					BString url = text;
 					url.RemoveFirst(kOpenPrivatePrefix);
@@ -2507,32 +2515,42 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 
 	// Ad-Block List
 	if (fAppSettings->GetValue(kSettingsKeyBlockAds, false)) {
-		static const char* kBlockedDomains[] = {
-			"doubleclick.net",
-			"googlesyndication.com",
-			"google-analytics.com",
-			"adservice.google.com",
-			"facebook.net",
-			"connect.facebook.net",
-			NULL
-		};
+		static const std::vector<BString> kBlockedDomains = [] {
+			std::vector<BString> domains;
+			domains.push_back("adservice.google.com");
+			domains.push_back("connect.facebook.net");
+			domains.push_back("doubleclick.net");
+			domains.push_back("facebook.net");
+			domains.push_back("google-analytics.com");
+			domains.push_back("googlesyndication.com");
+			std::sort(domains.begin(), domains.end());
+			return domains;
+		}();
 
 		BUrl checkUrl(url);
 		if (checkUrl.IsValid()) {
 			BString host = checkUrl.Host();
 			host.ToLower();
-			for (int i = 0; kBlockedDomains[i]; i++) {
-				// Check if host matches exactly or ends with .domain
-				if (host == kBlockedDomains[i]) {
-					if (view)
-						view->LoadURL("about:blank");
-					return;
-				}
 
-				int32 hostLen = host.Length();
-				int32 domainLen = strlen(kBlockedDomains[i]);
-				if (hostLen >= domainLen + 1 && host.EndsWith(kBlockedDomains[i])) {
-					if (host.ByteAt(hostLen - domainLen - 1) == '.') {
+			// Binary search for exact match
+			if (std::binary_search(kBlockedDomains.begin(), kBlockedDomains.end(), host)) {
+				if (view)
+					view->LoadURL("about:blank");
+				return;
+			}
+
+			// Check for subdomain match (e.g. ad.doubleclick.net)
+			// This is still O(N) in worst case unless we optimize domain tree, but N is small (6).
+			// With larger list, a trie or reversed domain sort would be better.
+			// Given the constraint "sorted vector and binary search", exact match is fast.
+			// For suffix match, we can lower_bound to find potential candidates.
+
+			// Simple suffix check for now as per previous logic, but using vector
+			for (const auto& domain : kBlockedDomains) {
+				if (host.EndsWith(domain)) {
+					int32 hostLen = host.Length();
+					int32 domainLen = domain.Length();
+					if (hostLen > domainLen && host.ByteAt(hostLen - domainLen - 1) == '.') {
 						if (view)
 							view->LoadURL("about:blank");
 						return;

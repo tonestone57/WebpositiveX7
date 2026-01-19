@@ -839,7 +839,7 @@ TabManagerController::SetDoubleClickOutsideTabsMessage(const BMessage& message,
 
 TabManager::TabManager(const BMessenger& target, BMessage* newTabMessage)
 	:
-	fController(new TabManagerController(this)),
+	fController(new(std::nothrow) TabManagerController(this)),
 	fTarget(target)
 {
 	fController->SetDoubleClickOutsideTabsMessage(*newTabMessage,
