@@ -853,6 +853,13 @@ BrowserWindow::~BrowserWindow()
 		fNetworkWindow->PrepareToQuit();
 		fNetworkWindow->Quit();
 	}
+
+	if (fTabSearchWindow) {
+		if (fTabSearchWindow->Lock()) {
+			fTabSearchWindow->Quit();
+			fTabSearchWindow = NULL;
+		}
+	}
 }
 
 
