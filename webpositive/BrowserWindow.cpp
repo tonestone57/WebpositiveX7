@@ -192,6 +192,54 @@ static const int32 kModifiers = B_SHIFT_KEY | B_COMMAND_KEY
 
 static const char* kBookmarkBarSubdir = "Bookmark bar";
 
+
+struct SyncParams {
+	BPath path;
+	BPrivate::Network::BUrlContext* context;
+	BMessenger target;
+};
+
+
+static status_t
+_ExportProfileThread(void* data)
+{
+	SyncParams* params = static_cast<SyncParams*>(data);
+	status_t status = Sync::ExportProfile(params->path, params->context->GetCookieJar());
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to export profile"));
+		errorMsg << ": " << strerror(status);
+		BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go();
+	}
+
+	params->context->Release();
+	delete params;
+	return B_OK;
+}
+
+
+static status_t
+_ImportProfileThread(void* data)
+{
+	SyncParams* params = static_cast<SyncParams*>(data);
+	status_t status = Sync::ImportProfile(params->path, params->context->GetCookieJar());
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to import profile"));
+		errorMsg << ": " << strerror(status);
+		BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go();
+	}
+
+	params->context->Release();
+	delete params;
+	return B_OK;
+}
+
+
 static BLayoutItem*
 layoutItemFor(BView* view)
 {
@@ -849,9 +897,10 @@ BrowserWindow::~BrowserWindow()
 		}
 	}
 	if (fNetworkWindow) {
-		fNetworkWindow->Lock();
-		fNetworkWindow->PrepareToQuit();
-		fNetworkWindow->Quit();
+		if (fNetworkWindow->Lock()) {
+			fNetworkWindow->PrepareToQuit();
+			fNetworkWindow->Quit();
+		}
 	}
 
 	if (fTabSearchWindow) {
@@ -1168,13 +1217,20 @@ BrowserWindow::MessageReceived(BMessage* message)
 				&& message->FindString("name", &name) == B_OK) {
 				BPath path(&ref);
 				path.Append(name);
-				status_t status = Sync::ExportProfile(path, fContext->GetCookieJar());
-				if (status != B_OK) {
-					BString errorMsg(B_TRANSLATE("Failed to export profile"));
-					errorMsg << ": " << strerror(status);
-					BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
-						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go();
+
+				SyncParams* params = new SyncParams;
+				params->path = path;
+				params->context = fContext.Get();
+				params->context->Acquire();
+				params->target = BMessenger(this);
+
+				thread_id thread = spawn_thread(_ExportProfileThread, "Export Profile",
+					B_NORMAL_PRIORITY, params);
+				if (thread >= 0) {
+					resume_thread(thread);
+				} else {
+					params->context->Release();
+					delete params;
 				}
 			}
 			break;
@@ -1185,16 +1241,21 @@ BrowserWindow::MessageReceived(BMessage* message)
 			entry_ref ref;
 			if (message->FindRef("refs", &ref) == B_OK) {
 				BPath path(&ref);
-				status_t status = Sync::ImportProfile(path, fContext->GetCookieJar());
-				if (status != B_OK) {
-					BString errorMsg(B_TRANSLATE("Failed to import profile"));
-					errorMsg << ": " << strerror(status);
-					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
-						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go();
+
+				SyncParams* params = new SyncParams;
+				params->path = path;
+				params->context = fContext.Get();
+				params->context->Acquire();
+				params->target = BMessenger(this);
+
+				thread_id thread = spawn_thread(_ImportProfileThread, "Import Profile",
+					B_NORMAL_PRIORITY, params);
+				if (thread >= 0) {
+					resume_thread(thread);
+				} else {
+					params->context->Release();
+					delete params;
 				}
-				// Refresh cookies?
-				// Refresh bookmarks?
 			}
 			break;
 		}
@@ -2144,32 +2205,25 @@ BrowserWindow::MenusBeginning()
 					}
 
 					// Grouping (Color)
-					// Prevent duplication by removing existing "Set tab color" menu
-					for (int32 i = 0; i < viewMenu->CountItems(); i++) {
-						BMenuItem* item = viewMenu->ItemAt(i);
-						if (strcmp(item->Label(), B_TRANSLATE("Set tab color")) == 0) {
-							viewMenu->RemoveItem(i);
-							delete item;
-							break;
+					// Only add if not already present
+					if (viewMenu->FindItem(B_TRANSLATE("Set tab color")) == NULL) {
+						BMenu* colorMenu = new BMenu(B_TRANSLATE("Set tab color"));
+						const char* kColorNames[] = {"None", "Red", "Green", "Blue", "Yellow"};
+						rgb_color kColors[] = {
+							ui_color(B_PANEL_BACKGROUND_COLOR),
+							{255, 100, 100, 255},
+							{100, 255, 100, 255},
+							{100, 100, 255, 255},
+							{255, 255, 100, 255}
+						};
+
+						for (size_t i = 0; i < sizeof(kColorNames)/sizeof(char*); i++) {
+							BMessage* colorMsg = new BMessage(SET_TAB_COLOR);
+							colorMsg->AddColor("color", kColors[i]);
+							colorMenu->AddItem(new BMenuItem(kColorNames[i], colorMsg));
 						}
+						viewMenu->AddItem(colorMenu);
 					}
-
-					BMenu* colorMenu = new BMenu(B_TRANSLATE("Set tab color"));
-					const char* kColorNames[] = {"None", "Red", "Green", "Blue", "Yellow"};
-					rgb_color kColors[] = {
-						ui_color(B_PANEL_BACKGROUND_COLOR),
-						{255, 100, 100, 255},
-						{100, 255, 100, 255},
-						{100, 100, 255, 255},
-						{255, 255, 100, 255}
-					};
-
-					for (size_t i = 0; i < sizeof(kColorNames)/sizeof(char*); i++) {
-						BMessage* colorMsg = new BMessage(SET_TAB_COLOR);
-						colorMsg->AddColor("color", kColors[i]);
-						colorMenu->AddItem(new BMenuItem(kColorNames[i], colorMsg));
-					}
-					viewMenu->AddItem(colorMenu);
 				}
 			}
 		}

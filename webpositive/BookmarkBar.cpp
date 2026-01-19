@@ -150,7 +150,7 @@ BookmarkBar::BookmarkBar(const char* title, BHandler* target,
 	fOverflowMenu = new BMenu(B_UTF8_ELLIPSIS);
 	fOverflowMenuOwner.reset(fOverflowMenu);
 
-	fPopUpMenu = new BPopUpMenu("Bookmark Popup", false, false);
+	fPopUpMenu.reset(new BPopUpMenu("Bookmark Popup", false, false));
 	fPopUpMenu->AddItem(
 		new BMenuItem(B_TRANSLATE("Open in new tab"), new BMessage(kOpenNewTabMsg)));
 	fPopUpMenu->AddItem(new BMenuItem(B_TRANSLATE("Rename"), new BMessage(kAskBookmarkNameMsg)));
@@ -164,7 +164,6 @@ BookmarkBar::BookmarkBar(const char* title, BHandler* target,
 BookmarkBar::~BookmarkBar()
 {
 	stop_watching(BMessenger(this));
-	delete fPopUpMenu;
 }
 
 
