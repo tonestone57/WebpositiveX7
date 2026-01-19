@@ -2643,17 +2643,25 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 		if (url.StartsWith("http://")) {
 			BUrl newUrl(url);
 			if (newUrl.IsValid()) {
-				newUrl.SetProtocol("https");
-				if (newUrl.Port() == 80)
-					newUrl.SetPort(443);
-
-				BString httpsUrl = newUrl.UrlString();
-				if (view) {
-					if (userData)
-						userData->SetExpectedUpgradedUrl(httpsUrl);
-					view->LoadURL(httpsUrl);
+				bool skipUpgrade = false;
+				if (userData && userData->AllowedInsecureHost() == newUrl.Host()) {
+					// User allowed this host to be insecure
+					skipUpgrade = true;
 				}
-				return; // Abort this load, we started a new one
+
+				if (!skipUpgrade) {
+					newUrl.SetProtocol("https");
+					if (newUrl.Port() == 80)
+						newUrl.SetPort(443);
+
+					BString httpsUrl = newUrl.UrlString();
+					if (view) {
+						if (userData)
+							userData->SetExpectedUpgradedUrl(httpsUrl);
+						view->LoadURL(httpsUrl);
+					}
+					return; // Abort this load, we started a new one
+				}
 			}
 		}
 	}
@@ -2788,8 +2796,34 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 		"Don't translate variable %url."));
 	status.ReplaceFirst("%url", url);
 
-	if (userData != NULL && userData->IsHttpsUpgraded())
+	if (userData != NULL && userData->IsHttpsUpgraded()) {
 		status << " " << B_TRANSLATE("(HTTPS-Only mode)");
+
+		BString text(B_TRANSLATE("The secure connection to %url failed."));
+		text.ReplaceFirst("%url", url);
+		text << "\n\n" << B_TRANSLATE("Do you want to try loading the unencrypted (insecure) version?");
+
+		BAlert* alert = new BAlert(B_TRANSLATE("HTTPS-Only Mode"), text.String(),
+			B_TRANSLATE("Cancel"), B_TRANSLATE("Load Insecurely"));
+
+		if (alert->Go() == 1) {
+			BString httpUrl = url;
+			if (httpUrl.StartsWith("https://")) {
+				httpUrl.ReplaceFirst("https://", "http://");
+			} else {
+				httpUrl.Prepend("http://");
+			}
+
+			// Allow this host
+			BUrl u(httpUrl);
+			userData->SetAllowedInsecureHost(u.Host());
+			userData->SetHttpsUpgraded(false);
+			userData->SetExpectedUpgradedUrl("");
+
+			view->LoadURL(httpUrl);
+			return;
+		}
+	}
 
 	view->WebPage()->SetStatusMessage(status);
 	_EnsureProgressBarHidden();
