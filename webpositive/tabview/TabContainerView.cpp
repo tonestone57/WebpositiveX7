@@ -52,13 +52,8 @@ TabContainerView::TabContainerView(Controller* controller)
 
 TabContainerView::~TabContainerView()
 {
-	if (fPreviewWindow && !fPreviewWindow->IsHidden())
+	if (fPreviewWindow)
 		fPreviewWindow->Quit();
-	// Since fPreviewWindow is a BWindow, Quit() deletes it.
-	// If it was just hidden, we still need to clean it up.
-	// But BWindow auto-destructs on Quit().
-	// To be safe, if we own it we should Quit it.
-	// BWindow::Quit() handles deletion.
 }
 
 
