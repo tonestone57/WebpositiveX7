@@ -14,7 +14,7 @@ class SitePermissionsManager {
 public:
 	static SitePermissionsManager* Instance();
 
-	bool CheckPermission(const char* url, bool& allowJS, bool& allowCookies, bool& allowPopups, float& zoom, bool& forceDesktop);
+	bool CheckPermission(const char* url, bool& allowJS, bool& allowCookies, bool& allowPopups, float& zoom, bool& forceDesktop, BString& customUserAgent);
 	void Reload();
 	void SetZoom(const char* domain, float zoom);
 

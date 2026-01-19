@@ -17,8 +17,8 @@ extern const char* kApplicationName;
 
 SitePermissionsManager* SitePermissionsManager::Instance()
 {
-	static SitePermissionsManager* sInstance = new SitePermissionsManager();
-	return sInstance;
+	static SitePermissionsManager sInstance;
+	return &sInstance;
 }
 
 
