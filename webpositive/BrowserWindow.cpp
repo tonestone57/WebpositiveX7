@@ -78,6 +78,7 @@
 #include <Url.h>
 
 #include <map>
+#include <vector>
 #include <algorithm>
 #include <stdio.h>
 
@@ -1411,10 +1412,15 @@ BrowserWindow::MessageReceived(BMessage* message)
 					fNetworkWindow->Activate();
 			} else {
 				fNetworkWindow = new NetworkWindow(BRect(150, 150, 600, 500));
+				fNetworkWindow->SetTarget(BMessenger(this));
 				fNetworkWindow->Show();
 			}
 			break;
 		}
+
+		case NETWORK_WINDOW_CLOSED:
+			fNetworkWindow = NULL;
+			break;
 
 		case TOGGLE_FULLSCREEN:
 			ToggleFullscreen();
@@ -1667,10 +1673,15 @@ BrowserWindow::MessageReceived(BMessage* message)
 			} else {
 				fPermissionsWindow = new PermissionsWindow(BRect(100, 100, 400, 400),
 					fContext->GetCookieJar());
+				fPermissionsWindow->SetTarget(BMessenger(this));
 				fPermissionsWindow->Show();
 			}
 			break;
 		}
+
+		case PERMISSIONS_WINDOW_CLOSED:
+			fPermissionsWindow = NULL;
+			break;
 
 		case CLOSE_TAB:
 			if (fTabManager->CountTabs() > 1) {
@@ -1916,6 +1927,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 		{
 			BString text;
 			if (message->FindString("string", &text) == B_OK) {
+				if (text.Compare("WebPositive:FormDirty:", 22) == 0) {
+					fFormSafetyHelper->StatusChanged(text, CurrentWebView());
+					break;
+				}
+
 				const char* kOpenPrivatePrefix = "OPEN_IN_PRIVATE_WINDOW:";
 				if (text.StartsWith(kOpenPrivatePrefix)) {
 					BString url = text;
@@ -3270,12 +3286,11 @@ BrowserWindow::_ShutdownTab(int32 index)
 	// webView pointer is still valid here, as RemoveTab only removed it from layout
 	if (webView == CurrentWebView())
 		SetCurrentWebView(NULL);
-	if (webView != NULL) {
+
+	if (webView != NULL)
 		webView->Shutdown();
-		delete webView;
-	} else {
-		delete view;
-	}
+
+	delete view;
 }
 
 

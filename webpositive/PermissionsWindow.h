@@ -6,6 +6,7 @@
 #define PERMISSIONS_WINDOW_H
 
 #include <Window.h>
+#include <Messenger.h>
 #include <NetworkCookieJar.h>
 
 class BListView;
@@ -29,6 +30,7 @@ public:
 	virtual	bool				QuitRequested();
 	virtual void				Show();
 
+			void				SetTarget(const BMessenger& target);
 			void				PrepareToQuit();
 private:
 			void				_LoadPermissions();
@@ -39,6 +41,7 @@ private:
 
 private:
 			BPrivate::Network::BNetworkCookieJar& fCookieJar;
+			BMessenger			fTarget;
 
 			bool				fQuitting;
 			BListView*			fDomainList;

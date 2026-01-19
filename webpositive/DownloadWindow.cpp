@@ -338,6 +338,19 @@ DownloadWindow::MessageReceived(BMessage* message)
 		case REMOVE_MISSING_DOWNLOADS:
 			_RemoveMissingDownloads();
 			break;
+		case REMOVE_DOWNLOAD_VIEW:
+		{
+			DownloadProgressView* view;
+			if (message->FindPointer("view", (void**)&view) == B_OK) {
+				if (view->Download())
+					fDownloadsMap.erase(view->Download());
+				view->RemoveSelf();
+				delete view;
+				_ValidateButtonStatus();
+				_SaveSettings();
+			}
+			break;
+		}
 		case SAVE_SETTINGS:
 			_ValidateButtonStatus();
 			if (message->HasBool("perform_save"))

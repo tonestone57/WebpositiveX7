@@ -6,6 +6,7 @@
 #define NETWORK_WINDOW_H
 
 #include <Window.h>
+#include <Messenger.h>
 #include <String.h>
 #include <StringItem.h>
 
@@ -58,12 +59,14 @@ public:
 	virtual void MessageReceived(BMessage* message);
 	virtual bool QuitRequested();
 
+	void SetTarget(const BMessenger& target);
 	void PrepareToQuit();
 
 private:
 	BListView* fRequestListView;
 	BButton* fClearButton;
 	std::map<BString, std::deque<NetworkRequestItem*> > fPendingRequests;
+	BMessenger fTarget;
 	bool fQuitting;
 };
 

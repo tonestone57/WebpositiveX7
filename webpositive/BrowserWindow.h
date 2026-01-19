@@ -135,7 +135,9 @@ enum {
 	EXPORT_HISTORY								= 'exhi',
 	SYNC_EXPORT									= 'syex',
 	SYNC_IMPORT									= 'syim',
-	CHECK_MEMORY_PRESSURE			= 'cmem'
+	CHECK_MEMORY_PRESSURE			= 'cmem',
+	PERMISSIONS_WINDOW_CLOSED		= 'pwcl',
+	NETWORK_WINDOW_CLOSED			= 'nwcl'
 };
 
 

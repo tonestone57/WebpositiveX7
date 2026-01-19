@@ -72,7 +72,7 @@ FormSafetyHelper::QuitRequested()
 		"            if (dirty) break;"
 		"        }"
 		"    } catch(e) {}"
-		"    window.status = 'WebPositive:FormDirty:' + (dirty ? 'true' : 'false');"
+		"    console.log('WebPositive:FormDirty:' + (dirty ? 'true' : 'false'));"
 		"})();"
 	);
 

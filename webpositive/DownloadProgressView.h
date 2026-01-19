@@ -24,7 +24,8 @@ enum {
 	PAUSE_DOWNLOAD = 'padn',
 	RESUME_DOWNLOAD = 'rsdn',
 	SET_MIME_TYPE = 'smmt',
-	TOGGLE_OPEN_WHEN_DONE = 'topd'
+	TOGGLE_OPEN_WHEN_DONE = 'topd',
+	REMOVE_DOWNLOAD_VIEW = 'rmdv'
 };
 
 

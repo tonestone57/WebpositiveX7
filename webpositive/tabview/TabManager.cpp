@@ -876,7 +876,6 @@ TabManager::TabManager(const BMessenger& target, BMessage* newTabMessage)
 
 TabManager::~TabManager()
 {
-	delete fController;
 }
 
 
