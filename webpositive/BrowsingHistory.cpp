@@ -208,9 +208,18 @@ BrowsingHistory::ImportHistory(const BPath& path)
 		return status;
 
 	off_t size;
-	file.GetSize(&size);
+	status = file.GetSize(&size);
+	if (status != B_OK)
+		return status;
+
+	// 256 MB seems like a reasonable upper limit for a history file
+	if (size < 0 || size > 0x10000000)
+		return B_ERROR;
+
 	// Optimize: raw buffer for manual parsing
-	char* buffer = new char[size + 1];
+	char* buffer = new(std::nothrow) char[size + 1];
+	if (buffer == NULL)
+		return B_NO_MEMORY;
 
 	if (file.Read(buffer, size) != size) {
 		delete[] buffer;
@@ -408,9 +417,9 @@ BrowsingHistory::BrowsingHistory()
 
 BrowsingHistory::~BrowsingHistory()
 {
+	delete fSaveRunner;
 	_SaveSettings(true);
 	_Clear();
-	delete fSaveRunner;
 }
 
 
