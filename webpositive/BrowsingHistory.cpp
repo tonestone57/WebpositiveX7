@@ -365,9 +365,9 @@ BrowsingHistory::ImportHistory(const BPath& path)
 // #pragma mark - BrowsingHistory
 
 
+static BLocker sSaveLock("history save lock");
 BrowsingHistory
 BrowsingHistory::sDefaultInstance;
-static BLocker* sSaveLock = new BLocker("history save lock");
 static bool sIsShuttingDown = false;
 
 

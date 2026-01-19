@@ -853,6 +853,13 @@ BrowserWindow::~BrowserWindow()
 		fNetworkWindow->PrepareToQuit();
 		fNetworkWindow->Quit();
 	}
+
+	if (fTabSearchWindow) {
+		if (fTabSearchWindow->Lock()) {
+			fTabSearchWindow->Quit();
+			fTabSearchWindow = NULL;
+		}
+	}
 }
 
 
@@ -3965,7 +3972,12 @@ BrowserWindow::_SaveFavicon(const BString& url, const BBitmap* icon)
 		int32 height = saveIcon->Bounds().IntegerHeight() + 1;
 		file.Write(&width, sizeof(width));
 		file.Write(&height, sizeof(height));
-		file.Write(saveIcon->Bits(), saveIcon->BitsLength());
+
+		int32 bytesPerRow = saveIcon->BytesPerRow();
+		int32 rowLen = width * 4;
+		uint8* bits = (uint8*)saveIcon->Bits();
+		for (int32 i = 0; i < height; i++)
+			file.Write(bits + (i * bytesPerRow), rowLen);
 	}
 	delete saveIcon;
 }
@@ -3992,11 +4004,37 @@ BrowserWindow::_LoadFavicon(const BString& url, BWebView* view)
 			file.Read(&height, sizeof(height)) == sizeof(height)) {
 
 			if (width > 0 && width < 256 && height > 0 && height < 256) {
-				BBitmap* icon = new BBitmap(BRect(0, 0, width - 1, height - 1), B_RGBA32);
-				if (file.Read(icon->Bits(), icon->BitsLength()) == icon->BitsLength()) {
-					_SetPageIcon(view, icon, false); // Don't save back to disk
+				// Verify file size matches expected packed size
+				off_t size;
+				file.GetSize(&size);
+				off_t expectedSize = sizeof(width) + sizeof(height) + (off_t)width * height * 4;
+
+				if (size == expectedSize) {
+					BBitmap* icon = new BBitmap(BRect(0, 0, width - 1, height - 1), B_RGBA32);
+					if (icon->InitCheck() == B_OK) {
+						int32 bytesPerRow = icon->BytesPerRow();
+						int32 rowLen = width * 4;
+						uint8* bits = (uint8*)icon->Bits();
+						bool success = true;
+						for (int32 i = 0; i < height; i++) {
+							if (file.Read(bits + (i * bytesPerRow), rowLen) != rowLen) {
+								success = false;
+								break;
+							}
+						}
+						if (success) {
+							_SetPageIcon(view, icon, false); // Don't save back to disk
+						}
+					}
+					delete icon;
+				} else {
+					// Invalid size or legacy file with padding. Discard.
+					// We can't safely read legacy files because we don't know the original padding.
+					// Deleting the file forces a fresh fetch next time.
+					file.Unset();
+					BEntry entry(path.Path());
+					entry.Remove();
 				}
-				delete icon;
 			}
 		}
 	}

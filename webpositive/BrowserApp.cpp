@@ -220,6 +220,15 @@ BrowserApp::BrowserApp()
 
 BrowserApp::~BrowserApp()
 {
+	if (fDownloadWindow && fDownloadWindow->Lock())
+		fDownloadWindow->Quit();
+	if (fSettingsWindow && fSettingsWindow->Lock())
+		fSettingsWindow->Quit();
+	if (fConsoleWindow && fConsoleWindow->Lock())
+		fConsoleWindow->Quit();
+	if (fCookieWindow && fCookieWindow->Lock())
+		fCookieWindow->Quit();
+
 	if (fContext)
 		fContext->Release();
 	delete fLaunchRefsMessage;
