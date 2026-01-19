@@ -192,6 +192,85 @@ static const int32 kModifiers = B_SHIFT_KEY | B_COMMAND_KEY
 
 static const char* kBookmarkBarSubdir = "Bookmark bar";
 
+
+struct SyncParams {
+	BPath path;
+	BPrivate::Network::BUrlContext* context;
+	BMessenger target;
+};
+
+
+struct FaviconSaveParams {
+	BPath path;
+	BBitmap* icon;
+};
+
+
+static status_t
+_SaveFaviconThread(void* data)
+{
+	FaviconSaveParams* params = static_cast<FaviconSaveParams*>(data);
+
+	BFile file(params->path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+	if (file.InitCheck() == B_OK) {
+		int32 width = params->icon->Bounds().IntegerWidth() + 1;
+		int32 height = params->icon->Bounds().IntegerHeight() + 1;
+		file.Write(&width, sizeof(width));
+		file.Write(&height, sizeof(height));
+
+		int32 bytesPerRow = params->icon->BytesPerRow();
+		int32 rowLen = width * 4;
+		uint8* bits = (uint8*)params->icon->Bits();
+		for (int32 i = 0; i < height; i++)
+			file.Write(bits + (i * bytesPerRow), rowLen);
+	}
+
+	delete params->icon;
+	delete params;
+	return B_OK;
+}
+
+
+static status_t
+_ExportProfileThread(void* data)
+{
+	SyncParams* params = static_cast<SyncParams*>(data);
+	status_t status = Sync::ExportProfile(params->path, params->context->GetCookieJar());
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to export profile"));
+		errorMsg << ": " << strerror(status);
+		BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go();
+	}
+
+	params->context->Release();
+	delete params;
+	return B_OK;
+}
+
+
+static status_t
+_ImportProfileThread(void* data)
+{
+	SyncParams* params = static_cast<SyncParams*>(data);
+	status_t status = Sync::ImportProfile(params->path, params->context->GetCookieJar());
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to import profile"));
+		errorMsg << ": " << strerror(status);
+		BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go();
+	}
+
+	params->context->Release();
+	delete params;
+	return B_OK;
+}
+
+
 static BLayoutItem*
 layoutItemFor(BView* view)
 {
@@ -849,9 +928,10 @@ BrowserWindow::~BrowserWindow()
 		}
 	}
 	if (fNetworkWindow) {
-		fNetworkWindow->Lock();
-		fNetworkWindow->PrepareToQuit();
-		fNetworkWindow->Quit();
+		if (fNetworkWindow->Lock()) {
+			fNetworkWindow->PrepareToQuit();
+			fNetworkWindow->Quit();
+		}
 	}
 
 	if (fTabSearchWindow) {
@@ -1168,13 +1248,20 @@ BrowserWindow::MessageReceived(BMessage* message)
 				&& message->FindString("name", &name) == B_OK) {
 				BPath path(&ref);
 				path.Append(name);
-				status_t status = Sync::ExportProfile(path, fContext->GetCookieJar());
-				if (status != B_OK) {
-					BString errorMsg(B_TRANSLATE("Failed to export profile"));
-					errorMsg << ": " << strerror(status);
-					BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
-						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go();
+
+				SyncParams* params = new SyncParams;
+				params->path = path;
+				params->context = fContext.Get();
+				params->context->Acquire();
+				params->target = BMessenger(this);
+
+				thread_id thread = spawn_thread(_ExportProfileThread, "Export Profile",
+					B_NORMAL_PRIORITY, params);
+				if (thread >= 0) {
+					resume_thread(thread);
+				} else {
+					params->context->Release();
+					delete params;
 				}
 			}
 			break;
@@ -1185,16 +1272,21 @@ BrowserWindow::MessageReceived(BMessage* message)
 			entry_ref ref;
 			if (message->FindRef("refs", &ref) == B_OK) {
 				BPath path(&ref);
-				status_t status = Sync::ImportProfile(path, fContext->GetCookieJar());
-				if (status != B_OK) {
-					BString errorMsg(B_TRANSLATE("Failed to import profile"));
-					errorMsg << ": " << strerror(status);
-					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
-						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go();
+
+				SyncParams* params = new SyncParams;
+				params->path = path;
+				params->context = fContext.Get();
+				params->context->Acquire();
+				params->target = BMessenger(this);
+
+				thread_id thread = spawn_thread(_ImportProfileThread, "Import Profile",
+					B_NORMAL_PRIORITY, params);
+				if (thread >= 0) {
+					resume_thread(thread);
+				} else {
+					params->context->Release();
+					delete params;
 				}
-				// Refresh cookies?
-				// Refresh bookmarks?
 			}
 			break;
 		}
@@ -2079,7 +2171,7 @@ BrowserWindow::QuitRequested()
 		// Do this here, so WebKit tear down happens earlier.
 		SetCurrentWebView(NULL);
 		while (fTabManager->CountTabs() > 0)
-			_ShutdownTab(0);
+			_ShutdownTab(fTabManager->CountTabs() - 1);
 
 		message.AddRect("window frame", WindowFrame());
 		be_app->PostMessage(&message);
@@ -2144,32 +2236,25 @@ BrowserWindow::MenusBeginning()
 					}
 
 					// Grouping (Color)
-					// Prevent duplication by removing existing "Set tab color" menu
-					for (int32 i = 0; i < viewMenu->CountItems(); i++) {
-						BMenuItem* item = viewMenu->ItemAt(i);
-						if (strcmp(item->Label(), B_TRANSLATE("Set tab color")) == 0) {
-							viewMenu->RemoveItem(i);
-							delete item;
-							break;
+					// Only add if not already present
+					if (viewMenu->FindItem(B_TRANSLATE("Set tab color")) == NULL) {
+						BMenu* colorMenu = new BMenu(B_TRANSLATE("Set tab color"));
+						const char* kColorNames[] = {"None", "Red", "Green", "Blue", "Yellow"};
+						rgb_color kColors[] = {
+							ui_color(B_PANEL_BACKGROUND_COLOR),
+							{255, 100, 100, 255},
+							{100, 255, 100, 255},
+							{100, 100, 255, 255},
+							{255, 255, 100, 255}
+						};
+
+						for (size_t i = 0; i < sizeof(kColorNames)/sizeof(char*); i++) {
+							BMessage* colorMsg = new BMessage(SET_TAB_COLOR);
+							colorMsg->AddColor("color", kColors[i]);
+							colorMenu->AddItem(new BMenuItem(kColorNames[i], colorMsg));
 						}
+						viewMenu->AddItem(colorMenu);
 					}
-
-					BMenu* colorMenu = new BMenu(B_TRANSLATE("Set tab color"));
-					const char* kColorNames[] = {"None", "Red", "Green", "Blue", "Yellow"};
-					rgb_color kColors[] = {
-						ui_color(B_PANEL_BACKGROUND_COLOR),
-						{255, 100, 100, 255},
-						{100, 255, 100, 255},
-						{100, 100, 255, 255},
-						{255, 255, 100, 255}
-					};
-
-					for (size_t i = 0; i < sizeof(kColorNames)/sizeof(char*); i++) {
-						BMessage* colorMsg = new BMessage(SET_TAB_COLOR);
-						colorMsg->AddColor("color", kColors[i]);
-						colorMenu->AddItem(new BMenuItem(kColorNames[i], colorMsg));
-					}
-					viewMenu->AddItem(colorMenu);
 				}
 			}
 		}
@@ -2589,17 +2674,25 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 		if (url.StartsWith("http://")) {
 			BUrl newUrl(url);
 			if (newUrl.IsValid()) {
-				newUrl.SetProtocol("https");
-				if (newUrl.Port() == 80)
-					newUrl.SetPort(443);
-
-				BString httpsUrl = newUrl.UrlString();
-				if (view) {
-					if (userData)
-						userData->SetExpectedUpgradedUrl(httpsUrl);
-					view->LoadURL(httpsUrl);
+				bool skipUpgrade = false;
+				if (userData && userData->AllowedInsecureHost() == newUrl.Host()) {
+					// User allowed this host to be insecure
+					skipUpgrade = true;
 				}
-				return; // Abort this load, we started a new one
+
+				if (!skipUpgrade) {
+					newUrl.SetProtocol("https");
+					if (newUrl.Port() == 80)
+						newUrl.SetPort(443);
+
+					BString httpsUrl = newUrl.UrlString();
+					if (view) {
+						if (userData)
+							userData->SetExpectedUpgradedUrl(httpsUrl);
+						view->LoadURL(httpsUrl);
+					}
+					return; // Abort this load, we started a new one
+				}
 			}
 		}
 	}
@@ -2734,8 +2827,34 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 		"Don't translate variable %url."));
 	status.ReplaceFirst("%url", url);
 
-	if (userData != NULL && userData->IsHttpsUpgraded())
+	if (userData != NULL && userData->IsHttpsUpgraded()) {
 		status << " " << B_TRANSLATE("(HTTPS-Only mode)");
+
+		BString text(B_TRANSLATE("The secure connection to %url failed."));
+		text.ReplaceFirst("%url", url);
+		text << "\n\n" << B_TRANSLATE("Do you want to try loading the unencrypted (insecure) version?");
+
+		BAlert* alert = new BAlert(B_TRANSLATE("HTTPS-Only Mode"), text.String(),
+			B_TRANSLATE("Cancel"), B_TRANSLATE("Load Insecurely"));
+
+		if (alert->Go() == 1) {
+			BString httpUrl = url;
+			if (httpUrl.StartsWith("https://")) {
+				httpUrl.ReplaceFirst("https://", "http://");
+			} else {
+				httpUrl.Prepend("http://");
+			}
+
+			// Allow this host
+			BUrl u(httpUrl);
+			userData->SetAllowedInsecureHost(u.Host());
+			userData->SetHttpsUpgraded(false);
+			userData->SetExpectedUpgradedUrl("");
+
+			view->LoadURL(httpUrl);
+			return;
+		}
+	}
 
 	view->WebPage()->SetStatusMessage(status);
 	_EnsureProgressBarHidden();
@@ -3966,20 +4085,23 @@ BrowserWindow::_SaveFavicon(const BString& url, const BBitmap* icon)
 		return;
 	}
 
-	BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
-	if (file.InitCheck() == B_OK) {
-		int32 width = saveIcon->Bounds().IntegerWidth() + 1;
-		int32 height = saveIcon->Bounds().IntegerHeight() + 1;
-		file.Write(&width, sizeof(width));
-		file.Write(&height, sizeof(height));
-
-		int32 bytesPerRow = saveIcon->BytesPerRow();
-		int32 rowLen = width * 4;
-		uint8* bits = (uint8*)saveIcon->Bits();
-		for (int32 i = 0; i < height; i++)
-			file.Write(bits + (i * bytesPerRow), rowLen);
+	FaviconSaveParams* params = new(std::nothrow) FaviconSaveParams;
+	if (params == NULL) {
+		delete saveIcon;
+		return;
 	}
-	delete saveIcon;
+
+	params->path = path;
+	params->icon = saveIcon;
+
+	thread_id thread = spawn_thread(_SaveFaviconThread, "Save Favicon",
+		B_LOW_PRIORITY, params);
+	if (thread >= 0) {
+		resume_thread(thread);
+	} else {
+		delete saveIcon;
+		delete params;
+	}
 }
 
 

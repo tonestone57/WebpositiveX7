@@ -196,6 +196,16 @@ public:
 		return fIsDiscarded;
 	}
 
+	void SetAllowedInsecureHost(const BString& host)
+	{
+		fAllowedInsecureHost = host;
+	}
+
+	const BString& AllowedInsecureHost() const
+	{
+		return fAllowedInsecureHost;
+	}
+
 	void SetPreview(const BBitmap* bitmap)
 	{
 		delete fPreview;
@@ -224,6 +234,7 @@ private:
 	BString		fPendingURL;
 	bool		fIsLazy;
 	bool		fIsDiscarded;
+	BString		fAllowedInsecureHost;
 	BBitmap*	fPreview;
 };
 

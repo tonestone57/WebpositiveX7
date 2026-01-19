@@ -49,7 +49,7 @@ private:
 	// Owner pointer for when the menu is NOT attached to the bar.
 	// When attached, the BMenuBar owns it.
 	std::unique_ptr<BMenu>			fOverflowMenuOwner;
-	BPopUpMenu*						fPopUpMenu;
+	std::unique_ptr<BPopUpMenu>		fPopUpMenu;
 	int32 							fSelectedItemIndex;
 };
 
