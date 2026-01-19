@@ -9,6 +9,7 @@
 #include <Alert.h>
 #include <OS.h>
 #include <Catalog.h>
+#include <ControlLook.h>
 #include <Directory.h>
 #include <Entry.h>
 #include <GroupLayout.h>
@@ -560,9 +561,21 @@ BookmarkBar::FrameResized(float width, float height)
 	float currentX = 0;
 	bool needsOverflow = false;
 
+	float left, top, right, bottom;
+	be_control_look->GetMenuItemInsets(&left, &top, &right, &bottom);
+	float itemPadding = left + right;
+
 	// First pass: try to fit everything without overflow menu
 	for (size_t k = 0; k < allItems.size(); k++) {
-		float itemWidth = allItems[k]->Frame().Width();
+		float itemWidth = 0;
+		if (allItems[k]->Menu() == this)
+			itemWidth = allItems[k]->Frame().Width();
+		else {
+			float w, h;
+			allItems[k]->GetContentSize(&w, &h);
+			itemWidth = w + itemPadding;
+		}
+
 		// Assuming standard padding/margins are included in Frame() or negligible for logic check,
 		// but actual placement by BMenuBar might differ slightly.
 		// We use the accumulated width logic similar to original code's reliance on 'rightmost'.
@@ -584,7 +597,15 @@ BookmarkBar::FrameResized(float width, float height)
 		currentX = 0;
 		fitCount = 0;
 		for (size_t k = 0; k < allItems.size(); k++) {
-			float itemWidth = allItems[k]->Frame().Width();
+			float itemWidth = 0;
+			if (allItems[k]->Menu() == this)
+				itemWidth = allItems[k]->Frame().Width();
+			else {
+				float w, h;
+				allItems[k]->GetContentSize(&w, &h);
+				itemWidth = w + itemPadding;
+			}
+
 			if (currentX + itemWidth > width - overflowMenuWidth) {
 				break;
 			}
