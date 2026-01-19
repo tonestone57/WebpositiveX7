@@ -172,7 +172,7 @@ BrowserApp::BrowserApp()
 	cookieStorePath << "/Cookies";
 	fCookies = new SettingsMessage(B_USER_SETTINGS_DIRECTORY,
 		cookieStorePath.String());
-	fContext = new BPrivate::Network::BUrlContext();
+	fContext.SetTo(new BPrivate::Network::BUrlContext(), true);
 	if (fCookies->InitCheck() == B_OK) {
 		BMessage cookieArchive = fCookies->GetValue("cookies", cookieArchive);
 		fContext->SetCookieJar(
@@ -229,8 +229,6 @@ BrowserApp::~BrowserApp()
 	if (fCookieWindow && fCookieWindow->Lock())
 		fCookieWindow->Quit();
 
-	if (fContext)
-		fContext->Release();
 	delete fLaunchRefsMessage;
 	delete fSettings;
 	delete fCookies;

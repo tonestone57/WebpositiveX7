@@ -425,11 +425,27 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 		return status;
 
 	off_t size;
-	file.GetSize(&size);
+	status = file.GetSize(&size);
+	if (status != B_OK)
+		return status;
+
+	// Check against reasonable limit (64MB) and int32 overflow
+	if (size < 0 || size > 0x4000000)
+		return B_ERROR;
+
+	// Use malloc because BString::Adopt takes ownership and uses free()
+	char* buffer = (char*)malloc(size + 1);
+	if (buffer == NULL)
+		return B_NO_MEMORY;
+
+	if (file.Read(buffer, size) != size) {
+		free(buffer);
+		return B_IO_ERROR;
+	}
+	buffer[size] = '\0';
+
 	BString content;
-	char* buffer = content.LockBuffer(size);
-	file.Read(buffer, size);
-	content.UnlockBuffer(size);
+	content.Adopt(buffer, size);
 
 	BPath bookmarkPath;
 	status = GetBookmarkPath(bookmarkPath);
