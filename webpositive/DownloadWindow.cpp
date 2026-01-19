@@ -597,7 +597,7 @@ DownloadWindow::_ScheduleSaveSettings()
 
 	BMessage message(SAVE_SETTINGS);
 	message.AddBool("perform_save", true);
-	fSaveSettingsRunner.reset(new(std::nothrow) BMessageRunner(BMessenger(this),
+	fSaveSettingsRunner.reset(new BMessageRunner(BMessenger(this),
 		&message, 2000000, 1));
 }
 

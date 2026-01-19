@@ -2224,7 +2224,7 @@ BrowserWindow::SetCurrentWebView(BWebView* webView)
 		PageUserData* userData = static_cast<PageUserData*>(
 			CurrentWebView()->GetUserData());
 		if (userData == NULL) {
-			userData = new PageUserData(CurrentFocus());
+		userData = new PageUserData(CurrentFocus());
 			CurrentWebView()->SetUserData(userData);
 		}
 		userData->SetFocusedView(CurrentFocus());
@@ -3326,9 +3326,7 @@ BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon, bool save)
 {
 	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
 	if (userData == NULL) {
-		userData = new(std::nothrow) PageUserData(NULL);
-		if (userData == NULL)
-			return;
+		userData = new PageUserData(NULL);
 		view->SetUserData(userData);
 	}
 	// The PageUserData makes a copy of the icon, which we pass on to

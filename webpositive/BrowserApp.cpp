@@ -371,19 +371,17 @@ BrowserApp::ReadyToRun()
 				archivedWindow.FindUInt32("window workspaces", 0, &workspaces);
 				BString url;
 				archivedWindow.FindString("tab", 0, &url);
-				BrowserWindow* window = new(std::nothrow) BrowserWindow(frame, fSettings, url,
+				BrowserWindow* window = new BrowserWindow(frame, fSettings, url,
 					fContext, INTERFACE_ELEMENT_ALL, NULL, workspaces, false);
 
-				if (window != NULL) {
-					window->Show();
-					pagesCreated++;
+				window->Show();
+				pagesCreated++;
 
-					for (int j = 1; archivedWindow.FindString("tab", j, &url)
-						== B_OK; j++) {
-						printf("Create %d:%d\n", i, j);
-						_CreateNewTab(window, url, false, true);
-						pagesCreated++;
-					}
+				for (int j = 1; archivedWindow.FindString("tab", j, &url)
+					== B_OK; j++) {
+					printf("Create %d:%d\n", i, j);
+					_CreateNewTab(window, url, false, true);
+					pagesCreated++;
 				}
 			}
 		}
