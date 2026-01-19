@@ -200,6 +200,37 @@ struct SyncParams {
 };
 
 
+struct FaviconSaveParams {
+	BPath path;
+	BBitmap* icon;
+};
+
+
+static status_t
+_SaveFaviconThread(void* data)
+{
+	FaviconSaveParams* params = static_cast<FaviconSaveParams*>(data);
+
+	BFile file(params->path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+	if (file.InitCheck() == B_OK) {
+		int32 width = params->icon->Bounds().IntegerWidth() + 1;
+		int32 height = params->icon->Bounds().IntegerHeight() + 1;
+		file.Write(&width, sizeof(width));
+		file.Write(&height, sizeof(height));
+
+		int32 bytesPerRow = params->icon->BytesPerRow();
+		int32 rowLen = width * 4;
+		uint8* bits = (uint8*)params->icon->Bits();
+		for (int32 i = 0; i < height; i++)
+			file.Write(bits + (i * bytesPerRow), rowLen);
+	}
+
+	delete params->icon;
+	delete params;
+	return B_OK;
+}
+
+
 static status_t
 _ExportProfileThread(void* data)
 {
@@ -2140,7 +2171,7 @@ BrowserWindow::QuitRequested()
 		// Do this here, so WebKit tear down happens earlier.
 		SetCurrentWebView(NULL);
 		while (fTabManager->CountTabs() > 0)
-			_ShutdownTab(0);
+			_ShutdownTab(fTabManager->CountTabs() - 1);
 
 		message.AddRect("window frame", WindowFrame());
 		be_app->PostMessage(&message);
@@ -4054,20 +4085,23 @@ BrowserWindow::_SaveFavicon(const BString& url, const BBitmap* icon)
 		return;
 	}
 
-	BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
-	if (file.InitCheck() == B_OK) {
-		int32 width = saveIcon->Bounds().IntegerWidth() + 1;
-		int32 height = saveIcon->Bounds().IntegerHeight() + 1;
-		file.Write(&width, sizeof(width));
-		file.Write(&height, sizeof(height));
-
-		int32 bytesPerRow = saveIcon->BytesPerRow();
-		int32 rowLen = width * 4;
-		uint8* bits = (uint8*)saveIcon->Bits();
-		for (int32 i = 0; i < height; i++)
-			file.Write(bits + (i * bytesPerRow), rowLen);
+	FaviconSaveParams* params = new(std::nothrow) FaviconSaveParams;
+	if (params == NULL) {
+		delete saveIcon;
+		return;
 	}
-	delete saveIcon;
+
+	params->path = path;
+	params->icon = saveIcon;
+
+	thread_id thread = spawn_thread(_SaveFaviconThread, "Save Favicon",
+		B_LOW_PRIORITY, params);
+	if (thread >= 0) {
+		resume_thread(thread);
+	} else {
+		delete saveIcon;
+		delete params;
+	}
 }
 
 
