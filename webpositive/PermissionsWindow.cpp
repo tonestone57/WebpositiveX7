@@ -122,7 +122,7 @@ PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCoo
 PermissionsWindow::~PermissionsWindow()
 {
 	if (fTarget.IsValid())
-		fTarget.SendMessage(PERMISSIONS_WINDOW_CLOSED);
+		fTarget.PostMessage(PERMISSIONS_WINDOW_CLOSED);
 
 	_ClearPermissions();
 }
