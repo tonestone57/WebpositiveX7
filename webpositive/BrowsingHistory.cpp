@@ -786,7 +786,10 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 	thread_id thread = spawn_thread(_SaveHistoryThread,
 		"save history", B_LOW_PRIORITY, context);
 	if (thread >= 0) {
-		resume_thread(thread);
+		if (resume_thread(thread) != B_OK) {
+			kill_thread(thread);
+			_SaveHistoryThread(context);
+		}
 	} else {
 		_SaveHistoryThread(context);
 	}
