@@ -181,8 +181,6 @@ public:
 
 private:
 	// WebPage notification API implementations
-	virtual	void				NavigationRequested(const BString& url,
-									BWebView* view);
 	virtual	void				CloseWindowRequested(BWebView* view);
 	virtual	void				NewPageCreated(BWebView* view,
 									BRect windowFrame, bool modalDialog,

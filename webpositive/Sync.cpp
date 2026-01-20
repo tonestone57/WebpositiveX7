@@ -115,9 +115,17 @@ Sync::ImportCookies(const BPath& path,
 	if (status != B_OK) return status;
 
 	off_t size;
-	file.GetSize(&size);
+	status = file.GetSize(&size);
+	if (status != B_OK) return status;
+
+	// Check against reasonable limit (64MB) and int32 overflow
+	if (size < 0 || size > 0x4000000)
+		return B_ERROR;
+
 	// Optimize: allocate raw buffer to avoid BString allocations
-	char* buffer = new char[size + 1];
+	char* buffer = new(std::nothrow) char[size + 1];
+	if (buffer == NULL)
+		return B_NO_MEMORY;
 
 	if (file.Read(buffer, size) != size) {
 		delete[] buffer;

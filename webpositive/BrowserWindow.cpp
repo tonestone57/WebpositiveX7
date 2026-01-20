@@ -2547,12 +2547,6 @@ BrowserWindow::ToggleFullscreen()
 
 
 void
-BrowserWindow::NavigationRequested(const BString& url, BWebView* view)
-{
-}
-
-
-void
 BrowserWindow::NewWindowRequested(const BString& url, bool primaryAction)
 {
 	// Always open new windows in the application thread, since
