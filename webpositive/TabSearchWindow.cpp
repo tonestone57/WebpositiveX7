@@ -6,6 +6,7 @@
 #include "TabSearchWindow.h"
 
 #include <Application.h>
+#include <Autolock.h>
 #include <GroupLayoutBuilder.h>
 #include <ListView.h>
 #include <ScrollView.h>
@@ -81,9 +82,14 @@ TabSearchWindow::MessageReceived(BMessage* message)
 				TabListItem* item = dynamic_cast<TabListItem*>(fTabList->ItemAt(selection));
 				if (item) {
 					BView* view = item->View();
-					if (fTabManager->HasView(view)) {
-						fTabManager->SelectTab(view);
-						PostMessage(B_QUIT_REQUESTED);
+					if (fTabManager) {
+						BMessenger target = fTabManager->Target();
+						if (target.LockTargetWithTimeout(100000) == B_OK) {
+							if (fTabManager->HasView(view))
+								fTabManager->SelectTab(view);
+							target.UnlockTarget();
+							PostMessage(B_QUIT_REQUESTED);
+						}
 					}
 				}
 			}
@@ -102,7 +108,7 @@ TabSearchWindow::QuitRequested()
 {
 	if (fTabManager) {
 		BMessage msg('tswq'); // TAB_SEARCH_WINDOW_QUIT
-		fTabManager->Target().SendMessage(&msg);
+		fTabManager->Target().PostMessage(&msg);
 	}
 	return true;
 }
@@ -116,6 +122,13 @@ TabSearchWindow::_UpdateList()
 
 	if (!fTabManager) return;
 
+	BMessenger target = fTabManager->Target();
+	// If we can't lock, we assume the window is busy or dead, so we skip updating
+	if (target.LockTargetWithTimeout(100000) != B_OK)
+		return;
+
+	BAutolock lock(target.Target(NULL));
+
 	for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
 		BString label = fTabManager->TabLabel(i);
 		BView* view = fTabManager->ViewForTab(i);
@@ -127,6 +140,14 @@ TabSearchWindow::_UpdateList()
 void
 TabSearchWindow::_FilterList()
 {
+	if (!fTabManager) return;
+
+	BMessenger target = fTabManager->Target();
+	if (target.LockTargetWithTimeout(100000) != B_OK)
+		return;
+
+	BAutolock lock(target.Target(NULL));
+
 	BString filter = fSearchControl->Text();
 	for (int32 i = fTabList->CountItems() - 1; i >= 0; i--)
 		delete fTabList->RemoveItem(i);

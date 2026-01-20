@@ -338,17 +338,29 @@ TabContainerView::SetTabLabel(int32 index, const char* label)
 }
 
 
-void
+status_t
 TabContainerView::MoveTab(int32 fromIndex, int32 toIndex)
 {
 	BGroupLayout* layout = GroupLayout();
 	BLayoutItem* item = layout->RemoveItem(fromIndex);
 	if (item) {
-		layout->AddItem(toIndex, item);
+		if (!layout->AddItem(toIndex, item)) {
+			// Failed to add at new index, try to restore
+			if (!layout->AddItem(fromIndex, item)) {
+				// We lost the item from the layout. Delete the item to avoid a leak.
+				// The caller (TabManager) is responsible for handling the failure
+				// and ensuring the view hierarchy remains consistent.
+				delete item;
+				return B_NO_MEMORY;
+			}
+			return B_NO_MEMORY;
+		}
 		// Update selection logic or invalidation if needed
 		Invalidate();
 		_ValidateTabVisibility();
+		return B_OK;
 	}
+	return B_BAD_VALUE;
 }
 
 
