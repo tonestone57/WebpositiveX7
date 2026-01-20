@@ -211,7 +211,13 @@ _SaveFaviconThread(void* data)
 {
 	FaviconSaveParams* params = static_cast<FaviconSaveParams*>(data);
 
-	BFile file(params->path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+	BPath tempPath(params->path);
+	BString tempFileName(tempPath.Leaf());
+	tempFileName << ".tmp";
+	tempPath.GetParent(&tempPath);
+	tempPath.Append(tempFileName);
+
+	BFile file(tempPath.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
 	if (file.InitCheck() == B_OK) {
 		int32 width = params->icon->Bounds().IntegerWidth() + 1;
 		int32 height = params->icon->Bounds().IntegerHeight() + 1;
@@ -223,6 +229,10 @@ _SaveFaviconThread(void* data)
 		uint8* bits = (uint8*)params->icon->Bits();
 		for (int32 i = 0; i < height; i++)
 			file.Write(bits + (i * bytesPerRow), rowLen);
+
+		file.Unset();
+		BEntry entry(tempPath.Path());
+		entry.Rename(params->path.Leaf(), true);
 	}
 
 	delete params->icon;
