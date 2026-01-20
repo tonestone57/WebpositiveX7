@@ -424,7 +424,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fNetworkWindow(NULL),
 	fIsBypassingCache(false),
 	fIsPrivate(privateWindow),
-	fButtonResetRunner(NULL)
+	fButtonResetRunner(NULL),
+	fExpectingDomInspection(false)
 {
 	fFormSafetyHelper.reset(new FormSafetyHelper(this));
 
@@ -1640,6 +1641,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case INSPECT_ELEMENT:
 			if (CurrentWebView() && CurrentWebView()->WebPage()) {
+				fExpectingDomInspection = true;
 				// Chunked transport to avoid console log limits/flooding
 				BString script =
 					"var html = document.documentElement.outerHTML;"
@@ -2040,43 +2042,46 @@ BrowserWindow::MessageReceived(BMessage* message)
 					fFormSafetyHelper->ConsoleMessage(text);
 					break;
 				}
-				if (text.StartsWith("INSPECT_DOM_START:")) {
-					fInspectDomBuffer = "";
-					fInspectDomExpectedChunks = atoi(text.String() + strlen("INSPECT_DOM_START:"));
-					fInspectDomReceivedChunks = 0;
+				if (fExpectingDomInspection) {
+					if (text.StartsWith("INSPECT_DOM_START:")) {
+						fInspectDomBuffer = "";
+						fInspectDomExpectedChunks = atoi(text.String() + strlen("INSPECT_DOM_START:"));
+						fInspectDomReceivedChunks = 0;
 
-					// Preallocate buffer to avoid frequent reallocations.
-					// JS side uses 2048 chars per chunk.
-					// Cap at 20MB to match the hard limit enforced below.
-					int32 estimatedSize = fInspectDomExpectedChunks * 2048;
-					if (estimatedSize > 20 * 1024 * 1024)
-						estimatedSize = 20 * 1024 * 1024;
+						// Preallocate buffer to avoid frequent reallocations.
+						// JS side uses 2048 chars per chunk.
+						// Cap at 20MB to match the hard limit enforced below.
+						int32 estimatedSize = fInspectDomExpectedChunks * 2048;
+						if (estimatedSize > 20 * 1024 * 1024)
+							estimatedSize = 20 * 1024 * 1024;
 
-					if (estimatedSize > 0) {
-						fInspectDomBuffer.LockBuffer(estimatedSize);
-						fInspectDomBuffer.UnlockBuffer(0);
+						if (estimatedSize > 0) {
+							fInspectDomBuffer.LockBuffer(estimatedSize);
+							fInspectDomBuffer.UnlockBuffer(0);
+						}
+
+						break; // Don't show in console
+					} else if (text.StartsWith("INSPECT_DOM_CHUNK:")) {
+						// Format: INSPECT_DOM_CHUNK:index:content
+						// We assume ordered delivery for now (console usually is),
+						// but rigorous impl would buffer by index.
+						// Simple append for now as JS execution is single threaded usually.
+						int32 firstColon = text.FindFirst(':', strlen("INSPECT_DOM_CHUNK:"));
+						// Cap at 20MB to prevent DoS
+						if (firstColon > 0 && fInspectDomBuffer.Length() < 20 * 1024 * 1024) {
+							fInspectDomBuffer << (text.String() + firstColon + 1);
+							fInspectDomReceivedChunks++;
+						}
+						break;
+					} else if (text.StartsWith("INSPECT_DOM_END")) {
+						fExpectingDomInspection = false;
+						BMessage msg(B_PAGE_SOURCE_RESULT);
+						msg.AddString("source", fInspectDomBuffer);
+						msg.AddString("url", CurrentWebView()->MainFrameURL());
+						PageSourceSaver::HandlePageSourceResult(&msg);
+						fInspectDomBuffer = "";
+						break;
 					}
-
-					break; // Don't show in console
-				} else if (text.StartsWith("INSPECT_DOM_CHUNK:")) {
-					// Format: INSPECT_DOM_CHUNK:index:content
-					// We assume ordered delivery for now (console usually is),
-					// but rigorous impl would buffer by index.
-					// Simple append for now as JS execution is single threaded usually.
-					int32 firstColon = text.FindFirst(':', strlen("INSPECT_DOM_CHUNK:"));
-					// Cap at 20MB to prevent DoS
-					if (firstColon > 0 && fInspectDomBuffer.Length() < 20 * 1024 * 1024) {
-						fInspectDomBuffer << (text.String() + firstColon + 1);
-						fInspectDomReceivedChunks++;
-					}
-					break;
-				} else if (text.StartsWith("INSPECT_DOM_END")) {
-					BMessage msg(B_PAGE_SOURCE_RESULT);
-					msg.AddString("source", fInspectDomBuffer);
-					msg.AddString("url", CurrentWebView()->MainFrameURL());
-					PageSourceSaver::HandlePageSourceResult(&msg);
-					fInspectDomBuffer = "";
-					break;
 				}
 			}
 			be_app->PostMessage(message);
@@ -2584,6 +2589,7 @@ BrowserWindow::CloseWindowRequested(BWebView* view)
 void
 BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 {
+	fExpectingDomInspection = false;
 	if (fNetworkWindow) {
 		BMessage msg(ADD_NETWORK_REQUEST);
 		msg.AddString("url", url);
@@ -2947,22 +2953,6 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			".doubleclick, .ad-banner, .banner-ad, .sponsor "
 			"{ display: none !important; }';"
 			"document.head.appendChild(style);";
-		view->WebPage()->ExecuteJavaScript(script);
-	}
-
-	// Inject JS for "Open Link in Private Window"
-	if (view && view->WebPage()) {
-		BString script =
-			"document.addEventListener('click', function(e) {"
-			"  if (e.shiftKey && (e.metaKey || e.ctrlKey)) {"
-			"    var link = e.target.closest('a');"
-			"    if (link) {"
-			"      e.preventDefault();"
-			"      e.stopPropagation();"
-			"      console.log('OPEN_IN_PRIVATE_WINDOW:' + link.href);"
-			"    }"
-			"  }"
-			"}, true);";
 		view->WebPage()->ExecuteJavaScript(script);
 	}
 

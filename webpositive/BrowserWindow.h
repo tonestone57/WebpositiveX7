@@ -360,6 +360,8 @@ private:
 			bool				fIsPrivate;
 
 			std::unique_ptr<BMessageRunner>		fMemoryPressureRunner;
+
+			bool				fExpectingDomInspection;
 };
 
 
