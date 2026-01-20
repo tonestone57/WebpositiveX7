@@ -23,7 +23,7 @@
 #include <Path.h>
 #include <Url.h>
 
-#include "BrowserApp.hh"
+#include "BrowserApp.h"
 
 
 static const uint32 SAVE_HISTORY = 'svhs';
