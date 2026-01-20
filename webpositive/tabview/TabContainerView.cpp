@@ -347,11 +347,9 @@ TabContainerView::MoveTab(int32 fromIndex, int32 toIndex)
 		if (!layout->AddItem(toIndex, item)) {
 			// Failed to add at new index, try to restore
 			if (!layout->AddItem(fromIndex, item)) {
-				// We lost the item from the layout. This is bad.
-				// However, since we return error, the caller (TabManager) should handle cleanup.
-				// But we still own the view? No, item owns view?
-				// item is BLayoutItem.
-				// If we return error, we should probably delete the item to avoid leak if we can't add it back.
+				// We lost the item from the layout. Delete the item to avoid a leak.
+				// The caller (TabManager) is responsible for handling the failure
+				// and ensuring the view hierarchy remains consistent.
 				delete item;
 				return B_NO_MEMORY;
 			}
