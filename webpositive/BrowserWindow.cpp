@@ -916,7 +916,6 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 BrowserWindow::~BrowserWindow()
 {
 	fAppSettings->RemoveListener(BMessenger(this));
-	fTabManager.reset();
 	fPulseRunner.reset();
 	fButtonResetRunner.reset();
 	fMemoryPressureRunner.reset();
@@ -941,6 +940,7 @@ BrowserWindow::~BrowserWindow()
 			fTabSearchWindow = NULL;
 		}
 	}
+	fTabManager.reset();
 }
 
 
