@@ -123,6 +123,8 @@ PermissionsWindow::~PermissionsWindow()
 {
 	if (fTarget.IsValid())
 		fTarget.SendMessage(PERMISSIONS_WINDOW_CLOSED);
+
+	_ClearPermissions();
 }
 
 
