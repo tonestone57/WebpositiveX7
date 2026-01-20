@@ -61,6 +61,8 @@ TabSearchWindow::TabSearchWindow(TabManager* manager)
 
 TabSearchWindow::~TabSearchWindow()
 {
+	for (int32 i = fTabList->CountItems() - 1; i >= 0; i--)
+		delete fTabList->RemoveItem(i);
 }
 
 

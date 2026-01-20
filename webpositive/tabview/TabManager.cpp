@@ -1092,7 +1092,11 @@ TabManager::MoveTab(int32 fromIndex, int32 toIndex)
 
 	BLayoutItem* item = fCardLayout->RemoveItem(fromIndex);
 	if (item) {
-		if (!fCardLayout->AddItem(toIndex, item))
+		if (!fCardLayout->AddItem(toIndex, item)) {
+			// BLayoutItem usually doesn't own the view, so we must delete it explicitly
+			// to avoid memory leaks if re-adding fails.
+			delete item->View();
 			delete item;
+		}
 	}
 }
