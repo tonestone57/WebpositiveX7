@@ -2040,15 +2040,6 @@ BrowserWindow::MessageReceived(BMessage* message)
 					fFormSafetyHelper->ConsoleMessage(text);
 					break;
 				}
-				if (text.StartsWith(kOpenPrivatePrefix)) {
-					BString url = text;
-					url.RemoveFirst(kOpenPrivatePrefix);
-					BMessage* newPrivateWindowMessage = new BMessage(NEW_WINDOW);
-					newPrivateWindowMessage->AddString("url", url);
-					newPrivateWindowMessage->AddBool("private", true);
-					be_app->PostMessage(newPrivateWindowMessage);
-					break;
-				}
 				if (text.StartsWith("INSPECT_DOM_START:")) {
 					fInspectDomBuffer = "";
 					fInspectDomExpectedChunks = atoi(text.String() + strlen("INSPECT_DOM_START:"));
@@ -2697,7 +2688,8 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 	bool allowPopups = true;
 	float zoom = 1.0;
 	bool forceDesktop = false;
-	SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop);
+	BString customUserAgent;
+	SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop, customUserAgent);
 
 	if (view && view->WebPage()) {
 		BWebSettings* settings = view->WebPage()->Settings();
@@ -2716,6 +2708,8 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 			// Force Desktop
 			if (forceDesktop) {
 				settings->SetUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15");
+			} else if (customUserAgent.Length() > 0) {
+				settings->SetUserAgent(customUserAgent.String());
 			} else {
 				settings->SetUserAgent(NULL); // Reset to default
 			}

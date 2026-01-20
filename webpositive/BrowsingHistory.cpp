@@ -378,6 +378,7 @@ static BLocker sSaveLock("history save lock");
 BrowsingHistory
 BrowsingHistory::sDefaultInstance;
 static bool sIsShuttingDown = false;
+static int32 sActiveSaveThreads = 0;
 
 
 struct SaveContext {
@@ -419,6 +420,10 @@ BrowsingHistory::~BrowsingHistory()
 {
 	delete fSaveRunner;
 	_SaveSettings(true);
+
+	while (atomic_get(&sActiveSaveThreads) > 0)
+		snooze(10000);
+
 	_Clear();
 }
 
@@ -777,6 +782,7 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 		return;
 	}
 
+	atomic_add(&sActiveSaveThreads, 1);
 	thread_id thread = spawn_thread(_SaveHistoryThread,
 		"save history", B_LOW_PRIORITY, context);
 	if (thread >= 0) {
@@ -809,11 +815,13 @@ BrowsingHistory::_SaveHistoryThread(void* cookie)
 
 	if (sIsShuttingDown) {
 		delete context;
+		atomic_add(&sActiveSaveThreads, -1);
 		return B_OK;
 	}
 
 	_SaveToDisk(&settingsArchive);
 	delete context;
+	atomic_add(&sActiveSaveThreads, -1);
 	return B_OK;
 }
 

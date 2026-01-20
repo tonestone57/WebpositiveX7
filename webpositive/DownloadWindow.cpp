@@ -674,8 +674,10 @@ DownloadWindow::_LoadSettings()
 			i++) {
 		DownloadProgressView* view = new DownloadProgressView(
 			&downloadArchive);
-		if (!view->Init(&downloadArchive))
+		if (!view->Init(&downloadArchive)) {
+			delete view;
 			continue;
+		}
 		fDownloadViewsLayout->AddView(0, view);
 	}
 }
