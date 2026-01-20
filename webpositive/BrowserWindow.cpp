@@ -1789,8 +1789,23 @@ BrowserWindow::MessageReceived(BMessage* message)
 				int32 index;
 				if (message->FindInt32("tab index", &index) != B_OK)
 					index = fTabManager->SelectedTabIndex();
+
+				// If we are closing the selected tab, we need to decide which
+				// tab to select next.
+				int32 nextSelection = -1;
+				if (index == fTabManager->SelectedTabIndex()) {
+					if (index < fTabManager->CountTabs() - 1)
+						nextSelection = index;
+					else
+						nextSelection = index - 1;
+				}
+
 				_ShutdownTab(index);
 				_UpdateTabGroupVisibility();
+
+				if (nextSelection >= 0)
+					fTabManager->SelectTab(nextSelection);
+
 			} else
 				PostMessage(B_QUIT_REQUESTED);
 			break;
@@ -3404,10 +3419,15 @@ BrowserWindow::_ShutdownTab(int32 index)
 		}
 	}
 
-	view = fTabManager->RemoveTab(index);
-	// webView pointer is still valid here, as RemoveTab only removed it from layout
+	// If the tab to be removed is the current one, we must unset it *before*
+	// removing it from the layout. Otherwise, SetCurrentWebView(NULL) might
+	// try to capture a preview of a view that is no longer attached to the
+	// window, resulting in graphical glitches or crashes.
 	if (webView == CurrentWebView())
 		SetCurrentWebView(NULL);
+
+	view = fTabManager->RemoveTab(index);
+	// webView pointer is still valid here, as RemoveTab only removed it from layout
 
 	if (webView != NULL)
 		webView->Shutdown();

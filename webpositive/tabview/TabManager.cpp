@@ -1080,23 +1080,24 @@ TabManager::MoveTab(int32 fromIndex, int32 toIndex)
 	fTabContainerView->MoveTab(fromIndex, toIndex);
 
 	// Move in Card Layout
-	// BCardLayout doesn't support MoveItem?
-	// We might need to remove and add.
-	// BUT removing item might delete the view if we are not careful.
-	// BCardLayout::RemoveItem returns BLayoutItem*. Item owns the view?
-	// Usually BLayoutItem doesn't own view unless specified.
-	// BCardLayout manages views.
-	// Let's check RemoveItem signature in BCardLayout... wait, I can't check headers easily.
-	// Assuming standard BLayout behavior: RemoveItem(int32) returns item.
-	// We can then AddItem(item, toIndex).
-
 	BLayoutItem* item = fCardLayout->RemoveItem(fromIndex);
 	if (item) {
 		if (!fCardLayout->AddItem(toIndex, item)) {
-			// BLayoutItem usually doesn't own the view, so we must delete it explicitly
-			// to avoid memory leaks if re-adding fails.
-			delete item->View();
-			delete item;
+			// Try to restore to original index
+			if (!fCardLayout->AddItem(fromIndex, item)) {
+				// Fatal error: lost item. Clean up to avoid leak.
+				delete item->View();
+				delete item;
+
+				// Keep container view in sync by removing the tab
+				// Note: The tab was already moved to toIndex in fTabContainerView
+				TabView* tab = fTabContainerView->RemoveTab(toIndex);
+				delete tab;
+			} else {
+				// Successfully restored to old index in card layout.
+				// Now revert the move in tab container to keep them in sync.
+				fTabContainerView->MoveTab(toIndex, fromIndex);
+			}
 		}
 	}
 }
