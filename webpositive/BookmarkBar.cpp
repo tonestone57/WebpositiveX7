@@ -362,6 +362,15 @@ BookmarkBar::MessageReceived(BMessage* message)
 							itemMessage->AddRef("refs", &ref);
 							fItemsMap[inode]->SetMessage(itemMessage);
 
+							if (followedEntry.IsDirectory()) {
+								BMenu* submenu = fItemsMap[inode]->Submenu();
+								if (submenu) {
+									BNavMenu* navMenu = dynamic_cast<BNavMenu*>(submenu);
+									if (navMenu)
+										navMenu->SetNavDir(&ref);
+								}
+							}
+
 							break;
 						}
 					}

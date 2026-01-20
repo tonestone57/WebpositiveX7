@@ -1077,7 +1077,8 @@ TabManager::MoveTab(int32 fromIndex, int32 toIndex)
 	if (fromIndex == toIndex) return;
 
 	// Move in Container View
-	fTabContainerView->MoveTab(fromIndex, toIndex);
+	if (fTabContainerView->MoveTab(fromIndex, toIndex) != B_OK)
+		return;
 
 	// Move in Card Layout
 	BLayoutItem* item = fCardLayout->RemoveItem(fromIndex);

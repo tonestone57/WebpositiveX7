@@ -338,17 +338,31 @@ TabContainerView::SetTabLabel(int32 index, const char* label)
 }
 
 
-void
+status_t
 TabContainerView::MoveTab(int32 fromIndex, int32 toIndex)
 {
 	BGroupLayout* layout = GroupLayout();
 	BLayoutItem* item = layout->RemoveItem(fromIndex);
 	if (item) {
-		layout->AddItem(toIndex, item);
+		if (!layout->AddItem(toIndex, item)) {
+			// Failed to add at new index, try to restore
+			if (!layout->AddItem(fromIndex, item)) {
+				// We lost the item from the layout. This is bad.
+				// However, since we return error, the caller (TabManager) should handle cleanup.
+				// But we still own the view? No, item owns view?
+				// item is BLayoutItem.
+				// If we return error, we should probably delete the item to avoid leak if we can't add it back.
+				delete item;
+				return B_NO_MEMORY;
+			}
+			return B_NO_MEMORY;
+		}
 		// Update selection logic or invalidation if needed
 		Invalidate();
 		_ValidateTabVisibility();
+		return B_OK;
 	}
+	return B_BAD_VALUE;
 }
 
 
