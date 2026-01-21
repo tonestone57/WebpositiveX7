@@ -145,6 +145,15 @@ SitePermissionsManager::UpdatePermission(const PermissionEntry& entry)
 }
 
 void
+SitePermissionsManager::RemovePermission(const char* domain)
+{
+	BAutolock lock(fLock);
+	BString host(domain);
+	host.ToLower();
+	fPermissionMap.erase(host);
+}
+
+void
 SitePermissionsManager::Save()
 {
 	BAutolock lock(fLock);

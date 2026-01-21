@@ -580,9 +580,8 @@ public:
 			drag.AddMessage("be:originator-data", &data);
 
 			BBitmap* iconClone = new BBitmap(fIcon);
-				// Needed because DragMessage will delete the bitmap when it's done.
-
 			DragMessage(&drag, iconClone, B_OP_ALPHA, offset);
+			delete iconClone;
 		}
 		return;
 	}

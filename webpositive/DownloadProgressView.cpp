@@ -270,7 +270,7 @@ DownloadProgressView::Init(BMessage* archive)
 	fLastUpdateTime = 0;
 	fBytesPerSecond = 0.0;
 	for (size_t i = 0; i < kBytesPerSecondSlots; i++)
-		fBytesPerSecondSlot[i] = 0.0;
+		fBytesPerSecondSlot[i] = -1.0;
 	fCurrentBytesPerSecondSlot = 0;
 	fLastSpeedReferenceSize = 0;
 	fEstimatedFinishReferenceSize = 0;
@@ -929,7 +929,7 @@ DownloadProgressView::_UpdateStatus(off_t currentSize, off_t expectedSize)
 			fBytesPerSecond = 0.0;
 			size_t count = 0;
 			for (size_t i = 0; i < kBytesPerSecondSlots; i++) {
-				if (fBytesPerSecondSlot[i] != 0.0) {
+				if (fBytesPerSecondSlot[i] >= 0.0) {
 					fBytesPerSecond += fBytesPerSecondSlot[i];
 					count++;
 				}
