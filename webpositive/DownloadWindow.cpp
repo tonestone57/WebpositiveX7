@@ -651,10 +651,14 @@ DownloadWindow::_PerformSaveSettings(bool wait)
 	} else {
 		thread_id thread = spawn_thread(_SaveSettingsThread,
 			"Save Downloads Settings", B_LOW_PRIORITY, message);
-		if (thread >= B_OK)
-			resume_thread(thread);
-		else
+		if (thread >= B_OK) {
+			if (resume_thread(thread) != B_OK) {
+				kill_thread(thread);
+				delete message;
+			}
+		} else {
 			delete message;
+		}
 	}
 }
 

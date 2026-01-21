@@ -124,9 +124,13 @@ ConsoleWindow::MessageReceived(BMessage* message)
 				fPreviousText = finalText;
 				fRepeatCounter = 0;
 			}
-			fMessagesListView->AddItem(new BStringItem(finalText.String()));
-			if (fMessagesListView->CountItems() > 500)
-				delete fMessagesListView->RemoveItem(0);
+			BStringItem* item = new BStringItem(finalText.String());
+			if (fMessagesListView->AddItem(item)) {
+				if (fMessagesListView->CountItems() > 500)
+					delete fMessagesListView->RemoveItem(0);
+			} else {
+				delete item;
+			}
 			break;
 		}
 		case CLEAR_CONSOLE_MESSAGES:
