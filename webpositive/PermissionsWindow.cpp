@@ -165,9 +165,13 @@ PermissionsWindow::MessageReceived(BMessage* message)
 		{
 			int32 selection = fDomainList->CurrentSelection();
 			if (selection >= 0) {
-				delete fDomainList->RemoveItem(selection);
-				_SavePermissions();
-				_UpdateFields();
+				PermissionItem* item = dynamic_cast<PermissionItem*>(fDomainList->ItemAt(selection));
+				if (item) {
+					SitePermissionsManager::Instance()->RemovePermission(item->Text());
+					delete fDomainList->RemoveItem(selection);
+					SitePermissionsManager::Instance()->Save();
+					_UpdateFields();
+				}
 			}
 			break;
 		}

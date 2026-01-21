@@ -101,24 +101,6 @@ NetworkWindow::MessageReceived(BMessage* message)
 			break;
 		}
 		case UPDATE_NETWORK_REQUEST:
-					NetworkRequestItem* oldItem
-						= (NetworkRequestItem*)fRequestListView->ItemAt(0);
-					if (oldItem->IsPending()) {
-						std::deque<NetworkRequestItem*>& list
-							= fPendingRequests[oldItem->Url()];
-						if (!list.empty() && list.front() == oldItem) {
-							list.pop_front();
-							if (list.empty())
-								fPendingRequests.erase(oldItem->Url());
-						}
-					}
-					delete fRequestListView->RemoveItem(0);
-				}
-				fRequestListView->ScrollTo(fRequestListView->CountItems() - 1);
-			}
-			break;
-		}
-		case UPDATE_NETWORK_REQUEST:
 		{
 			BString url;
 			BString status;

@@ -29,6 +29,7 @@ public:
 	};
 
 	void UpdatePermission(const PermissionEntry& entry);
+	void RemovePermission(const char* domain);
 	void Save();
 
 private:
