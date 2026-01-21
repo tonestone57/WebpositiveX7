@@ -1269,7 +1269,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 				thread_id thread = spawn_thread(_ExportProfileThread, "Export Profile",
 					B_NORMAL_PRIORITY, params);
 				if (thread >= 0) {
-					resume_thread(thread);
+					if (resume_thread(thread) != B_OK) {
+						kill_thread(thread);
+						params->context->Release();
+						delete params;
+					}
 				} else {
 					params->context->Release();
 					delete params;
@@ -1293,7 +1297,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 				thread_id thread = spawn_thread(_ImportProfileThread, "Import Profile",
 					B_NORMAL_PRIORITY, params);
 				if (thread >= 0) {
-					resume_thread(thread);
+					if (resume_thread(thread) != B_OK) {
+						kill_thread(thread);
+						params->context->Release();
+						delete params;
+					}
 				} else {
 					params->context->Release();
 					delete params;
@@ -4105,7 +4113,11 @@ BrowserWindow::_SaveFavicon(const BString& url, const BBitmap* icon)
 	thread_id thread = spawn_thread(_SaveFaviconThread, "Save Favicon",
 		B_LOW_PRIORITY, params);
 	if (thread >= 0) {
-		resume_thread(thread);
+		if (resume_thread(thread) != B_OK) {
+			kill_thread(thread);
+			delete saveIcon;
+			delete params;
+		}
 	} else {
 		delete saveIcon;
 		delete params;
