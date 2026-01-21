@@ -3441,7 +3441,7 @@ BrowserWindow::_ShutdownTab(int32 index)
 	// removing it from the layout. Otherwise, SetCurrentWebView(NULL) might
 	// try to capture a preview of a view that is no longer attached to the
 	// window, resulting in graphical glitches or crashes.
-	if (webView == CurrentWebView())
+	if (CurrentWebView() != NULL && webView == CurrentWebView())
 		SetCurrentWebView(NULL);
 
 	view = fTabManager->RemoveTab(index);
