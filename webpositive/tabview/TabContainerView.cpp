@@ -353,7 +353,7 @@ TabContainerView::MoveTab(int32 fromIndex, int32 toIndex)
 				delete item;
 				return B_NO_MEMORY;
 			}
-			return B_NO_MEMORY;
+			return B_ERROR;
 		}
 		// Update selection logic or invalidation if needed
 		Invalidate();

@@ -1077,8 +1077,19 @@ TabManager::MoveTab(int32 fromIndex, int32 toIndex)
 	if (fromIndex == toIndex) return;
 
 	// Move in Container View
-	if (fTabContainerView->MoveTab(fromIndex, toIndex) != B_OK)
+	status_t result = fTabContainerView->MoveTab(fromIndex, toIndex);
+	if (result != B_OK) {
+		if (result == B_NO_MEMORY) {
+			// The tab button was deleted by TabContainerView because restoration failed.
+			// We must remove the corresponding card to keep sync.
+			BLayoutItem* item = fCardLayout->RemoveItem(fromIndex);
+			if (item) {
+				delete item->View();
+				delete item;
+			}
+		}
 		return;
+	}
 
 	// Move in Card Layout
 	BLayoutItem* item = fCardLayout->RemoveItem(fromIndex);
