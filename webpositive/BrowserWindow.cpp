@@ -2061,16 +2061,6 @@ BrowserWindow::MessageReceived(BMessage* message)
 		{
 			BString text;
 			if (message->FindString("string", &text) == B_OK) {
-				const char* kOpenPrivatePrefix = "OPEN_IN_PRIVATE_WINDOW:";
-				if (text.StartsWith(kOpenPrivatePrefix)) {
-					BString url = text;
-					url.RemoveFirst(kOpenPrivatePrefix);
-					BMessage* newPrivateWindowMessage = new BMessage(NEW_WINDOW);
-					newPrivateWindowMessage->AddString("url", url);
-					newPrivateWindowMessage->AddBool("private", true);
-					be_app->PostMessage(newPrivateWindowMessage);
-					break;
-				}
 				if (text.StartsWith("WebPositive:FormDirty:")) {
 					fFormSafetyHelper->ConsoleMessage(text);
 					break;
