@@ -958,7 +958,7 @@ TabManager::SelectTab(int32 tabIndex)
 
 	BMessage message(TAB_CHANGED);
 	message.AddInt32("tab index", tabIndex);
-	fTarget.SendMessage(&message);
+	fTarget.PostMessage(&message);
 }
 
 
@@ -983,7 +983,7 @@ TabManager::CloseTab(int32 tabIndex)
 {
 	BMessage message(CLOSE_TAB);
 	message.AddInt32("tab index", tabIndex);
-	fTarget.SendMessage(&message);
+	fTarget.PostMessage(&message);
 }
 
 

@@ -111,7 +111,9 @@ BookmarkManager::_CreateBookmark(const BPath& path, BString fileName, const BStr
 			} else {
 				// Find a unique name for the bookmark.
 				int32 tries = 1;
+				BString baseName = fileName;
 				while (entry.Exists()) {
+					fileName = baseName;
 					fileName << " " << tries++;
 					entryPath = path;
 					status = entryPath.Append(fileName);
