@@ -207,10 +207,6 @@ BrowserApp::BrowserApp()
 		}
 	}
 
-	BMessage autoSaveMessage(AUTO_SAVE_SESSION);
-	fAutoSaver = new BMessageRunner(be_app_messenger, &autoSaveMessage,
-		60000000); // 60 seconds
-
 	signal(SIGSEGV, crash_handler);
 	signal(SIGABRT, crash_handler);
 	signal(SIGILL, crash_handler);
@@ -220,6 +216,8 @@ BrowserApp::BrowserApp()
 
 BrowserApp::~BrowserApp()
 {
+	RemoveHandler(BrowsingHistory::DefaultInstance());
+
 	if (fDownloadWindow && fDownloadWindow->Lock())
 		fDownloadWindow->Quit();
 	if (fSettingsWindow && fSettingsWindow->Lock())

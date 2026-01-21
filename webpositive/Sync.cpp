@@ -127,10 +127,10 @@ Sync::ImportCookies(const BPath& path,
 	if (buffer == NULL)
 		return B_NO_MEMORY;
 
-	if (file.Read(buffer, size) != size) {
-		delete[] buffer;
+	std::unique_ptr<char[]> bufferPtr(buffer);
+
+	if (file.Read(buffer, size) != size)
 		return B_IO_ERROR;
-	}
 	buffer[size] = '\0';
 
 	char* cursor = buffer;
@@ -200,6 +200,7 @@ Sync::ImportCookies(const BPath& path,
 		}
 	}
 
-	delete[] buffer;
+	// bufferPtr will delete buffer
+	bufferPtr.reset();
 	return B_OK;
 }

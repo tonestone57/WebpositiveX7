@@ -221,10 +221,10 @@ BrowsingHistory::ImportHistory(const BPath& path)
 	if (buffer == NULL)
 		return B_NO_MEMORY;
 
-	if (file.Read(buffer, size) != size) {
-		delete[] buffer;
+	std::unique_ptr<char[]> bufferPtr(buffer);
+
+	if (file.Read(buffer, size) != size)
 		return B_IO_ERROR;
-	}
 	buffer[size] = '\0';
 
 	std::vector<BrowsingHistoryItem> items;
@@ -327,7 +327,8 @@ BrowsingHistory::ImportHistory(const BPath& path)
 		if (cursor < end) cursor++;
 	}
 
-	delete[] buffer;
+	// bufferPtr will delete buffer
+	bufferPtr.reset();
 
 	if (items.empty())
 		return B_OK;

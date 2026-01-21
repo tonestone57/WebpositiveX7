@@ -1153,10 +1153,14 @@ SettingsWindow::_UpdateProxySettings()
 
 	// Securely store proxy password in KeyStore
 	BKeyStore keyStore;
+	const char* password = fProxyPasswordControl->Text();
 	keyStore.SetPassword("WebPositive", "ProxySettings",
-		fProxyPasswordControl->Text(), "");
+		password, "");
 
 	// Clear sensitive password from UI control
+	// Note: We need to use the password for SetProxyInfo before clearing,
+	// or retrieve it. We'll use a local copy.
+	BString passwordStr(password);
 	fProxyPasswordControl->SetText("");
 
 	// Clear plaintext password from settings file if present
@@ -1167,7 +1171,7 @@ SettingsWindow::_UpdateProxySettings()
 		if (fUseProxyAuthCheckBox->Value() == B_CONTROL_ON) {
 			BWebSettings::Default()->SetProxyInfo(fProxyAddressControl->Text(),
 				proxyPort, B_PROXY_TYPE_HTTP, fProxyUsernameControl->Text(),
-				fProxyPasswordControl->Text());
+				passwordStr.String());
 		} else {
 			BWebSettings::Default()->SetProxyInfo(fProxyAddressControl->Text(),
 				proxyPort, B_PROXY_TYPE_HTTP, "", "");
