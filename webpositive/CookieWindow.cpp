@@ -215,16 +215,20 @@ CookieWindow::MessageReceived(BMessage* message)
 
 		case COOKIE_IMPORT:
 		{
-			BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
-				NULL, B_FILE_NODE, false, new BMessage(COOKIE_IMPORT));
-			panel->Show();
+			if (fImportPanel == NULL) {
+				fImportPanel.reset(new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
+					NULL, B_FILE_NODE, false, new BMessage(COOKIE_IMPORT)));
+			}
+			fImportPanel->Show();
 			break;
 		}
 		case COOKIE_EXPORT:
 		{
-			BFilePanel* panel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this),
-				NULL, 0, false, new BMessage(COOKIE_EXPORT));
-			panel->Show();
+			if (fExportPanel == NULL) {
+				fExportPanel.reset(new BFilePanel(B_SAVE_PANEL, new BMessenger(this),
+					NULL, 0, false, new BMessage(COOKIE_EXPORT)));
+			}
+			fExportPanel->Show();
 			break;
 		}
 		case B_SAVE_REQUESTED:

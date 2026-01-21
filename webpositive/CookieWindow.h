@@ -13,6 +13,7 @@
 
 #include <map>
 #include <vector>
+#include <memory>
 
 #include <NetworkCookieJar.h>
 
@@ -22,6 +23,7 @@ class BOutlineListView;
 class BStringItem;
 class BStringView;
 class BString;
+class BFilePanel;
 
 
 class CookieWindow : public BWindow {
@@ -52,6 +54,8 @@ private:
 	BPrivate::Network::BNetworkCookieJar&	fCookieJar;
 
 	std::map<BString, std::vector<BPrivate::Network::BNetworkCookie> > fCookieMap;
+	std::unique_ptr<BFilePanel>	fImportPanel;
+	std::unique_ptr<BFilePanel>	fExportPanel;
 };
 
 
