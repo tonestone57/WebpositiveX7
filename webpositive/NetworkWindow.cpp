@@ -72,10 +72,35 @@ NetworkWindow::MessageReceived(BMessage* message)
 				BString displayText;
 				displayText.SetToFormat("[Pending] %s (Headers: N/A)", url.String());
 				NetworkRequestItem* item = new NetworkRequestItem(displayText, url);
-				fRequestListView->AddItem(item);
-				fPendingRequests[url].push_back(item);
+				if (fRequestListView->AddItem(item)) {
+					try {
+						fPendingRequests[url].push_back(item);
+					} catch (...) {
+						// Ignore map insertion failure, item stays in list
+					}
 
-				if (fRequestListView->CountItems() > 500) {
+					if (fRequestListView->CountItems() > 500) {
+						NetworkRequestItem* oldItem
+							= (NetworkRequestItem*)fRequestListView->ItemAt(0);
+						if (oldItem->IsPending()) {
+							std::deque<NetworkRequestItem*>& list
+								= fPendingRequests[oldItem->Url()];
+							if (!list.empty() && list.front() == oldItem) {
+								list.pop_front();
+								if (list.empty())
+									fPendingRequests.erase(oldItem->Url());
+							}
+						}
+						delete fRequestListView->RemoveItem(0);
+					}
+					fRequestListView->ScrollTo(fRequestListView->CountItems() - 1);
+				} else {
+					delete item;
+				}
+			}
+			break;
+		}
+		case UPDATE_NETWORK_REQUEST:
 					NetworkRequestItem* oldItem
 						= (NetworkRequestItem*)fRequestListView->ItemAt(0);
 					if (oldItem->IsPending()) {

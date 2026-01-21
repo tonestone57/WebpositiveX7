@@ -41,9 +41,12 @@ PageSourceSaver::HandlePageSourceResult(const BMessage* message)
 	BMessage* copy = new BMessage(*message);
 	thread_id thread = spawn_thread(_PageSourceThread, "Page Source Saver",
 		B_NORMAL_PRIORITY, copy);
-	if (thread >= 0)
-		resume_thread(thread);
-	else
+	if (thread >= 0) {
+		if (resume_thread(thread) != B_OK) {
+			kill_thread(thread);
+			delete copy;
+		}
+	} else
 		delete copy;
 }
 

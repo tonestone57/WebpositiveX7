@@ -10,20 +10,20 @@
 #include <new>
 
 // Mock Headers
-#include "String.h"
-#include "DateTime.h"
-#include "Locker.h"
-#include "Handler.h"
-#include "Message.h"
-#include "Autolock.h"
-#include "Entry.h"
-#include "File.h"
-#include "FindDirectory.h"
-#include "MessageRunner.h"
-#include "Path.h"
-#include "Messenger.h"
+#include <String.h>
+#include <DateTime.h>
+#include <Locker.h>
+#include <Handler.h>
+#include <Message.h>
+#include <Autolock.h>
+#include <Entry.h>
+#include <File.h>
+#include <FindDirectory.h>
+#include <MessageRunner.h>
+#include <Path.h>
+#include <Messenger.h>
 #include "BrowserApp.h"
-#include "OS.h"
+#include <OS.h>
 
 // Stub for find_directory
 status_t find_directory(directory_which which, BPath* path) {

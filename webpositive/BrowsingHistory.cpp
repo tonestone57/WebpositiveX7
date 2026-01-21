@@ -728,9 +728,21 @@ BrowsingHistory::_LoadSettings()
 			if (oldestAllowedDateTime < item.DateTime()) {
 				// Bulk load: create item and push back, sort later
 				if (fHistoryMap.find(item.URL()) == fHistoryMap.end()) {
-					BrowsingHistoryItem* newItem = new BrowsingHistoryItem(item);
-					fHistoryList.push_back(newItem);
-					fHistoryMap[newItem->URL()] = newItem;
+					std::unique_ptr<BrowsingHistoryItem> newItem(new(std::nothrow) BrowsingHistoryItem(item));
+					if (!newItem) continue;
+
+					try {
+						fHistoryList.push_back(newItem.get());
+						try {
+							fHistoryMap[newItem->URL()] = newItem.get();
+							newItem.release();
+						} catch (...) {
+							fHistoryList.pop_back();
+							throw;
+						}
+					} catch (...) {
+						// newItem destroyed by unique_ptr
+					}
 				}
 			}
 			historyItemArchive.MakeEmpty();

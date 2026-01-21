@@ -1178,6 +1178,13 @@ SettingsWindow::_UpdateProxySettings()
 		}
 	} else
 		BWebSettings::Default()->SetProxyInfo();
+
+	// Wipe the password string from memory
+	if (passwordStr.Length() > 0) {
+		char* ptr = passwordStr.LockBuffer(passwordStr.Length());
+		memset(ptr, 0, passwordStr.Length());
+		passwordStr.UnlockBuffer(0);
+	}
 }
 
 

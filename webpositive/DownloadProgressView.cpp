@@ -908,7 +908,10 @@ DownloadProgressView::_UpdateStatus(off_t currentSize, off_t expectedSize)
 	fCurrentSize = currentSize;
 	fExpectedSize = expectedSize;
 
-	fStatusBar->SetTo(100.0 * currentSize / expectedSize);
+	if (expectedSize > 0)
+		fStatusBar->SetTo(100.0 * currentSize / expectedSize);
+	else
+		fStatusBar->SetTo(0.0);
 
 	bigtime_t currentTime = system_time();
 	if ((currentTime - fLastUpdateTime) > kMaxUpdateInterval) {

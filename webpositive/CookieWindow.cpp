@@ -326,7 +326,7 @@ CookieWindow::_BuildDomainList()
 	fCookieMap.clear();
 
 	// 1. Build a tree of domains in memory
-	DomainNode* rootNode = new DomainNode("", true);
+	std::unique_ptr<DomainNode> rootNode(new DomainNode("", true));
 
 	BPrivate::Network::BNetworkCookieJar::Iterator it = fCookieJar.GetIterator();
 	const BPrivate::Network::BNetworkCookie* cookie;
@@ -353,7 +353,7 @@ CookieWindow::_BuildDomainList()
 			temp.Remove(0, firstDot + 1);
 		}
 
-		DomainNode* current = rootNode;
+		DomainNode* current = rootNode.get();
 		// Iterate backwards (from "com" to "mail.google.com")
 		for (int i = path.size() - 1; i >= 0; i--) {
 			BString& part = path[i];
@@ -382,16 +382,19 @@ CookieWindow::_BuildDomainList()
 			for (it = node->children.begin(); it != node->children.end(); it++) {
 				DomainNode* child = it->second;
 				DomainItem* item = new DomainItem(child->domain, child->fake);
+				if (item == NULL)
+					continue;
 				item->SetOutlineLevel(level);
-				list->AddItem(item);
+				if (!list->AddItem(item)) {
+					delete item;
+					continue;
+				}
 				Flatten(child, list, level + 1);
 			}
 		}
 	};
 
-	TreeFlattener::Flatten(rootNode, fDomains, 0);
-
-	delete rootNode;
+	TreeFlattener::Flatten(rootNode.get(), fDomains, 0);
 
 	int32 i = 0;
 	int32 firstNotEmpty = i;

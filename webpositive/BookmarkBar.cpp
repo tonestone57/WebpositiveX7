@@ -222,7 +222,10 @@ BookmarkBar::AttachedToWindow()
 	thread_id loader = spawn_thread(LoadBookmarksThread, "BookmarkLoader",
 		B_NORMAL_PRIORITY, params);
 	if (loader >= 0) {
-		resume_thread(loader);
+		if (resume_thread(loader) != B_OK) {
+			kill_thread(loader);
+			delete params;
+		}
 	} else {
 		delete params;
 	}
