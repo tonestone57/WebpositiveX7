@@ -894,14 +894,6 @@ SettingsWindow::_ApplySettings()
 	_UpdateFontSettings();
 	_UpdateProxySettings();
 
-	// GPU Acceleration is handled in UI but engine support is currently platform-dependent.
-	// We log the setting change for diagnostic purposes.
-	if (fEnableGPUCheckBox->Value() == B_CONTROL_ON) {
-		printf("GPU Acceleration: Enabled (if supported)\n");
-	} else {
-		printf("GPU Acceleration: Disabled\n");
-	}
-
 	fSettings->SetValue(kSettingsKeyHttpsOnly,
 		fHttpsOnlyCheckBox->Value() == B_CONTROL_ON);
 	fSettings->SetValue(kSettingsKeyBlockAds,
