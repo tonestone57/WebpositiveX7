@@ -616,10 +616,24 @@ _SaveSettingsThread(void* data)
 		&& path.Append(kApplicationName) == B_OK
 		&& path.Append("Downloads") == B_OK) {
 
+		BPath tempPath(path);
+		BString tempFileName(tempPath.Leaf());
+		tempFileName << ".tmp";
+		tempPath.GetParent(&tempPath);
+		tempPath.Append(tempFileName);
+
 		BFile file;
-		if (file.SetTo(path.Path(),
+		if (file.SetTo(tempPath.Path(),
 				B_ERASE_FILE | B_CREATE_FILE | B_WRITE_ONLY) == B_OK) {
-			message->Flatten(&file);
+			if (message->Flatten(&file) == B_OK) {
+				file.Unset();
+				BEntry entry(tempPath.Path());
+				entry.Rename(path.Leaf(), true);
+			} else {
+				file.Unset();
+				BEntry entry(tempPath.Path());
+				entry.Remove();
+			}
 		}
 	}
 	delete message;

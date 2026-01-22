@@ -393,13 +393,29 @@ _SaveToDisk(BMessage* settingsArchive)
 {
 	// Implement logic similar to _OpenSettingsFile but standalone to avoid
 	// dependency on the singleton instance which might be destroyed.
-	BFile settingsFile;
 	BPath path;
 	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK
 		&& path.Append(kApplicationName) == B_OK
 		&& path.Append("BrowsingHistory") == B_OK) {
-		if (settingsFile.SetTo(path.Path(), B_CREATE_FILE | B_ERASE_FILE | B_WRITE_ONLY) == B_OK) {
-			settingsArchive->Flatten(&settingsFile);
+
+		BPath tempPath(path);
+		BString tempFileName(tempPath.Leaf());
+		tempFileName << ".tmp";
+		tempPath.GetParent(&tempPath);
+		tempPath.Append(tempFileName);
+
+		BFile settingsFile;
+		if (settingsFile.SetTo(tempPath.Path(), B_CREATE_FILE | B_ERASE_FILE | B_WRITE_ONLY) == B_OK) {
+			if (settingsArchive->Flatten(&settingsFile) == B_OK) {
+				settingsFile.Unset();
+				BEntry entry(tempPath.Path());
+				entry.Rename(path.Leaf(), true);
+			} else {
+				// Clean up partial file on failure
+				settingsFile.Unset();
+				BEntry entry(tempPath.Path());
+				entry.Remove();
+			}
 		}
 	}
 }
