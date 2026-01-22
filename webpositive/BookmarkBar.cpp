@@ -91,7 +91,7 @@ LoadBookmarksThread(void* data)
 	BEntry bookmark;
 
 	std::vector<BookmarkItem*>* items = new std::vector<BookmarkItem*>();
-	items->reserve(20);
+	items->reserve(100);
 
 	while (dir.GetNextEntry(&bookmark, false) == B_OK) {
 		node_ref ref;
@@ -103,7 +103,7 @@ LoadBookmarksThread(void* data)
 				bookmarkItem->item = item;
 				items->push_back(bookmarkItem);
 
-				if (items->size() >= 20) {
+				if (items->size() >= 100) {
 					BMessage message(kMsgInitialBookmarksLoaded);
 					message.AddPointer("list", items);
 					if (params->target.SendMessage(&message) != B_OK) {
@@ -114,7 +114,7 @@ LoadBookmarksThread(void* data)
 						delete items;
 					}
 					items = new std::vector<BookmarkItem*>();
-					items->reserve(20);
+					items->reserve(100);
 				}
 			}
 		}
