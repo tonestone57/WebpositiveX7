@@ -85,11 +85,16 @@ NetworkWindow::MessageReceived(BMessage* message)
 						if (oldItem->IsPending()) {
 							std::deque<NetworkRequestItem*>& list
 								= fPendingRequests[oldItem->Url()];
-							if (!list.empty() && list.front() == oldItem) {
-								list.pop_front();
-								if (list.empty())
-									fPendingRequests.erase(oldItem->Url());
+							// Robust removal: find and remove oldItem regardless of position
+							for (std::deque<NetworkRequestItem*>::iterator it = list.begin();
+									it != list.end(); ++it) {
+								if (*it == oldItem) {
+									list.erase(it);
+									break;
+								}
 							}
+							if (list.empty())
+								fPendingRequests.erase(oldItem->Url());
 						}
 						delete fRequestListView->RemoveItem(0);
 					}
