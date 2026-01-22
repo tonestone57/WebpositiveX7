@@ -260,8 +260,12 @@ BookmarkBar::MessageReceived(BMessage* message)
 								maxRight -= 32;
 
 							if (last->Frame().right > maxRight) {
-								fOverflowMenu->AddItem(item);
-								addedToOverflow = true;
+								if (fOverflowMenu->AddItem(item))
+									addedToOverflow = true;
+								else {
+									delete item;
+									continue;
+								}
 							}
 						}
 
@@ -270,7 +274,10 @@ BookmarkBar::MessageReceived(BMessage* message)
 							if (IndexOf(fOverflowMenu) != B_ERROR)
 								count--;
 
-							BMenuBar::AddItem(item, count);
+							if (!BMenuBar::AddItem(item, count)) {
+								delete item;
+								continue;
+							}
 						}
 
 						fItemsMap[data->inode] = item;
@@ -730,8 +737,12 @@ BookmarkBar::_AddItem(ino_t inode, BEntry* entry, bool layout)
 			maxRight -= 32;
 
 		if (last->Frame().right > maxRight) {
-			fOverflowMenu->AddItem(item);
-			addedToOverflow = true;
+			if (fOverflowMenu->AddItem(item))
+				addedToOverflow = true;
+			else {
+				delete item;
+				return;
+			}
 		}
 	}
 
@@ -740,7 +751,10 @@ BookmarkBar::_AddItem(ino_t inode, BEntry* entry, bool layout)
 		if (IndexOf(fOverflowMenu) != B_ERROR)
 			count--;
 
-		BMenuBar::AddItem(item, count);
+		if (!BMenuBar::AddItem(item, count)) {
+			delete item;
+			return;
+		}
 	}
 
 	fItemsMap[inode] = (IconMenuItem*)item;

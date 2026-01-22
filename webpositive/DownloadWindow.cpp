@@ -696,7 +696,8 @@ DownloadWindow::_LoadSettings()
 			delete view;
 			continue;
 		}
-		fDownloadViewsLayout->AddView(0, view);
+		if (fDownloadViewsLayout->AddView(0, view) == NULL)
+			delete view;
 	}
 }
 
