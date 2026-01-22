@@ -150,7 +150,7 @@ AuthenticationPanel::MessageReceived(BMessage* message)
 void
 AuthenticationPanel::_TogglePasswordVisibility()
 {
-	// TODO: Toggling this is broken in BTextView. Workaround is to
+	// Toggling HideTyping is broken in BTextView. Workaround is to
 	// set the text and selection again.
 	BString text = m_passwordTextControl->Text();
 	int32 selectionStart;
