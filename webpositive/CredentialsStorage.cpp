@@ -80,7 +80,9 @@ Credentials::operator=(const Credentials& other)
 		return *this;
 
 	fUsername = other.fUsername;
-	fPassword = other.fPassword;
+	// Force deep copy to avoid COW, so we can wipe the buffer later without affecting others
+	// or being affected by COW mechanics (which might allocate a new buffer on LockBuffer).
+	fPassword.SetTo(other.fPassword.String());
 
 	return *this;
 }

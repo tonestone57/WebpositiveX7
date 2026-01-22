@@ -48,16 +48,16 @@ public:
 			const BDateTime&	DateTime() const { return fDateTime; }
 			void				SetDateTime(const BDateTime& dateTime) { fDateTime = dateTime; }
 
-			uint32				InvokationCount() const {
-									return fInvokationCount; }
-			void				SetInvokationCount(uint32 count) { fInvokationCount = count; }
+			uint32				InvocationCount() const {
+									return fInvocationCount; }
+			void				SetInvocationCount(uint32 count) { fInvocationCount = count; }
 
 			void				Invoked();
 
 private:
 			BString				fURL;
 			BDateTime			fDateTime;
-			uint32				fInvokationCount;
+			uint32				fInvocationCount;
 };
 
 struct BrowsingHistoryItemPointerCompare {
