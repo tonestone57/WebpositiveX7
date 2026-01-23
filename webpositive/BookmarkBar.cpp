@@ -91,7 +91,7 @@ LoadBookmarksThread(void* data)
 	BEntry bookmark;
 
 	std::vector<BookmarkItem*>* items = new std::vector<BookmarkItem*>();
-	items->reserve(20);
+	items->reserve(100);
 
 	while (dir.GetNextEntry(&bookmark, false) == B_OK) {
 		node_ref ref;
@@ -103,7 +103,7 @@ LoadBookmarksThread(void* data)
 				bookmarkItem->item = item;
 				items->push_back(bookmarkItem);
 
-				if (items->size() >= 20) {
+				if (items->size() >= 100) {
 					BMessage message(kMsgInitialBookmarksLoaded);
 					message.AddPointer("list", items);
 					if (params->target.SendMessage(&message) != B_OK) {
@@ -114,7 +114,7 @@ LoadBookmarksThread(void* data)
 						delete items;
 					}
 					items = new std::vector<BookmarkItem*>();
-					items->reserve(20);
+					items->reserve(100);
 				}
 			}
 		}
@@ -260,8 +260,12 @@ BookmarkBar::MessageReceived(BMessage* message)
 								maxRight -= 32;
 
 							if (last->Frame().right > maxRight) {
-								fOverflowMenu->AddItem(item);
-								addedToOverflow = true;
+								if (fOverflowMenu->AddItem(item))
+									addedToOverflow = true;
+								else {
+									delete item;
+									continue;
+								}
 							}
 						}
 
@@ -270,7 +274,10 @@ BookmarkBar::MessageReceived(BMessage* message)
 							if (IndexOf(fOverflowMenu) != B_ERROR)
 								count--;
 
-							BMenuBar::AddItem(item, count);
+							if (!BMenuBar::AddItem(item, count)) {
+								delete item;
+								continue;
+							}
 						}
 
 						fItemsMap[data->inode] = item;
@@ -730,8 +737,12 @@ BookmarkBar::_AddItem(ino_t inode, BEntry* entry, bool layout)
 			maxRight -= 32;
 
 		if (last->Frame().right > maxRight) {
-			fOverflowMenu->AddItem(item);
-			addedToOverflow = true;
+			if (fOverflowMenu->AddItem(item))
+				addedToOverflow = true;
+			else {
+				delete item;
+				return;
+			}
 		}
 	}
 
@@ -740,7 +751,10 @@ BookmarkBar::_AddItem(ino_t inode, BEntry* entry, bool layout)
 		if (IndexOf(fOverflowMenu) != B_ERROR)
 			count--;
 
-		BMenuBar::AddItem(item, count);
+		if (!BMenuBar::AddItem(item, count)) {
+			delete item;
+			return;
+		}
 	}
 
 	fItemsMap[inode] = (IconMenuItem*)item;

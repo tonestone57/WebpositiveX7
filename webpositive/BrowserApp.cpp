@@ -384,7 +384,6 @@ BrowserApp::ReadyToRun()
 
 				for (int j = 1; archivedWindow.FindString("tab", j, &url)
 					== B_OK; j++) {
-					printf("Create %d:%d\n", i, j);
 					_CreateNewTab(window, url, false, true);
 					pagesCreated++;
 				}

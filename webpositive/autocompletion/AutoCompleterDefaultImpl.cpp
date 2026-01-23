@@ -241,10 +241,10 @@ BDefaultChoiceView::ListView::MessageReceived(BMessage* message)
 void
 BDefaultChoiceView::ListView::MouseDown(BPoint point)
 {
-	if (!Window()->Frame().Contains(ConvertToScreen(point)))
+	if (!Window()->Frame().Contains(ConvertToScreen(point))) {
 		// click outside of window, so we close it:
-		Window()->Quit();
-	else
+		fCompleter->CancelChoice();
+	} else
 		BListView::MouseDown(point);
 }
 
