@@ -1042,8 +1042,18 @@ SettingsWindow::_RevertSettings()
 		false));
 	fProxyUsernameControl->SetText(fSettings->GetValue(kSettingsKeyProxyUsername,
 		""));
-	fProxyPasswordControl->SetText(fSettings->GetValue(kSettingsKeyProxyPassword,
-		""));
+
+	BString proxyPassword = fSettings->GetValue(kSettingsKeyProxyPassword, "");
+	if (proxyPassword.Length() == 0
+		&& fUseProxyAuthCheckBox->Value() == B_CONTROL_ON) {
+		BKeyStore keyStore;
+		BPasswordKey key;
+		if (keyStore.GetKey("WebPositive", B_KEY_TYPE_PASSWORD, "ProxySettings",
+				key) == B_OK) {
+			proxyPassword = key.Password();
+		}
+	}
+	fProxyPasswordControl->SetText(proxyPassword.String());
 
 	// Privacy settings
 	fHttpsOnlyCheckBox->SetValue(fSettings->GetValue(kSettingsKeyHttpsOnly,
