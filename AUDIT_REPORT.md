@@ -9,30 +9,52 @@
     -   Modified `_RevertSettings` to fetch the proxy password from `BKeyStore` if the settings file has an empty password but authentication is enabled.
     -   Prevents the password from being cleared from the KeyStore when the user opens and saves settings.
 
-## audited Files (No Critical Issues Found)
+## Audited Files (No Critical Issues Found)
 The following files were reviewed for memory leaks, race conditions, and logic errors. No further critical issues were identified.
 
 *   **`DownloadWindow.cpp`**:
-    *   Thread management for saving settings checks return values correctly (`resume_thread`).
-    *   View memory management in `fDownloadViewsLayout` is handled via standard BLayoutItem ownership.
-    *   Map iterators in `_DownloadFinished` are handled safely.
+    -   Thread management for saving settings checks return values correctly (`resume_thread`).
+    -   View memory management in `fDownloadViewsLayout` is handled via standard BLayoutItem ownership.
+    -   Map iterators in `_DownloadFinished` are handled safely.
 
 *   **`BrowsingHistory.cpp`**:
-    *   Uses `std::unique_ptr` for raw buffer management during import.
-    *   Uses `atomic_add` for tracking active save threads to ensure clean shutdown.
-    *   Thread-safe locking mechanisms are in place.
+    -   Uses `std::unique_ptr` for raw buffer management during import.
+    -   Uses `atomic_add` for tracking active save threads to ensure clean shutdown.
+    -   Thread-safe locking mechanisms are in place.
 
 *   **`TabManager.cpp`**:
-    *   `MoveTab` implements robust recovery logic if memory allocation fails during tab reordering, preventing inconsistent state.
+    -   `MoveTab` implements robust recovery logic if memory allocation fails during tab reordering, preventing inconsistent state.
 
 *   **`NetworkWindow.cpp`**:
-    *   List view item management correctly handles deletion.
-    *   Concurrency between `ADD` and `UPDATE` messages is serialized by the window message loop.
+    -   List view item management correctly handles deletion.
+    -   Concurrency between `ADD` and `UPDATE` messages is serialized by the window message loop.
 
 *   **`ConsoleWindow.cpp`**:
-    *   Message coalescing logic handles repeated lines correctly.
-    *   List size limiting correctly manages memory.
+    -   Message coalescing logic handles repeated lines correctly.
+    -   List size limiting correctly manages memory.
 
 *   **`AuthenticationPanel.cpp`**:
-    *   Implements a correct modal loop using semaphores and `wait_for_objects_etc` to keep the parent window responsive.
-    *   Securely wipes password memory buffers.
+    -   Implements a correct modal loop using semaphores and `wait_for_objects_etc` to keep the parent window responsive.
+    -   Securely wipes password memory buffers.
+
+*   **`BookmarkBar.cpp`**:
+    -   Uses `std::unique_ptr` for overflow menu ownership management.
+    -   Threaded loading logic properly hands off ownership of allocated items to the main thread via `BMessage`.
+    -   Robustly handles file system changes (`B_ENTRY_MOVED`, etc.).
+
+*   **`CredentialsStorage.cpp`**:
+    -   Securely wipes password buffers in `Credentials` destructor.
+    -   Uses `SetTo` with string pointer to force deep copy and avoid COW issues with sensitive data.
+    -   Correctly uses `BKeyStore` for persistent storage.
+
+*   **`PermissionsWindow.cpp`**:
+    -   Correctly cleans up list items in `_ClearPermissions`.
+    -   Uses `SitePermissionsManager` singleton for data persistence.
+
+*   **`SitePermissionsManager.cpp`**:
+    -   Thread-safe access via `BAutolock`.
+    -   Correctly handles case-insensitive domain matching.
+
+*   **`URLInputGroup.cpp`**:
+    -   Drag and drop bitmap memory is managed correctly (deleted after `DragMessage`).
+    -   Text insertion logic safely handles formatting.
