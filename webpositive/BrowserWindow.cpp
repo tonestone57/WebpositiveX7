@@ -1218,7 +1218,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 						errorMsg << ": " << strerror(status);
 						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 							errorMsg.String(), B_TRANSLATE("OK"));
-						alert->Go();
+						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 					}
 				} else if (type == EXPORT_HISTORY) {
 					BPath path(&ref);
@@ -1229,7 +1229,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 						errorMsg << ": " << strerror(status);
 						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 							errorMsg.String(), B_TRANSLATE("OK"));
-						alert->Go();
+						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 					}
 				} else if (type == EXPORT_COOKIES) {
 					BPath path(&ref);
@@ -1240,7 +1240,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 						errorMsg << ": " << strerror(status);
 						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 							errorMsg.String(), B_TRANSLATE("OK"));
-						alert->Go();
+						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 					}
 				} else if (type == SAVE_PAGE) {
 					BFile output(&dir, name,
@@ -1377,7 +1377,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					errorMsg << ": " << strerror(status);
 					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
 						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go();
+					alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 				}
 			}
 			break;
@@ -2930,7 +2930,6 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 		msg->AddString("url", url);
 		msg->AddPointer("view", view);
 		alert->Go(new BInvoker(msg, this));
-		return;
 	}
 
 	view->WebPage()->SetStatusMessage(status);

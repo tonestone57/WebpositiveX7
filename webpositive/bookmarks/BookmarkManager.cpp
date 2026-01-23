@@ -10,6 +10,8 @@
 #include <Entry.h>
 #include <File.h>
 #include <FindDirectory.h>
+#include <Invoker.h>
+#include <Message.h>
 #include <NodeInfo.h>
 #include <Roster.h>
 #include <stdio.h>
@@ -61,7 +63,7 @@ BookmarkManager::CreateBookmark(const BString& fileName, const BString& title,
 			message.String(), B_TRANSLATE("OK"), NULL, NULL,
 			B_WIDTH_AS_USUAL, B_STOP_ALERT);
 		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
-		alert->Go();
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 	}
 }
 
@@ -198,7 +200,7 @@ BookmarkManager::_CreateBookmark(const BPath& path, BString fileName, const BStr
 			message.String(), B_TRANSLATE("OK"), NULL, NULL,
 			B_WIDTH_AS_USUAL, B_STOP_ALERT);
 		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
-		alert->Go();
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 		return;
 	}
 }
@@ -253,7 +255,7 @@ BookmarkManager::CreateBookmarkFromMessage(BMessage* message)
 			message.String(), B_TRANSLATE("OK"), NULL, NULL,
 			B_WIDTH_AS_USUAL, B_STOP_ALERT);
 		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
-		alert->Go();
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 	}
 	delete largeIcon;
 }
@@ -278,7 +280,7 @@ BookmarkManager::ShowBookmarks()
 			message.String(), B_TRANSLATE("OK"), NULL, NULL,
 			B_WIDTH_AS_USUAL, B_STOP_ALERT);
 		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
-		alert->Go();
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 		return;
 	}
 }

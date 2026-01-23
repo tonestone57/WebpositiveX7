@@ -5,6 +5,8 @@
 
 #include "TabSearchWindow.h"
 
+#include "BrowserWindow.h"
+
 #include <Application.h>
 #include <Autolock.h>
 #include <GroupLayoutBuilder.h>
