@@ -84,12 +84,10 @@ TabSearchWindow::MessageReceived(BMessage* message)
 					BView* view = item->View();
 					if (fTabManager) {
 						BMessenger target = fTabManager->Target();
-						if (target.LockTargetWithTimeout(100000) == B_OK) {
-							if (fTabManager->HasView(view))
-								fTabManager->SelectTab(view);
-							target.UnlockTarget();
-							PostMessage(B_QUIT_REQUESTED);
-						}
+						BMessage selectMsg(SELECT_TAB_BY_VIEW);
+						selectMsg.AddPointer("view", view);
+						target.SendMessage(&selectMsg);
+						PostMessage(B_QUIT_REQUESTED);
 					}
 				}
 			}
@@ -107,7 +105,7 @@ bool
 TabSearchWindow::QuitRequested()
 {
 	if (fTabManager) {
-		BMessage msg('tswq'); // TAB_SEARCH_WINDOW_QUIT
+		BMessage msg(TAB_SEARCH_WINDOW_QUIT); // TAB_SEARCH_WINDOW_QUIT
 		fTabManager->Target().PostMessage(&msg);
 	}
 	return true;

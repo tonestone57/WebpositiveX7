@@ -1597,6 +1597,20 @@ BrowserWindow::MessageReceived(BMessage* message)
 			break;
 		}
 
+		case FORM_SAFETY_ALERT_CONFIRMED:
+			fFormSafetyHelper->AlertConfirmed(message);
+			break;
+
+		case SELECT_TAB_BY_VIEW:
+		{
+			BView* view = NULL;
+			if (message->FindPointer("view", (void**)&view) == B_OK) {
+				if (fTabManager->HasView(view))
+					fTabManager->SelectTab(view);
+			}
+			break;
+		}
+
 		case TOGGLE_FULLSCREEN:
 			ToggleFullscreen();
 			break;
