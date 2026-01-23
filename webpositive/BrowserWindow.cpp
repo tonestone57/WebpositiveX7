@@ -36,6 +36,7 @@
 
 #include <OS.h>
 #include <Alert.h>
+#include <Invoker.h>
 #include <TranslatorFormats.h>
 #include <TranslationUtils.h>
 #include <Application.h>
@@ -1217,7 +1218,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 						errorMsg << ": " << strerror(status);
 						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 							errorMsg.String(), B_TRANSLATE("OK"));
-						alert->Go();
+						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 					}
 				} else if (type == EXPORT_HISTORY) {
 					BPath path(&ref);
@@ -1228,7 +1229,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 						errorMsg << ": " << strerror(status);
 						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 							errorMsg.String(), B_TRANSLATE("OK"));
-						alert->Go();
+						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 					}
 				} else if (type == EXPORT_COOKIES) {
 					BPath path(&ref);
@@ -1239,7 +1240,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 						errorMsg << ": " << strerror(status);
 						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 							errorMsg.String(), B_TRANSLATE("OK"));
-						alert->Go();
+						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 					}
 				} else if (type == SAVE_PAGE) {
 					BFile output(&dir, name,
@@ -1336,8 +1337,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 				B_TRANSLATE("Cancel"));
 			alert->SetShortcut(1, B_ESCAPE);
 
-			if (alert->Go() == 0)
-				history->Clear();
+			alert->Go(new BInvoker(new BMessage(CLEAR_HISTORY_CONFIRMED), this));
 			break;
 		}
 
@@ -1377,7 +1377,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					errorMsg << ": " << strerror(status);
 					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
 						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go();
+					alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 				}
 			}
 			break;
@@ -1428,8 +1428,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 					string.String(), B_TRANSLATE("Cancel"),
 					B_TRANSLATE("Open all"));
 				alert->SetShortcut(0, B_ESCAPE);
-				if (alert->Go() == 0)
-					break;
+
+				BMessage* confirmMsg = new BMessage(OPEN_MANY_BOOKMARKS_CONFIRMED);
+				confirmMsg->AddMessage("original_message", message);
+				alert->Go(new BInvoker(confirmMsg, this));
+				break;
 			}
 			message->AddPointer("window", this);
 			be_app->PostMessage(message);
@@ -1539,6 +1542,74 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case NETWORK_WINDOW_CLOSED:
 			fNetworkWindow = NULL;
 			break;
+
+		case CLEAR_HISTORY_CONFIRMED:
+		{
+			int32 which;
+			if (message->FindInt32("which", &which) == B_OK && which == 0)
+				BrowsingHistory::DefaultInstance()->Clear();
+			break;
+		}
+
+		case OPEN_MANY_BOOKMARKS_CONFIRMED:
+		{
+			int32 which;
+			if (message->FindInt32("which", &which) == B_OK && which == 1) {
+				BMessage originalMessage;
+				if (message->FindMessage("original_message", &originalMessage) == B_OK) {
+					originalMessage.AddPointer("window", this);
+					be_app->PostMessage(&originalMessage);
+				}
+			}
+			break;
+		}
+
+		case LOAD_INSECURE_CONFIRMED:
+		{
+			int32 which;
+			if (message->FindInt32("which", &which) == B_OK && which == 1) {
+				BString url;
+				BWebView* view;
+				if (message->FindString("url", &url) == B_OK
+					&& message->FindPointer("view", (void**)&view) == B_OK) {
+
+					// Verify view still exists
+					if (fTabManager->HasView(view)) {
+						BString httpUrl = url;
+						if (httpUrl.StartsWith("https://")) {
+							httpUrl.ReplaceFirst("https://", "http://");
+						} else {
+							httpUrl.Prepend("http://");
+						}
+
+						PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+						if (userData) {
+							BUrl u(httpUrl);
+							userData->SetAllowedInsecureHost(u.Host());
+							userData->SetHttpsUpgraded(false);
+							userData->SetExpectedUpgradedUrl("");
+						}
+
+						view->LoadURL(httpUrl);
+					}
+				}
+			}
+			break;
+		}
+
+		case FORM_SAFETY_ALERT_CONFIRMED:
+			fFormSafetyHelper->AlertConfirmed(message);
+			break;
+
+		case SELECT_TAB_BY_VIEW:
+		{
+			BView* view = NULL;
+			if (message->FindPointer("view", (void**)&view) == B_OK) {
+				if (fTabManager->HasView(view))
+					fTabManager->SelectTab(view);
+			}
+			break;
+		}
 
 		case TOGGLE_FULLSCREEN:
 			ToggleFullscreen();
@@ -1778,7 +1849,8 @@ BrowserWindow::MessageReceived(BMessage* message)
 				info << "No page loaded.";
 			}
 			BAlert* alert = new BAlert("Security Info", info.String(), "OK");
-			alert->Go();
+			alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
+			alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 			break;
 		}
 
@@ -2854,23 +2926,10 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 		BAlert* alert = new BAlert(B_TRANSLATE("HTTPS-Only Mode"), text.String(),
 			B_TRANSLATE("Cancel"), B_TRANSLATE("Load Insecurely"));
 
-		if (alert->Go() == 1) {
-			BString httpUrl = url;
-			if (httpUrl.StartsWith("https://")) {
-				httpUrl.ReplaceFirst("https://", "http://");
-			} else {
-				httpUrl.Prepend("http://");
-			}
-
-			// Allow this host
-			BUrl u(httpUrl);
-			userData->SetAllowedInsecureHost(u.Host());
-			userData->SetHttpsUpgraded(false);
-			userData->SetExpectedUpgradedUrl("");
-
-			view->LoadURL(httpUrl);
-			return;
-		}
+		BMessage* msg = new BMessage(LOAD_INSECURE_CONFIRMED);
+		msg->AddString("url", url);
+		msg->AddPointer("view", view);
+		alert->Go(new BInvoker(msg, this));
 	}
 
 	view->WebPage()->SetStatusMessage(status);

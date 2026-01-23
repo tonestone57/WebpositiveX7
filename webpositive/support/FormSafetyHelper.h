@@ -23,6 +23,7 @@ public:
 			bool				QuitRequested();
 			void				MessageReceived(BMessage* message);
 			void				ConsoleMessage(const BString& message);
+			void				AlertConfirmed(BMessage* message);
 
 			bool				IsFormCheckPending() const { return fFormCheckPending; }
 			bool				IsForceClose() const { return fForceClose; }

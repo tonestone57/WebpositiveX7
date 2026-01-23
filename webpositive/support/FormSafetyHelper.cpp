@@ -11,6 +11,7 @@
 
 #include <Alert.h>
 #include <Catalog.h>
+#include <Invoker.h>
 #include <MessageRunner.h>
 
 #undef B_TRANSLATION_CONTEXT
@@ -144,14 +145,20 @@ FormSafetyHelper::_CheckFormDirtyFinished()
 			B_TRANSLATE("One or more tabs have unsaved form data. Do you want to close the window anyway?"),
 			B_TRANSLATE("Cancel"), B_TRANSLATE("Close"));
 		alert->SetShortcut(0, B_ESCAPE);
-		int32 result = alert->Go();
-		if (result == 1) { // Close
-			fForceClose = true;
-			fWindow->PostMessage(B_QUIT_REQUESTED);
-		}
-		// If Cancel, do nothing, window stays open
+		alert->Go(new BInvoker(new BMessage(FORM_SAFETY_ALERT_CONFIRMED), fWindow));
 	} else {
 		// No dirty tabs, proceed to close
+		fForceClose = true;
+		fWindow->PostMessage(B_QUIT_REQUESTED);
+	}
+}
+
+
+void
+FormSafetyHelper::AlertConfirmed(BMessage* message)
+{
+	int32 which;
+	if (message->FindInt32("which", &which) == B_OK && which == 1) { // Close
 		fForceClose = true;
 		fWindow->PostMessage(B_QUIT_REQUESTED);
 	}
