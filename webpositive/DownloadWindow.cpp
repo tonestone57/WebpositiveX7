@@ -10,6 +10,7 @@
 
 #include <Alert.h>
 #include <Autolock.h>
+#include <Invoker.h>
 #include <Button.h>
 #include <Catalog.h>
 #include <ControlLook.h>
@@ -328,7 +329,7 @@ DownloadWindow::MessageReceived(BMessage* message)
 				BAlert* alert = new BAlert(B_TRANSLATE("Error opening downloads "
 					"folder"), errorString.String(), B_TRANSLATE("OK"));
 				alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
-				alert->Go(NULL);
+				alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 			}
 			break;
 		}
