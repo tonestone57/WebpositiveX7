@@ -84,10 +84,18 @@ TabSearchWindow::MessageReceived(BMessage* message)
 					BView* view = item->View();
 					if (fTabManager) {
 						BMessenger target = fTabManager->Target();
-						BMessage selectMsg(SELECT_TAB_BY_VIEW);
-						selectMsg.AddPointer("view", view);
-						target.SendMessage(&selectMsg);
-						PostMessage(B_QUIT_REQUESTED);
+						if (target.IsValid()) {
+							// If the target (fTarget) is the Window, this works.
+							// Assuming fTarget is indeed the BrowserWindow as initialized in TabManager::TabManager.
+							// TabManager::TabManager(..., BMessenger& target, ...)
+							// BrowserWindow passes BMessenger(this).
+							// So fTabManager->Target() is the BrowserWindow.
+
+							BMessage selectMsg(SELECT_TAB_BY_VIEW);
+							selectMsg.AddPointer("view", view);
+							target.SendMessage(&selectMsg);
+							PostMessage(B_QUIT_REQUESTED);
+						}
 					}
 				}
 			}

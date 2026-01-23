@@ -1569,12 +1569,12 @@ BrowserWindow::MessageReceived(BMessage* message)
 			int32 which;
 			if (message->FindInt32("which", &which) == B_OK && which == 1) {
 				BString url;
-				int32 tabIndex;
+				BWebView* view;
 				if (message->FindString("url", &url) == B_OK
-					&& message->FindInt32("tab_index", &tabIndex) == B_OK) {
+					&& message->FindPointer("view", (void**)&view) == B_OK) {
 
-					BWebView* view = dynamic_cast<BWebView*>(fTabManager->ViewForTab(tabIndex));
-					if (view) {
+					// Verify view still exists
+					if (fTabManager->HasView(view)) {
 						BString httpUrl = url;
 						if (httpUrl.StartsWith("https://")) {
 							httpUrl.ReplaceFirst("https://", "http://");
@@ -2928,7 +2928,7 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 
 		BMessage* msg = new BMessage(LOAD_INSECURE_CONFIRMED);
 		msg->AddString("url", url);
-		msg->AddInt32("tab_index", fTabManager->TabForView(view));
+		msg->AddPointer("view", view);
 		alert->Go(new BInvoker(msg, this));
 		return;
 	}
