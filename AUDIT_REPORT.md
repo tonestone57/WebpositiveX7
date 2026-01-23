@@ -58,3 +58,27 @@ The following files were reviewed for memory leaks, race conditions, and logic e
 *   **`URLInputGroup.cpp`**:
     -   Drag and drop bitmap memory is managed correctly (deleted after `DragMessage`).
     -   Text insertion logic safely handles formatting.
+
+*   **`BrowserApp.cpp`**:
+    -   Signal-safe crash handler implementation.
+    -   Correctly handles `setenv` for cookies.
+    -   Window management loop logic in `QuitRequested` is robust.
+
+*   **`CookieWindow.cpp`**:
+    -   RAII used for root domain node.
+    -   Tree traversal logic in `_BuildDomainList` appears correct and safe.
+
+*   **`DownloadProgressView.cpp`**:
+    -   Correct usage of `watch_node` and `stop_watching`.
+    -   Memory management of child views (IconView, buttons) is handled by the layout system.
+
+*   **`Sync.cpp`**:
+    -   `ImportCookies` uses `std::unique_ptr` for buffer safety and checks file size limits.
+    -   Cookie file parsing is robust against malformed lines.
+
+*   **`SourceWindow.cpp`**:
+    -   Syntax highlighting logic uses safe bounds checking (`TextLength()`).
+    -   Uses `BTextView` correctly for read-only display.
+
+*   **`TabSearchWindow.cpp`**:
+    -   Uses `LockTargetWithTimeout` when accessing `BrowserWindow` state, preventing potential deadlocks if the main window is busy or closing.
