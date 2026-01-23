@@ -10,6 +10,7 @@
 
 #include <Alert.h>
 #include <Application.h>
+#include <Invoker.h>
 #include <Bitmap.h>
 #include <Button.h>
 #include <CheckBox.h>
@@ -55,6 +56,7 @@ enum {
 	COPY_URL_TO_CLIPBOARD	= 'curl',
 	OPEN_CONTAINING_FOLDER	= 'opfd',
 	MIME_TYPE_SET			= 'mtsn',
+	OPEN_EXECUTABLE_CONFIRMED = 'oexc',
 };
 
 const bigtime_t kMaxUpdateInterval = 100000LL;
@@ -512,11 +514,12 @@ DownloadProgressView::MessageReceived(BMessage* message)
 						B_WARNING_ALERT);
 					alert->SetShortcut(0, B_ESCAPE);
 
-					if (alert->Go() != 1)
-						break;
+					BMessage* msg = new BMessage(OPEN_EXECUTABLE_CONFIRMED);
+					msg->AddRef("refs", &ref);
+					alert->Go(new BInvoker(msg, this));
+				} else {
+					status = be_roster->Launch(&ref);
 				}
-
-				status = be_roster->Launch(&ref);
 			}
 
 			if (status != B_OK && status != B_ALREADY_RUNNING) {
@@ -524,10 +527,30 @@ DownloadProgressView::MessageReceived(BMessage* message)
 					B_TRANSLATE("The download could not be opened."),
 					B_TRANSLATE("OK"));
 				alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
-				alert->Go(NULL);
+				alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 			}
 			break;
 		}
+
+		case OPEN_EXECUTABLE_CONFIRMED:
+		{
+			int32 which;
+			if (message->FindInt32("which", &which) == B_OK && which == 1) {
+				entry_ref ref;
+				if (message->FindRef("refs", &ref) == B_OK) {
+					status_t status = be_roster->Launch(&ref);
+					if (status != B_OK && status != B_ALREADY_RUNNING) {
+						BAlert* alert = new BAlert(B_TRANSLATE("Open download error"),
+							B_TRANSLATE("The download could not be opened."),
+							B_TRANSLATE("OK"));
+						alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
+						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
+					}
+				}
+			}
+			break;
+		}
+
 		case RESTART_DOWNLOAD:
 		{
 			// We can't create a download without a full web context (mainly

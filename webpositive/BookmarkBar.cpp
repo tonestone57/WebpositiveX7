@@ -7,6 +7,7 @@
 #include "BookmarkBar.h"
 
 #include <Alert.h>
+#include <Invoker.h>
 #include <OS.h>
 #include <Catalog.h>
 #include <ControlLook.h>
@@ -455,7 +456,7 @@ BookmarkBar::MessageReceived(BMessage* message)
 					BString errorMessage = B_TRANSLATE("Failed to delete bookmark:\n'%path%'");
 					errorMessage.ReplaceFirst("%path%", path.Path());
 					BAlert* alert = new BAlert("Error", errorMessage.String(), B_TRANSLATE("OK"));
-					alert->Go();
+					alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 					break;
 				}
 
@@ -466,7 +467,7 @@ BookmarkBar::MessageReceived(BMessage* message)
 							"from boookmark bar.");
 					errorMessage.ReplaceFirst("%leaf%", path.Leaf());
 					BAlert* alert = new BAlert("Error", errorMessage.String(), B_TRANSLATE("OK"));
-					alert->Go();
+					alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 				}
 			}
 			break;
