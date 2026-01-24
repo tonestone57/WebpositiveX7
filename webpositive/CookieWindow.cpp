@@ -32,7 +32,8 @@ enum {
 	COOKIE_DELETE = 'cdel',
 	COOKIE_REFRESH = 'rfsh',
 
-	DOMAIN_SELECTED = 'dmsl'
+	DOMAIN_SELECTED = 'dmsl',
+	COOKIE_SELECTED = 'cksl'
 };
 
 
@@ -163,6 +164,10 @@ CookieWindow::CookieWindow(BRect frame,
 	fCookies->AddColumn(new BStringColumn(B_TRANSLATE("Flags"),
 		flagsLength, flagsLength, flagsLength, 0), 4);
 
+	fDeleteButton = new BButton("delete", B_TRANSLATE("Delete"),
+		new BMessage(COOKIE_DELETE));
+	fDeleteButton->SetEnabled(false);
+
 	root->AddItem(BGroupLayoutBuilder(B_VERTICAL, B_USE_DEFAULT_SPACING)
 		.SetInsets(5, 5, 5, 5)
 		.AddGroup(B_HORIZONTAL, B_USE_DEFAULT_SPACING)
@@ -177,10 +182,10 @@ CookieWindow::CookieWindow(BRect frame,
 			.Add(new BButton("export", B_TRANSLATE("Export" B_UTF8_ELLIPSIS),
 				new BMessage(COOKIE_EXPORT)))
 			.AddGlue()
-			.Add(new BButton("delete", B_TRANSLATE("Delete"),
-				new BMessage(COOKIE_DELETE))), 3);
+			.Add(fDeleteButton), 3);
 
 	fDomains->SetSelectionMessage(new BMessage(DOMAIN_SELECTED));
+	fCookies->SetSelectionMessage(new BMessage(COOKIE_SELECTED));
 }
 
 
@@ -202,11 +207,20 @@ CookieWindow::MessageReceived(BMessage* message)
 				BString domain = item->Text();
 				_ShowCookiesForDomain(domain);
 			}
+			fDeleteButton->SetEnabled(index >= 0);
+			return;
+		}
+
+		case COOKIE_SELECTED:
+		{
+			fDeleteButton->SetEnabled(fCookies->CurrentSelection() >= 0 ||
+				fDomains->CurrentSelection() >= 0);
 			return;
 		}
 
 		case COOKIE_REFRESH:
 			_BuildDomainList();
+			fDeleteButton->SetEnabled(false);
 			return;
 
 		case COOKIE_DELETE:
