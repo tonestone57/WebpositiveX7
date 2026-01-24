@@ -2818,6 +2818,10 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 			settings->SetJavaScriptEnabled(allowJS);
 			settings->SetCookiesEnabled(allowCookies);
 
+			// Enable Media Source Extensions
+			bool enableMSE = fAppSettings->GetValue(kSettingsKeyEnableMSE, true);
+			settings->SetMediaSourceEnabled(enableMSE);
+
 			// Only apply global cache setting if we are NOT currently in a forced reload (bypass cache) state
 			if (!fIsBypassingCache) {
 				if (fAppSettings->GetValue(kSettingsKeyDisableCache, false)) {
