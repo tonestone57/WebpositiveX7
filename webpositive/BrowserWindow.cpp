@@ -1026,11 +1026,17 @@ BrowserWindow::DispatchMessage(BMessage* message, BHandler* target)
 	}
 
 	if (message->what == B_MOUSE_WHEEL_CHANGED) {
+		BWebView* webView = CurrentWebView();
+		if (webView == NULL) {
+			BWebWindow::DispatchMessage(message, target);
+			return;
+		}
+
 		BPoint where;
 		uint32 buttons;
-		CurrentWebView()->GetMouse(&where, &buttons, false);
+		webView->GetMouse(&where, &buttons, false);
 		// Only do this when the mouse is over the web view
-		if (CurrentWebView()->Bounds().Contains(where)) {
+		if (webView->Bounds().Contains(where)) {
 			// Zoom and unzoom text on Command + mouse wheel.
 			// This could of course (and maybe should be) implemented in the
 			// WebView, but there would need to be a way for the WebView to
@@ -1040,9 +1046,9 @@ BrowserWindow::DispatchMessage(BMessage* message, BHandler* target)
 				float deltaY;
 				if (message->FindFloat("be:wheel_delta_y", &deltaY) == B_OK) {
 					if (deltaY < 0)
-						CurrentWebView()->IncreaseZoomFactor(fZoomTextOnly);
+						webView->IncreaseZoomFactor(fZoomTextOnly);
 					else
-						CurrentWebView()->DecreaseZoomFactor(fZoomTextOnly);
+						webView->DecreaseZoomFactor(fZoomTextOnly);
 
 					return;
 				}
@@ -1123,6 +1129,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case GOTO_URL:
 		{
+			if (CurrentWebView() == NULL)
+				break;
+
 			BString url;
 			if (message->FindString("url", &url) != B_OK)
 				url = fURLInputGroup->Text();
@@ -1135,6 +1144,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case SAVE_PAGE:
 		{
+			if (CurrentWebView() == NULL)
+				break;
+
 			BMessage saveMsg(B_SAVE_REQUESTED);
 			saveMsg.AddInt32("type", SAVE_PAGE);
 			fSavePanel->SetMessage(&saveMsg);
@@ -1343,6 +1355,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case CREATE_BOOKMARK:
 		{
+			if (CurrentWebView() == NULL)
+				break;
+
 			BString fileName;
 			BString title(CurrentWebView()->MainFrameTitle());
 			BString url(CurrentWebView()->MainFrameURL());
@@ -1489,24 +1504,24 @@ BrowserWindow::MessageReceived(BMessage* message)
 		}
 
 		case ZOOM_FACTOR_INCREASE:
-			CurrentWebView()->IncreaseZoomFactor(fZoomTextOnly);
-			{
+			if (CurrentWebView()) {
+				CurrentWebView()->IncreaseZoomFactor(fZoomTextOnly);
 				float z = CurrentWebView()->ZoomFactor(false);
 				BString domain = BUrl(CurrentWebView()->MainFrameURL()).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
 			}
 			break;
 		case ZOOM_FACTOR_DECREASE:
-			CurrentWebView()->DecreaseZoomFactor(fZoomTextOnly);
-			{
+			if (CurrentWebView()) {
+				CurrentWebView()->DecreaseZoomFactor(fZoomTextOnly);
 				float z = CurrentWebView()->ZoomFactor(false);
 				BString domain = BUrl(CurrentWebView()->MainFrameURL()).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
 			}
 			break;
 		case ZOOM_FACTOR_RESET:
-			CurrentWebView()->ResetZoomFactor();
-			{
+			if (CurrentWebView()) {
+				CurrentWebView()->ResetZoomFactor();
 				BString domain = BUrl(CurrentWebView()->MainFrameURL()).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), 1.0);
 			}
@@ -1722,7 +1737,8 @@ BrowserWindow::MessageReceived(BMessage* message)
 			break;
 
 		case SHOW_PAGE_SOURCE:
-			CurrentWebView()->WebPage()->SendPageSource();
+			if (CurrentWebView())
+				CurrentWebView()->WebPage()->SendPageSource();
 			break;
 		case B_PAGE_SOURCE_RESULT:
 			PageSourceSaver::HandlePageSourceResult(message);
@@ -1760,8 +1776,10 @@ BrowserWindow::MessageReceived(BMessage* message)
 		}
 
 		case EDIT_FIND_NEXT:
-			CurrentWebView()->FindString(fFindTextControl->Text(), true,
-				fFindCaseSensitiveCheckBox->Value());
+			if (CurrentWebView()) {
+				CurrentWebView()->FindString(fFindTextControl->Text(), true,
+					fFindCaseSensitiveCheckBox->Value());
+			}
 			break;
 		case FIND_TEXT_CHANGED:
 		{
@@ -1771,8 +1789,10 @@ BrowserWindow::MessageReceived(BMessage* message)
 			break;
 		}
 		case EDIT_FIND_PREVIOUS:
-			CurrentWebView()->FindString(fFindTextControl->Text(), false,
-				fFindCaseSensitiveCheckBox->Value());
+			if (CurrentWebView()) {
+				CurrentWebView()->FindString(fFindTextControl->Text(), false,
+					fFindCaseSensitiveCheckBox->Value());
+			}
 			break;
 		case EDIT_SHOW_FIND_GROUP:
 			if (!fFindGroup->IsVisible())

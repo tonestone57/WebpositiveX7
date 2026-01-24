@@ -160,6 +160,13 @@ SitePermissionsManager::Save()
 	_Save();
 }
 
+std::map<BString, SitePermissionsManager::PermissionEntry>
+SitePermissionsManager::GetPermissions()
+{
+	BAutolock lock(fLock);
+	return fPermissionMap;
+}
+
 void
 SitePermissionsManager::_Save()
 {

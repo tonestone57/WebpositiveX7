@@ -283,34 +283,16 @@ PermissionsWindow::_LoadPermissions()
 	for (int32 i = fDomainList->CountItems() - 1; i >= 0; i--)
 		delete fDomainList->RemoveItem(i);
 
-	BPath path;
-	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
-		path.Append(kApplicationName);
-		path.Append("SitePermissions");
-		SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.Path());
+	std::map<BString, SitePermissionsManager::PermissionEntry> permissions
+		= SitePermissionsManager::Instance()->GetPermissions();
 
-		int32 i = 0;
-		BMessage domainMsg;
-		while (settings.FindMessage("domain", i++, &domainMsg) == B_OK) {
-			BString domain;
-			if (domainMsg.FindString("name", &domain) == B_OK) {
-				bool js = true;
-				bool cookies = true;
-				bool popups = false;
-				float zoom = 1.0;
-				bool forceDesktop = false;
-				BString userAgent;
-				domainMsg.FindBool("js", &js);
-				domainMsg.FindBool("cookies", &cookies);
-				domainMsg.FindBool("popups", &popups);
-				domainMsg.FindFloat("zoom", &zoom);
-				domainMsg.FindBool("forceDesktop", &forceDesktop);
-				domainMsg.FindString("customUserAgent", &userAgent);
-
-				PermissionItem* item = new PermissionItem(domain, js, cookies, popups, zoom, forceDesktop, userAgent.String());
-				fDomainList->AddItem(item);
-			}
-		}
+	std::map<BString, SitePermissionsManager::PermissionEntry>::iterator it;
+	for (it = permissions.begin(); it != permissions.end(); ++it) {
+		const SitePermissionsManager::PermissionEntry& entry = it->second;
+		PermissionItem* item = new PermissionItem(entry.domain, entry.js,
+			entry.cookies, entry.popups, entry.zoom, entry.forceDesktop,
+			entry.customUserAgent);
+		fDomainList->AddItem(item);
 	}
 }
 

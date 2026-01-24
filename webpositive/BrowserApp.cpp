@@ -498,7 +498,9 @@ BrowserApp::MessageReceived(BMessage* message)
 		message->FindRect("window frame", &fLastWindowFrame);
 		if (fWindowCount <= 0) {
 			BMessage* message = new BMessage(B_QUIT_REQUESTED);
-			message->AddMessage("window", DetachCurrentMessage());
+			BMessage* detachedMessage = DetachCurrentMessage();
+			message->AddMessage("window", detachedMessage);
+			delete detachedMessage;
 			PostMessage(message);
 		}
 		break;

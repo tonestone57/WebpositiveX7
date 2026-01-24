@@ -32,6 +32,8 @@ public:
 	void RemovePermission(const char* domain);
 	void Save();
 
+	std::map<BString, PermissionEntry> GetPermissions();
+
 private:
 	SitePermissionsManager();
 	~SitePermissionsManager();

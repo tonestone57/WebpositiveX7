@@ -49,6 +49,7 @@ private:
 	BOutlineListView*			fDomains;
 	BColumnListView*			fCookies;
 	BStringView*				fHeaderView;
+	BButton*					fDeleteButton;
 
 	bool						fQuitting;
 	BPrivate::Network::BNetworkCookieJar&	fCookieJar;

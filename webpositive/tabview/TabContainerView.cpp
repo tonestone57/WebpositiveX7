@@ -350,6 +350,8 @@ TabContainerView::MoveTab(int32 fromIndex, int32 toIndex)
 				// We lost the item from the layout. Delete the item to avoid a leak.
 				// The caller (TabManager) is responsible for handling the failure
 				// and ensuring the view hierarchy remains consistent.
+				if (item->View())
+					delete item->View();
 				delete item;
 				return B_NO_MEMORY;
 			}
