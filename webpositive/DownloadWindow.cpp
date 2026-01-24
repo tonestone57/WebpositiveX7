@@ -464,7 +464,11 @@ DownloadWindow::_DownloadStarted(BWebDownload* download)
 		delete view;
 		return;
 	}
-	fDownloadViewsLayout->AddView(index, view);
+	if (fDownloadViewsLayout->AddView(index, view) == NULL) {
+		download->Cancel();
+		delete view;
+		return;
+	}
 	fDownloadsMap[download] = view;
 
 	// Scroll new download into view
