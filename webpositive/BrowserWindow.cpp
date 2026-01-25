@@ -197,7 +197,7 @@ static const char* kBookmarkBarSubdir = "Bookmark bar";
 
 struct SyncParams {
 	BPath path;
-	BPrivate::Network::BUrlContext* context;
+	BReference<BPrivate::Network::BUrlContext> context;
 	BMessenger target;
 };
 
@@ -247,7 +247,7 @@ static status_t
 _ExportProfileThread(void* data)
 {
 	SyncParams* params = static_cast<SyncParams*>(data);
-	status_t status = Sync::ExportProfile(params->path, params->context->GetCookieJar());
+	status_t status = Sync::ExportProfile(params->path, params->context.Get()->GetCookieJar());
 
 	if (status != B_OK) {
 		BString errorMsg(B_TRANSLATE("Failed to export profile"));
@@ -257,7 +257,6 @@ _ExportProfileThread(void* data)
 		alert->Go();
 	}
 
-	// params->context->Release();
 	delete params;
 	return B_OK;
 }
@@ -267,7 +266,7 @@ static status_t
 _ImportProfileThread(void* data)
 {
 	SyncParams* params = static_cast<SyncParams*>(data);
-	status_t status = Sync::ImportProfile(params->path, params->context->GetCookieJar());
+	status_t status = Sync::ImportProfile(params->path, params->context.Get()->GetCookieJar());
 
 	if (status != B_OK) {
 		BString errorMsg(B_TRANSLATE("Failed to import profile"));
@@ -277,7 +276,6 @@ _ImportProfileThread(void* data)
 		alert->Go();
 	}
 
-	// params->context->Release();
 	delete params;
 	return B_OK;
 }
@@ -1276,8 +1274,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 				SyncParams* params = new SyncParams;
 				params->path = path;
-				params->context = fContext.Get();
-				// params->context->Acquire();
+				params->context = fContext;
 				params->target = BMessenger(this);
 
 				thread_id thread = spawn_thread(_ExportProfileThread, "Export Profile",
@@ -1285,11 +1282,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 				if (thread >= 0) {
 					if (resume_thread(thread) != B_OK) {
 						kill_thread(thread);
-						// params->context->Release();
 						delete params;
 					}
 				} else {
-					// params->context->Release();
 					delete params;
 				}
 			}
@@ -1304,8 +1299,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 				SyncParams* params = new SyncParams;
 				params->path = path;
-				params->context = fContext.Get();
-				// params->context->Acquire();
+				params->context = fContext;
 				params->target = BMessenger(this);
 
 				thread_id thread = spawn_thread(_ImportProfileThread, "Import Profile",
@@ -1313,11 +1307,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 				if (thread >= 0) {
 					if (resume_thread(thread) != B_OK) {
 						kill_thread(thread);
-						// params->context->Release();
 						delete params;
 					}
 				} else {
-					// params->context->Release();
 					delete params;
 				}
 			}
@@ -1509,7 +1501,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 				CurrentWebView()->IncreaseZoomFactor(fZoomTextOnly);
 				float z = 1.0;
 				if (CurrentWebView()->WebPage()) z = CurrentWebView()->WebPage()->ZoomFactor();
-				BString domain = BUrl(CurrentWebView()->MainFrameURL().String()).Host();
+				BString domain = BUrl(CurrentWebView()->MainFrameURL().String(), true).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
 			}
 			break;
@@ -1518,14 +1510,14 @@ BrowserWindow::MessageReceived(BMessage* message)
 				CurrentWebView()->DecreaseZoomFactor(fZoomTextOnly);
 				float z = 1.0;
 				if (CurrentWebView()->WebPage()) z = CurrentWebView()->WebPage()->ZoomFactor();
-				BString domain = BUrl(CurrentWebView()->MainFrameURL().String()).Host();
+				BString domain = BUrl(CurrentWebView()->MainFrameURL().String(), true).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
 			}
 			break;
 		case ZOOM_FACTOR_RESET:
 			if (CurrentWebView()) {
 				CurrentWebView()->ResetZoomFactor();
-				BString domain = BUrl(CurrentWebView()->MainFrameURL().String()).Host();
+				BString domain = BUrl(CurrentWebView()->MainFrameURL().String(), true).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), 1.0);
 			}
 			break;
@@ -1602,7 +1594,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 						PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
 						if (userData) {
-							BUrl u(httpUrl.String());
+							BUrl u(httpUrl.String(), true);
 							userData->SetAllowedInsecureHost(u.Host());
 							userData->SetHttpsUpgraded(false);
 							userData->SetExpectedUpgradedUrl("");
@@ -2728,7 +2720,7 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 			return domains;
 		}();
 
-		BUrl checkUrl(url.String());
+		BUrl checkUrl(url.String(), true);
 		if (checkUrl.IsValid()) {
 			BString host = checkUrl.Host();
 			host.ToLower();
@@ -2781,7 +2773,7 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 		}
 
 		if (url.StartsWith("http://")) {
-			BUrl newUrl(url.String());
+			BUrl newUrl(url.String(), true);
 			if (newUrl.IsValid()) {
 				bool skipUpgrade = false;
 				if (userData && userData->AllowedInsecureHost() == newUrl.Host()) {
@@ -4138,7 +4130,7 @@ BrowserWindow::_GetFaviconPath(const BString& url, BPath& path)
 	if (create_directory(path.Path(), 0777) != B_OK)
 		return B_ERROR;
 
-	BUrl parsedUrl(url.String());
+	BUrl parsedUrl(url.String(), true);
 	if (!parsedUrl.IsValid() || parsedUrl.Host().Length() == 0)
 		return B_BAD_VALUE;
 

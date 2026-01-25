@@ -776,10 +776,12 @@ BrowserApp::_CreateNewWindow(const BString& url, bool fullscreen, bool privateWi
 		fLastWindowFrame.OffsetTo(50, 50);
 
 	BPrivate::Network::BUrlContext* context = fContext;
+	BReference<BPrivate::Network::BUrlContext> privateContext;
 	if (privateWindow) {
 		// Private context: empty cookie jar (default), no persistence.
 		// Created with ref count 1.
-		context = new BPrivate::Network::BUrlContext();
+		privateContext.SetTo(new BPrivate::Network::BUrlContext(), true);
+		context = privateContext.Get();
 	}
 
 	BrowserWindow* window = new BrowserWindow(fLastWindowFrame, fSettings,
@@ -787,10 +789,6 @@ BrowserApp::_CreateNewWindow(const BString& url, bool fullscreen, bool privateWi
 		privateWindow);
 
 	if (privateWindow) {
-		// BrowserWindow stores context in a BReference, which increments ref count.
-		// We release our initial reference so the window owns it.
-		// context->Release();
-
 		// Set visual indicator
 		window->SetTitle(BString("(Private) ").Append(window->Title()));
 	}
