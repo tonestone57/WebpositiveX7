@@ -87,7 +87,7 @@ FormSafetyHelper::QuitRequested()
 			continue;
 
 		fTabsToCheck++;
-		view->WebPage()->EvaluateJavaScript(checkScript);
+		view->EvaluateJavaScript(checkScript);
 	}
 
 	if (fTabsToCheck == 0) {

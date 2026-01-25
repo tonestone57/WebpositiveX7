@@ -88,6 +88,7 @@
 #include "BaseURL.h"
 #include "BitmapButton.h"
 #include "BookmarkBar.h"
+#include "BookmarkManager.h"
 #include "BrowserApp.h"
 #include "BrowsingHistory.h"
 #include "CredentialsStorage.h"
@@ -100,6 +101,7 @@
 #include "SettingsMessage.h"
 #include "SitePermissionsManager.h"
 #include "Sync.h"
+#include "TabContainerView.h"
 #include "TabManager.h"
 #include "TabSearchWindow.h"
 #include "URLInputGroup.h"
@@ -428,13 +430,13 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fToolbarBottom(false),
 	fIsLoading(false),
 	fLowRAMMode(false),
-	fTabSearchWindow(NULL),
 	fLastHistoryGeneration(0),
+	fTabSearchWindow(NULL),
 	fPermissionsWindow(NULL),
 	fNetworkWindow(NULL),
 	fIsBypassingCache(false),
+	fButtonResetRunner(nullptr),
 	fIsPrivate(privateWindow),
-	fButtonResetRunner(NULL),
 	fExpectingDomInspection(false)
 {
 	fFormSafetyHelper.reset(new FormSafetyHelper(this));
@@ -653,7 +655,7 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 
 	BPath bookmarkPath;
 	entry_ref bookmarkRef;
-	if (_BookmarkPath(bookmarkPath) == B_OK
+	if (BookmarkManager::GetBookmarkPath(bookmarkPath) == B_OK
 		&& get_ref_for_path(bookmarkPath.Path(), &bookmarkRef) == B_OK) {
 		BMenu* bookmarkMenu
 			= new BookmarkMenu(B_TRANSLATE("Bookmarks"), this, &bookmarkRef);
@@ -1166,9 +1168,23 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case IMPORT_BOOKMARKS:
 		{
-			BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
-				NULL, B_FILE_NODE, false, new BMessage(IMPORT_BOOKMARKS));
-			panel->Show();
+			// Handle Import from FilePanel selection
+			entry_ref ref;
+			if (message->FindRef("refs", &ref) == B_OK) {
+				BPath path(&ref);
+				status_t status = BookmarkManager::ImportBookmarks(path);
+				if (status != B_OK) {
+					BString errorMsg(B_TRANSLATE("Failed to import bookmarks"));
+					errorMsg << ": " << strerror(status);
+					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+						errorMsg.String(), B_TRANSLATE("OK"));
+					alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
+				}
+			} else {
+				BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
+					NULL, B_FILE_NODE, false, new BMessage(IMPORT_BOOKMARKS));
+				panel->Show();
+			}
 			break;
 		}
 
@@ -1194,18 +1210,64 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case SYNC_EXPORT:
 		{
-			BFilePanel* panel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this),
-				NULL, B_DIRECTORY_NODE, false, new BMessage(SYNC_EXPORT));
-			panel->SetSaveText("WebPositiveProfile");
-			panel->Show();
+			// BFilePanel for directory selection might send this if we set the message
+			entry_ref ref;
+			BString name;
+			if (message->FindRef("directory", &ref) == B_OK
+				&& message->FindString("name", &name) == B_OK) {
+				BPath path(&ref);
+				path.Append(name);
+
+				SyncParams* params = new SyncParams;
+				params->path = path;
+				params->context = fContext;
+				params->target = BMessenger(this);
+
+				thread_id thread = spawn_thread(_ExportProfileThread, "Export Profile",
+					B_NORMAL_PRIORITY, params);
+				if (thread >= 0) {
+					if (resume_thread(thread) != B_OK) {
+						kill_thread(thread);
+						delete params;
+					}
+				} else {
+					delete params;
+				}
+			} else {
+				BFilePanel* panel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this),
+					NULL, B_DIRECTORY_NODE, false, new BMessage(SYNC_EXPORT));
+				panel->SetSaveText("WebPositiveProfile");
+				panel->Show();
+			}
 			break;
 		}
 
 		case SYNC_IMPORT:
 		{
-			BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
-				NULL, B_DIRECTORY_NODE, false, new BMessage(SYNC_IMPORT));
-			panel->Show();
+			entry_ref ref;
+			if (message->FindRef("refs", &ref) == B_OK) {
+				BPath path(&ref);
+
+				SyncParams* params = new SyncParams;
+				params->path = path;
+				params->context = fContext;
+				params->target = BMessenger(this);
+
+				thread_id thread = spawn_thread(_ImportProfileThread, "Import Profile",
+					B_NORMAL_PRIORITY, params);
+				if (thread >= 0) {
+					if (resume_thread(thread) != B_OK) {
+						kill_thread(thread);
+						delete params;
+					}
+				} else {
+					delete params;
+				}
+			} else {
+				BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
+					NULL, B_DIRECTORY_NODE, false, new BMessage(SYNC_IMPORT));
+				panel->Show();
+			}
 			break;
 		}
 
@@ -1257,60 +1319,6 @@ BrowserWindow::MessageReceived(BMessage* message)
 					BFile output(&dir, name,
 						B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
 					CurrentWebView()->WebPage()->GetContentsAsMHTML(output);
-				}
-			}
-			break;
-		}
-
-		case SYNC_EXPORT:
-		{
-			// BFilePanel for directory selection might send this if we set the message
-			entry_ref ref;
-			BString name;
-			if (message->FindRef("directory", &ref) == B_OK
-				&& message->FindString("name", &name) == B_OK) {
-				BPath path(&ref);
-				path.Append(name);
-
-				SyncParams* params = new SyncParams;
-				params->path = path;
-				params->context = fContext;
-				params->target = BMessenger(this);
-
-				thread_id thread = spawn_thread(_ExportProfileThread, "Export Profile",
-					B_NORMAL_PRIORITY, params);
-				if (thread >= 0) {
-					if (resume_thread(thread) != B_OK) {
-						kill_thread(thread);
-						delete params;
-					}
-				} else {
-					delete params;
-				}
-			}
-			break;
-		}
-
-		case SYNC_IMPORT:
-		{
-			entry_ref ref;
-			if (message->FindRef("refs", &ref) == B_OK) {
-				BPath path(&ref);
-
-				SyncParams* params = new SyncParams;
-				params->path = path;
-				params->context = fContext;
-				params->target = BMessenger(this);
-
-				thread_id thread = spawn_thread(_ImportProfileThread, "Import Profile",
-					B_NORMAL_PRIORITY, params);
-				if (thread >= 0) {
-					if (resume_thread(thread) != B_OK) {
-						kill_thread(thread);
-						delete params;
-					}
-				} else {
-					delete params;
 				}
 			}
 			break;
@@ -1372,24 +1380,6 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case SHOW_BOOKMARKS:
 			BookmarkManager::ShowBookmarks();
 			break;
-
-		case IMPORT_BOOKMARKS:
-		{
-			// Handle Import from FilePanel selection
-			entry_ref ref;
-			if (message->FindRef("refs", &ref) == B_OK) {
-				BPath path(&ref);
-				status_t status = BookmarkManager::ImportBookmarks(path);
-				if (status != B_OK) {
-					BString errorMsg(B_TRANSLATE("Failed to import bookmarks"));
-					errorMsg << ": " << strerror(status);
-					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
-						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
-				}
-			}
-			break;
-		}
 
 		case B_REFS_RECEIVED:
 		{
@@ -1500,7 +1490,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 			if (CurrentWebView()) {
 				CurrentWebView()->IncreaseZoomFactor(fZoomTextOnly);
 				float z = 1.0;
-				if (CurrentWebView()->WebPage()) z = CurrentWebView()->WebPage()->ZoomFactor();
+				if (CurrentWebView()->WebPage()) z = CurrentWebView()->ZoomFactor();
 				BString domain = BUrl(CurrentWebView()->MainFrameURL().String(), true).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
 			}
@@ -1509,7 +1499,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 			if (CurrentWebView()) {
 				CurrentWebView()->DecreaseZoomFactor(fZoomTextOnly);
 				float z = 1.0;
-				if (CurrentWebView()->WebPage()) z = CurrentWebView()->WebPage()->ZoomFactor();
+				if (CurrentWebView()->WebPage()) z = CurrentWebView()->ZoomFactor();
 				BString domain = BUrl(CurrentWebView()->MainFrameURL().String(), true).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
 			}
@@ -1527,9 +1517,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 			fZoomTextOnlyMenuItem->SetMarked(fZoomTextOnly);
 			BWebView* webView = CurrentWebView();
 			if (webView != NULL && webView->WebPage()) {
-				float zoomFactor = webView->WebPage()->ZoomFactor();
-				webView->WebPage()->SetZoomFactor(1.0);
-				webView->WebPage()->SetZoomFactor(zoomFactor);
+				float zoomFactor = webView->ZoomFactor();
+				webView->SetZoomFactor(1.0);
+				webView->SetZoomFactor(zoomFactor);
 			}
 			break;
 		}
@@ -1639,7 +1629,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 			if (fTabSearchWindow) {
 				fTabSearchWindow->Activate();
 			} else {
-				fTabSearchWindow = new TabSearchWindow(fTabManager);
+				fTabSearchWindow = new TabSearchWindow(fTabManager.get());
 				fTabSearchWindow->Show();
 			}
 			break;
@@ -1663,7 +1653,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 				if (webView) {
 					tabIndex = fTabManager->TabForView(webView);
 					if (tabIndex >= 0) {
-						TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
+						TabView* tab = static_cast<TabContainerView*>(fTabManager->GetTabContainerView())->TabAt(tabIndex);
 						if (tab) {
 							tab->SetGroupColor(color);
 						}
@@ -1696,7 +1686,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					"}"
 					"toggleReaderMode(";
 				script << (fReaderMode ? "true" : "false") << ");";
-				CurrentWebView()->WebPage()->EvaluateJavaScript(script);
+				CurrentWebView()->EvaluateJavaScript(script);
 			}
 			break;
 
@@ -1727,7 +1717,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					"}"
 					"toggleDarkMode(";
 				script << (fDarkMode ? "true" : "false") << ");";
-				CurrentWebView()->WebPage()->EvaluateJavaScript(script);
+				CurrentWebView()->EvaluateJavaScript(script);
 			}
 			break;
 
@@ -1753,7 +1743,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					"  console.log('INSPECT_DOM_CHUNK:' + i + ':' + chunk);"
 					"}"
 					"console.log('INSPECT_DOM_END');";
-				CurrentWebView()->WebPage()->EvaluateJavaScript(script);
+				CurrentWebView()->EvaluateJavaScript(script);
 			}
 			break;
 
@@ -1762,10 +1752,12 @@ BrowserWindow::MessageReceived(BMessage* message)
 			bool load = fAppSettings->GetValue(kSettingsKeyLoadImages, true);
 			fAppSettings->SetValue(kSettingsKeyLoadImages, !load);
 			// Apply immediately
+			/*
 			if (CurrentWebView() && CurrentWebView()->WebPage()) {
 				BWebSettings* settings = CurrentWebView()->WebPage()->Settings();
 				if (settings) settings->SetLoadsImagesAutomatically(!load);
 			}
+			*/
 			fLoadImagesMenuItem->SetMarked(load);
 			break;
 		}
@@ -1995,7 +1987,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 			if (webView) {
 				tabIndex = fTabManager->TabForView(webView);
 				if (tabIndex >= 0) {
-					TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
+					TabView* tab = static_cast<TabContainerView*>(fTabManager->GetTabContainerView())->TabAt(tabIndex);
 					if (tab) {
 						bool pinned = (message->what == PIN_TAB);
 						if (tab->IsPinned() == pinned) break;
@@ -2004,7 +1996,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 						int32 pinnedCount = 0;
 						for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
-							TabView* t = fTabManager->GetTabContainerView()->TabAt(i);
+							TabView* t = static_cast<TabContainerView*>(fTabManager->GetTabContainerView())->TabAt(i);
 							if (t && t->IsPinned() && t != tab) {
 								pinnedCount++;
 							}
@@ -2303,7 +2295,7 @@ BrowserWindow::MenusBeginning()
 	if (currentWebView) {
 		int32 tabIndex = fTabManager->TabForView(currentWebView);
 		if (tabIndex >= 0) {
-			TabView* tab = fTabManager->GetTabContainerView()->TabAt(tabIndex);
+			TabView* tab = static_cast<TabContainerView*>(fTabManager->GetTabContainerView())->TabAt(tabIndex);
 			if (tab) {
 				// We don't have a "Tab" menu in the main menu bar, but we can add
 				// these options to the "View" menu or context menu if accessible.
@@ -2808,7 +2800,10 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 	SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop, customUserAgent);
 
 	if (view && view->WebPage()) {
-		BWebSettings* settings = view->WebPage()->Settings();
+		// TODO: WebKit API change: BWebSettings setters removed.
+		// Need to find new way to apply settings (likely via BWebView or WebContext properties).
+		// BWebSettings* settings = view->WebPage()->Settings();
+		/*
 		if (settings) {
 			settings->SetJavaScriptEnabled(allowJS);
 			settings->SetCookiesEnabled(allowCookies);
@@ -2816,6 +2811,7 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 			// Enable Media Source Extensions
 			bool enableMSE = fAppSettings->GetValue(kSettingsKeyEnableMSE, true);
 			settings->SetMediaSourceEnabled(enableMSE);
+		*/
 
 			// Only apply global cache setting if we are NOT currently in a forced reload (bypass cache) state
 			if (!fIsBypassingCache) {
@@ -2825,6 +2821,7 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 					view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
 				}
 			}
+		/*
 			// Force Desktop
 			if (forceDesktop) {
 				settings->SetUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15");
@@ -2838,6 +2835,7 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 			bool loadImages = fAppSettings->GetValue(kSettingsKeyLoadImages, true);
 			settings->SetLoadsImagesAutomatically(loadImages);
 		}
+		*/
 	}
 
 	if (view == CurrentWebView())
@@ -2858,7 +2856,7 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 
 	BString status(B_TRANSLATE("Requesting %url"));
 	status.ReplaceFirst("%url", url);
-	view->WebPage()->SetStatusMessage(status);
+	view->SetStatusMessage(status);
 }
 
 
@@ -2873,7 +2871,7 @@ BrowserWindow::LoadCommitted(const BString& url, BWebView* view)
 		BString script = "var style = document.createElement('style');"
 			"style.innerHTML = '* { animation: none !important; transition: none !important; }';"
 			"document.head.appendChild(style);";
-		view->WebPage()->EvaluateJavaScript(script);
+		view->EvaluateJavaScript(script);
 	}
 
 	if (view != CurrentWebView())
@@ -2886,7 +2884,7 @@ BrowserWindow::LoadCommitted(const BString& url, BWebView* view)
 
 	BString status(B_TRANSLATE("Loading %url"));
 	status.ReplaceFirst("%url", url);
-	view->WebPage()->SetStatusMessage(status);
+	view->SetStatusMessage(status);
 }
 
 
@@ -2951,7 +2949,7 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 		alert->Go(new BInvoker(msg, this));
 	}
 
-	view->WebPage()->SetStatusMessage(status);
+	view->SetStatusMessage(status);
 	_EnsureProgressBarHidden();
 }
 
@@ -2986,16 +2984,16 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 	if (view && view->WebPage()) {
 		// Apply Per-Site Zoom
 		if (found) {
-			view->WebPage()->SetZoomFactor(zoom);
+			view->SetZoomFactor(zoom);
 		} else {
-			view->WebPage()->SetZoomFactor(1.0);
+			view->SetZoomFactor(1.0);
 		}
 	}
 
 	if (found && !allowPopups) {
 		// Enforce No Popups via JS
 		if (view && view->WebPage()) {
-			view->WebPage()->EvaluateJavaScript(
+			view->EvaluateJavaScript(
 				"window.open = function() { console.log('Popups blocked by WebPositive permissions'); return null; };");
 		}
 	}
@@ -3015,7 +3013,7 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			"  };"
 			"}"
 			"toggleDarkMode(true);";
-		view->WebPage()->EvaluateJavaScript(script);
+		view->EvaluateJavaScript(script);
 	}
 
 	if (fReaderMode && view && view->WebPage()) {
@@ -3035,7 +3033,7 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			"  };"
 			"}"
 			"toggleReaderMode(true);";
-		view->WebPage()->EvaluateJavaScript(script);
+		view->EvaluateJavaScript(script);
 	}
 
 	// Ad Blocking
@@ -3046,7 +3044,7 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			".doubleclick, .ad-banner, .banner-ad, .sponsor "
 			"{ display: none !important; }';"
 			"document.head.appendChild(style);";
-		view->WebPage()->EvaluateJavaScript(script);
+		view->EvaluateJavaScript(script);
 	}
 
 	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
@@ -3066,7 +3064,7 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 	BString status(B_TRANSLATE_COMMENT("%url finished", "Loading URL "
 		"finished. Don't translate variable %url."));
 	status.ReplaceFirst("%url", url);
-	view->WebPage()->SetStatusMessage(status);
+	view->SetStatusMessage(status);
 	_EnsureProgressBarHidden();
 
 	NavigationCapabilitiesChanged(fBackButton->IsEnabled(),
@@ -3349,7 +3347,7 @@ BrowserWindow::AuthenticationChallenge(BString message, BString& inOutUser,
 	BString keyString;
 
 	if (view != NULL) {
-		BUrl url(view->MainFrameURL());
+		BUrl url(view->MainFrameURL().String(), true);
 		if (url.IsValid()) {
 			// protocol://host:port
 			BString proto(url.Protocol());
@@ -3388,7 +3386,7 @@ BrowserWindow::AuthenticationChallenge(BString message, BString& inOutUser,
 		// Backward compatibility: Try the old less specific key
 		BString legacyKeyString(message);
 		if (view != NULL) {
-			BUrl url(view->MainFrameURL());
+			BUrl url(view->MainFrameURL().String(), true);
 			if (url.IsValid())
 				legacyKeyString.Prepend(BString().SetToFormat("%s:", url.Host().String()));
 		}
@@ -3689,7 +3687,7 @@ BrowserWindow::_UpdateHistoryMenu()
 
 	int32 start = std::max((int32)0, count - 100);
 	for (int32 i = start; i < count; i++) {
-		BrowsingHistoryItem historyItem = history->HistoryItemAt(i);
+		BrowsingHistoryItem historyItem = *history->HistoryItemAt(i);
 		BMessage* message = new BMessage(GOTO_URL);
 		message->AddString("url", historyItem.URL().String());
 

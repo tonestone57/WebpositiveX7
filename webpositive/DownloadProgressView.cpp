@@ -827,8 +827,8 @@ DownloadProgressView::DownloadFinished()
 	success.SetIcon(fIconView->Bitmap());
 	success.Send();
 
-	if (fOpenWhenDoneCheckBox->Value())
-		PostMessage(OPEN_DOWNLOAD);
+	if (fOpenWhenDoneCheckBox->Value() && Window())
+		Window()->PostMessage(OPEN_DOWNLOAD, this);
 
 	_UpdateStatusText();
 }

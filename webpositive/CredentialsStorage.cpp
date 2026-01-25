@@ -14,7 +14,7 @@
 #include <File.h>
 #include <FindDirectory.h>
 #include <KeyStore.h>
-#include <PasswordKey.h>
+// #include <PasswordKey.h>
 #include <Message.h>
 #include <Path.h>
 

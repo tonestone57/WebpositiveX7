@@ -18,6 +18,7 @@
 #include <Path.h>
 
 #include "BrowserApp.h"
+#include "BrowserWindow.h"
 #include "SitePermissionsManager.h"
 #include "BrowsingHistory.h"
 #include <NetworkCookie.h>
@@ -260,22 +261,6 @@ PermissionsWindow::WindowActivated(bool active)
 	BWindow::WindowActivated(active);
 }
 
-
-// Helper to manage BMessage per domain
-static void
-SetDomainSettings(BMessage& msg, bool js, bool cookies, bool popups, float zoom, bool forceDesktop)
-{
-	msg.RemoveName("js");
-	msg.RemoveName("cookies");
-	msg.RemoveName("popups");
-	msg.RemoveName("zoom");
-	msg.RemoveName("forceDesktop");
-	msg.AddBool("js", js);
-	msg.AddBool("cookies", cookies);
-	msg.AddBool("popups", popups);
-	msg.AddFloat("zoom", zoom);
-	msg.AddBool("forceDesktop", forceDesktop);
-}
 
 void
 PermissionsWindow::_LoadPermissions()

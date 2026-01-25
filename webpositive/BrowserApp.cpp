@@ -64,6 +64,8 @@
 #include "WebView.h"
 #include "WebViewConstants.h"
 #include "CredentialsStorage.h"
+#include "PageUserData.h"
+#include "SettingsKeys.h"
 
 
 #undef B_TRANSLATION_CONTEXT

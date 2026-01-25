@@ -649,7 +649,7 @@ BrowsingHistory::_RemoveItemsForDomain(const char* domain)
 
 		// Fast pre-filter
 		if (item->URL().IFindFirst(targetDomain) >= 0) {
-			BUrl url(item->URL().String());
+			BUrl url(item->URL().String(), true);
 			if (url.Host() == targetDomain ||
 				(url.Host().EndsWith(targetDomain) &&
 				 url.Host().Length() > targetDomain.Length() &&
