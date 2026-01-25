@@ -14,6 +14,7 @@
 #include <File.h>
 #include <FindDirectory.h>
 #include <KeyStore.h>
+#include <PasswordKey.h>
 #include <Message.h>
 #include <Path.h>
 
@@ -184,13 +185,12 @@ CredentialsStorage::PutCredentials(const HashString& key,
 		return status;
 
 	if (fPersistent) {
-		BKeyStore keyStore;
 		BPasswordKey passwordKey;
 		passwordKey.SetIdentifier(key.GetString());
 		passwordKey.SetPassword(credentials.Password());
 		passwordKey.SetSecondaryInfo(credentials.Username());
 		passwordKey.SetPurpose(B_KEY_PURPOSE_WEB);
-		return keyStore.AddKey("WebPositive", passwordKey);
+		return fKeyStore.AddKey("WebPositive", passwordKey);
 	}
 	return B_OK;
 }
@@ -213,8 +213,7 @@ CredentialsStorage::RemoveCredentials(const HashString& key)
 	if (fCredentialMap.ContainsKey(key)) {
 		fCredentialMap.Remove(key);
 		if (fPersistent) {
-			BKeyStore keyStore;
-			keyStore.RemoveKey("WebPositive", B_KEY_TYPE_PASSWORD, key.GetString());
+			fKeyStore.RemoveKey("WebPositive", B_KEY_TYPE_PASSWORD, key.GetString());
 		}
 	}
 }
@@ -231,20 +230,13 @@ CredentialsStorage::_LoadSettings()
 
 	fSettingsLoaded = true;
 
-	BKeyStore keyStore;
-	BMessage passwords;
-	if (keyStore.GetKeys("WebPositive", B_KEY_TYPE_PASSWORD, &passwords) == B_OK) {
-		BMessage passwordMsg;
-		for (int32 i = 0; passwords.FindMessage("key", i, &passwordMsg) == B_OK; i++) {
-			const char* identifier;
-			const char* password;
-			const char* secondaryInfo;
-			if (passwordMsg.FindString("identifier", &identifier) == B_OK
-				&& passwordMsg.FindString("password", &password) == B_OK
-				&& passwordMsg.FindString("secondaryInfo", &secondaryInfo) == B_OK) {
-
-				Credentials credentials(secondaryInfo, password);
-				fCredentialMap.Put(identifier, credentials);
+	BKeyList passwords;
+	if (fKeyStore.GetKeys("WebPositive", B_KEY_TYPE_PASSWORD, &passwords) == B_OK) {
+		for (int32 i = 0; i < passwords.CountItems(); i++) {
+			BPasswordKey* key = dynamic_cast<BPasswordKey*>(passwords.ItemAt(i));
+			if (key != NULL) {
+				Credentials credentials(key->SecondaryInfo(), key->Password());
+				fCredentialMap.Put(key->Identifier(), credentials);
 			}
 		}
 	}

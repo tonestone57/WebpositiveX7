@@ -19,6 +19,7 @@
 #include <Message.h>
 #include <PopUpMenu.h>
 #include <KeyStore.h>
+#include <PasswordKey.h>
 #include <ScrollView.h>
 #include <SeparatorView.h>
 #include <SpaceLayoutItem.h>

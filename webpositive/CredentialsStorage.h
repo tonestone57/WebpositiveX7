@@ -9,6 +9,7 @@
 
 #include <Locker.h>
 #include <String.h>
+#include <KeyStore.h>
 
 #include "HashMap.h"
 #include "HashString.h"
@@ -70,6 +71,7 @@ private:
 	static	CredentialsStorage	sSessionInstance;
 			bool				fSettingsLoaded;
 			bool				fPersistent;
+			BKeyStore			fKeyStore;
 };
 
 
