@@ -1059,15 +1059,15 @@ SettingsWindow::_RevertSettings()
 		""));
 
 	BString proxyPassword = fSettings->GetValue(kSettingsKeyProxyPassword, "");
-	// if (proxyPassword.Length() == 0
-	// 	&& fUseProxyAuthCheckBox->Value() == B_CONTROL_ON) {
-	// 	BKeyStore keyStore;
-	// 	BPasswordKey key;
-	// 	if (keyStore.GetKey("WebPositive", B_KEY_TYPE_PASSWORD, "ProxySettings",
-	// 			key) == B_OK) {
-	// 		proxyPassword = key.Password();
-	// 	}
-	// }
+	if (proxyPassword.Length() == 0
+		&& fUseProxyAuthCheckBox->Value() == B_CONTROL_ON) {
+		BKeyStore keyStore;
+		BPasswordKey key;
+		if (keyStore.GetKey("WebPositive", B_KEY_TYPE_PASSWORD, "ProxySettings",
+				key) == B_OK) {
+			proxyPassword = key.Password();
+		}
+	}
 	fProxyPasswordControl->SetText(proxyPassword.String());
 
 	// Privacy settings
@@ -1169,10 +1169,13 @@ SettingsWindow::_UpdateProxySettings()
 		fProxyUsernameControl->Text());
 
 	// Securely store proxy password in KeyStore
-	// BKeyStore keyStore;
+	BKeyStore keyStore;
 	const char* password = fProxyPasswordControl->Text();
-	// keyStore.SetPassword("WebPositive", "ProxySettings",
-	// 	password, "");
+	BPasswordKey passwordKey;
+	passwordKey.SetIdentifier("ProxySettings");
+	passwordKey.SetPassword(password);
+	passwordKey.SetPurpose(B_KEY_PURPOSE_WEB);
+	keyStore.AddKey("WebPositive", passwordKey);
 
 	// Clear sensitive password from UI control
 	// Note: We need to use the password for SetProxyInfo before clearing,
