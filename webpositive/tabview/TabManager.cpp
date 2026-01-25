@@ -633,19 +633,19 @@ WebTabView::MouseDown(BPoint where, uint32 buttons)
 		msg = new BMessage(CLOSE_OTHER_TABS);
 		msg->AddInt32("tab index", ContainerView()->IndexOf(this));
 		BMenuItem* closeOtherItem = new BMenuItem(B_TRANSLATE("Close other tabs"), msg);
-		closeOtherItem->SetEnabled(ContainerView()->CountTabs() > 1);
+		closeOtherItem->SetEnabled(ContainerView()->GetLayout()->CountItems() > 1);
 		menu->AddItem(closeOtherItem);
 
 		// Close tabs to the right
 		msg = new BMessage(CLOSE_TABS_TO_RIGHT);
 		msg->AddInt32("tab index", ContainerView()->IndexOf(this));
 		BMenuItem* closeRightItem = new BMenuItem(B_TRANSLATE("Close tabs to the right"), msg);
-		closeRightItem->SetEnabled(ContainerView()->IndexOf(this) < ContainerView()->CountTabs() - 1);
+		closeRightItem->SetEnabled(ContainerView()->IndexOf(this) < ContainerView()->GetLayout()->CountItems() - 1);
 		menu->AddItem(closeRightItem);
 
-		menu->SetTargetForItems(Window()); // Send to BrowserWindow
+		menu->SetTargetForItems(ContainerView()->Window()); // Send to BrowserWindow
 		menu->SetAsyncAutoDestruct(true);
-		menu->Go(ConvertToScreen(where), true, true, true);
+		menu->Go(ContainerView()->ConvertToScreen(where), true, true, true);
 		return;
 	}
 
@@ -846,7 +846,7 @@ TabManager::TabManager(const BMessenger& target, BMessage* newTabMessage)
 	fCardLayout = new BCardLayout();
 	fContainerView->SetLayout(fCardLayout);
 
-	fTabContainerView = new TabContainerView(fController);
+	fTabContainerView = new TabContainerView(fController.get());
 	fTabContainerGroup = new TabContainerGroup(fTabContainerView);
 	fTabContainerGroup->GroupLayout()->SetInsets(0, 3, 0, 0);
 
@@ -958,7 +958,7 @@ TabManager::SelectTab(int32 tabIndex)
 
 	BMessage message(TAB_CHANGED);
 	message.AddInt32("tab index", tabIndex);
-	fTarget.PostMessage(&message);
+	fTarget.SendMessage(&message);
 }
 
 
@@ -983,7 +983,7 @@ TabManager::CloseTab(int32 tabIndex)
 {
 	BMessage message(CLOSE_TAB);
 	message.AddInt32("tab index", tabIndex);
-	fTarget.PostMessage(&message);
+	fTarget.SendMessage(&message);
 }
 
 

@@ -213,7 +213,7 @@ CookieWindow::MessageReceived(BMessage* message)
 
 		case COOKIE_SELECTED:
 		{
-			fDeleteButton->SetEnabled(fCookies->CurrentSelection() >= 0 ||
+			fDeleteButton->SetEnabled(fCookies->CurrentSelection() != NULL ||
 				fDomains->CurrentSelection() >= 0);
 			return;
 		}

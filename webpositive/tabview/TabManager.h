@@ -13,8 +13,7 @@
 #include <memory>
 
 enum {
-	TAB_CHANGED = 'tcha',
-	CLOSE_TAB = 'cltb'
+	TAB_CHANGED = 'tcha'
 };
 
 class BBitmap;

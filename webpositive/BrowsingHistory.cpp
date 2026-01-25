@@ -7,6 +7,7 @@
 #include "BrowsingHistory.h"
 
 #include <algorithm>
+#include <memory>
 #include <new>
 #include <stdio.h>
 #include <stdlib.h>
@@ -648,7 +649,7 @@ BrowsingHistory::_RemoveItemsForDomain(const char* domain)
 
 		// Fast pre-filter
 		if (item->URL().IFindFirst(targetDomain) >= 0) {
-			BUrl url(item->URL());
+			BUrl url(item->URL().String());
 			if (url.Host() == targetDomain ||
 				(url.Host().EndsWith(targetDomain) &&
 				 url.Host().Length() > targetDomain.Length() &&

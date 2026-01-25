@@ -31,6 +31,7 @@
 
 #include "BrowserWindow.h"
 
+#include <memory>
 #include <stdlib.h>
 #include <string.h>
 
@@ -196,7 +197,7 @@ static const char* kBookmarkBarSubdir = "Bookmark bar";
 
 struct SyncParams {
 	BPath path;
-	BPrivate::Network::BUrlContext* context;
+	BReference<BPrivate::Network::BUrlContext> context;
 	BMessenger target;
 };
 
@@ -246,7 +247,7 @@ static status_t
 _ExportProfileThread(void* data)
 {
 	SyncParams* params = static_cast<SyncParams*>(data);
-	status_t status = Sync::ExportProfile(params->path, params->context->GetCookieJar());
+	status_t status = Sync::ExportProfile(params->path, params->context.Get()->GetCookieJar());
 
 	if (status != B_OK) {
 		BString errorMsg(B_TRANSLATE("Failed to export profile"));
@@ -256,7 +257,6 @@ _ExportProfileThread(void* data)
 		alert->Go();
 	}
 
-	params->context->Release();
 	delete params;
 	return B_OK;
 }
@@ -266,7 +266,7 @@ static status_t
 _ImportProfileThread(void* data)
 {
 	SyncParams* params = static_cast<SyncParams*>(data);
-	status_t status = Sync::ImportProfile(params->path, params->context->GetCookieJar());
+	status_t status = Sync::ImportProfile(params->path, params->context.Get()->GetCookieJar());
 
 	if (status != B_OK) {
 		BString errorMsg(B_TRANSLATE("Failed to import profile"));
@@ -276,7 +276,6 @@ _ImportProfileThread(void* data)
 		alert->Go();
 	}
 
-	params->context->Release();
 	delete params;
 	return B_OK;
 }
@@ -1275,8 +1274,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 				SyncParams* params = new SyncParams;
 				params->path = path;
-				params->context = fContext.Get();
-				params->context->Acquire();
+				params->context = fContext;
 				params->target = BMessenger(this);
 
 				thread_id thread = spawn_thread(_ExportProfileThread, "Export Profile",
@@ -1284,11 +1282,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 				if (thread >= 0) {
 					if (resume_thread(thread) != B_OK) {
 						kill_thread(thread);
-						params->context->Release();
 						delete params;
 					}
 				} else {
-					params->context->Release();
 					delete params;
 				}
 			}
@@ -1303,8 +1299,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 				SyncParams* params = new SyncParams;
 				params->path = path;
-				params->context = fContext.Get();
-				params->context->Acquire();
+				params->context = fContext;
 				params->target = BMessenger(this);
 
 				thread_id thread = spawn_thread(_ImportProfileThread, "Import Profile",
@@ -1312,11 +1307,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 				if (thread >= 0) {
 					if (resume_thread(thread) != B_OK) {
 						kill_thread(thread);
-						params->context->Release();
 						delete params;
 					}
 				} else {
-					params->context->Release();
 					delete params;
 				}
 			}
@@ -1506,23 +1499,25 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case ZOOM_FACTOR_INCREASE:
 			if (CurrentWebView()) {
 				CurrentWebView()->IncreaseZoomFactor(fZoomTextOnly);
-				float z = CurrentWebView()->ZoomFactor(false);
-				BString domain = BUrl(CurrentWebView()->MainFrameURL()).Host();
+				float z = 1.0;
+				if (CurrentWebView()->WebPage()) z = CurrentWebView()->WebPage()->ZoomFactor();
+				BString domain = BUrl(CurrentWebView()->MainFrameURL().String(), true).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
 			}
 			break;
 		case ZOOM_FACTOR_DECREASE:
 			if (CurrentWebView()) {
 				CurrentWebView()->DecreaseZoomFactor(fZoomTextOnly);
-				float z = CurrentWebView()->ZoomFactor(false);
-				BString domain = BUrl(CurrentWebView()->MainFrameURL()).Host();
+				float z = 1.0;
+				if (CurrentWebView()->WebPage()) z = CurrentWebView()->WebPage()->ZoomFactor();
+				BString domain = BUrl(CurrentWebView()->MainFrameURL().String(), true).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
 			}
 			break;
 		case ZOOM_FACTOR_RESET:
 			if (CurrentWebView()) {
 				CurrentWebView()->ResetZoomFactor();
-				BString domain = BUrl(CurrentWebView()->MainFrameURL()).Host();
+				BString domain = BUrl(CurrentWebView()->MainFrameURL().String(), true).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), 1.0);
 			}
 			break;
@@ -1531,10 +1526,10 @@ BrowserWindow::MessageReceived(BMessage* message)
 			fZoomTextOnly = !fZoomTextOnly;
 			fZoomTextOnlyMenuItem->SetMarked(fZoomTextOnly);
 			BWebView* webView = CurrentWebView();
-			if (webView != NULL) {
-				float zoomFactor = webView->ZoomFactor(!fZoomTextOnly);
-				webView->SetZoomFactor(1.0, !fZoomTextOnly);
-				webView->SetZoomFactor(zoomFactor, fZoomTextOnly);
+			if (webView != NULL && webView->WebPage()) {
+				float zoomFactor = webView->WebPage()->ZoomFactor();
+				webView->WebPage()->SetZoomFactor(1.0);
+				webView->WebPage()->SetZoomFactor(zoomFactor);
 			}
 			break;
 		}
@@ -1599,7 +1594,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 						PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
 						if (userData) {
-							BUrl u(httpUrl);
+							BUrl u(httpUrl.String(), true);
 							userData->SetAllowedInsecureHost(u.Host());
 							userData->SetHttpsUpgraded(false);
 							userData->SetExpectedUpgradedUrl("");
@@ -1701,7 +1696,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					"}"
 					"toggleReaderMode(";
 				script << (fReaderMode ? "true" : "false") << ");";
-				CurrentWebView()->WebPage()->ExecuteJavaScript(script);
+				CurrentWebView()->WebPage()->EvaluateJavaScript(script);
 			}
 			break;
 
@@ -1732,7 +1727,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					"}"
 					"toggleDarkMode(";
 				script << (fDarkMode ? "true" : "false") << ");";
-				CurrentWebView()->WebPage()->ExecuteJavaScript(script);
+				CurrentWebView()->WebPage()->EvaluateJavaScript(script);
 			}
 			break;
 
@@ -1758,7 +1753,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					"  console.log('INSPECT_DOM_CHUNK:' + i + ':' + chunk);"
 					"}"
 					"console.log('INSPECT_DOM_END');";
-				CurrentWebView()->WebPage()->ExecuteJavaScript(script);
+				CurrentWebView()->WebPage()->EvaluateJavaScript(script);
 			}
 			break;
 
@@ -2725,7 +2720,7 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 			return domains;
 		}();
 
-		BUrl checkUrl(url);
+		BUrl checkUrl(url.String(), true);
 		if (checkUrl.IsValid()) {
 			BString host = checkUrl.Host();
 			host.ToLower();
@@ -2778,7 +2773,7 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 		}
 
 		if (url.StartsWith("http://")) {
-			BUrl newUrl(url);
+			BUrl newUrl(url.String(), true);
 			if (newUrl.IsValid()) {
 				bool skipUpgrade = false;
 				if (userData && userData->AllowedInsecureHost() == newUrl.Host()) {
@@ -2878,7 +2873,7 @@ BrowserWindow::LoadCommitted(const BString& url, BWebView* view)
 		BString script = "var style = document.createElement('style');"
 			"style.innerHTML = '* { animation: none !important; transition: none !important; }';"
 			"document.head.appendChild(style);";
-		view->WebPage()->ExecuteJavaScript(script);
+		view->WebPage()->EvaluateJavaScript(script);
 	}
 
 	if (view != CurrentWebView())
@@ -2988,27 +2983,19 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 	BString customUserAgent;
 	bool found = SitePermissionsManager::Instance()->CheckPermission(url.String(), allowJS, allowCookies, allowPopups, zoom, forceDesktop, customUserAgent);
 
-	if (view) {
+	if (view && view->WebPage()) {
 		// Apply Per-Site Zoom
-		// Note: We only apply if found, or if we want to enforce 1.0 default if not found?
-		// Usually if not found we let it remain what user set, OR we reset to 1.0?
-		// The prompt says "persistence", which implies if I visit a new site it should be default.
-		// If I visit a site I saved, it should be saved value.
-		// If I changed it manually, it should save.
-		// So if found, we apply 'zoom'. If not found, we apply 1.0?
-		// Existing behavior resets zoom on navigation?
-		// Let's assume if 'found', we apply. If not, we reset to 1.0.
 		if (found) {
-			view->SetZoomFactor(zoom);
+			view->WebPage()->SetZoomFactor(zoom);
 		} else {
-			view->SetZoomFactor(1.0);
+			view->WebPage()->SetZoomFactor(1.0);
 		}
 	}
 
 	if (found && !allowPopups) {
 		// Enforce No Popups via JS
 		if (view && view->WebPage()) {
-			view->WebPage()->ExecuteJavaScript(
+			view->WebPage()->EvaluateJavaScript(
 				"window.open = function() { console.log('Popups blocked by WebPositive permissions'); return null; };");
 		}
 	}
@@ -3028,7 +3015,7 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			"  };"
 			"}"
 			"toggleDarkMode(true);";
-		view->WebPage()->ExecuteJavaScript(script);
+		view->WebPage()->EvaluateJavaScript(script);
 	}
 
 	if (fReaderMode && view && view->WebPage()) {
@@ -3048,7 +3035,7 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			"  };"
 			"}"
 			"toggleReaderMode(true);";
-		view->WebPage()->ExecuteJavaScript(script);
+		view->WebPage()->EvaluateJavaScript(script);
 	}
 
 	// Ad Blocking
@@ -3059,7 +3046,7 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			".doubleclick, .ad-banner, .banner-ad, .sponsor "
 			"{ display: none !important; }';"
 			"document.head.appendChild(style);";
-		view->WebPage()->ExecuteJavaScript(script);
+		view->WebPage()->EvaluateJavaScript(script);
 	}
 
 	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
@@ -4113,7 +4100,7 @@ BrowserWindow::_UpdateToolbarPlacement()
 	if (fToolbarBottom) {
 		// Add before status bar (last item)
 		int32 count = layout->CountItems();
-		layout->AddItem(fNavigationGroup, count - 1);
+		layout->AddItem(count - 1, fNavigationGroup);
 	} else {
 		// Add after tabs.
 		// Layout items:
@@ -4123,7 +4110,7 @@ BrowserWindow::_UpdateToolbarPlacement()
 		// We want to insert after Tab Group.
 		int32 tabIndex = layout->IndexOfItem(fTabGroup);
 		int32 insertIndex = (tabIndex >= 0) ? tabIndex + 1 : 2;
-		layout->AddItem(fNavigationGroup, insertIndex);
+		layout->AddItem(insertIndex, fNavigationGroup);
 	}
 }
 
@@ -4143,7 +4130,7 @@ BrowserWindow::_GetFaviconPath(const BString& url, BPath& path)
 	if (create_directory(path.Path(), 0777) != B_OK)
 		return B_ERROR;
 
-	BUrl parsedUrl(url);
+	BUrl parsedUrl(url.String(), true);
 	if (!parsedUrl.IsValid() || parsedUrl.Host().Length() == 0)
 		return B_BAD_VALUE;
 

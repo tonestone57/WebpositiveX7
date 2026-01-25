@@ -36,6 +36,7 @@
 #include <Entry.h>
 #include <FindDirectory.h>
 #include <Locale.h>
+#include <MessageRunner.h>
 #include <Path.h>
 #include <Screen.h>
 #include <UrlContext.h>
@@ -68,8 +69,8 @@
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "WebPositive"
 
-extern const char* kApplicationSignature = "application/x-vnd.Haiku-WebPositive";
-extern const char* kApplicationName = B_TRANSLATE_SYSTEM_NAME("WebPositive");
+const char* kApplicationSignature = "application/x-vnd.Haiku-WebPositive";
+const char* kApplicationName = B_TRANSLATE_SYSTEM_NAME("WebPositive");
 static const uint32 PRELOAD_BROWSING_HISTORY = 'plbh';
 static const uint32 AUTO_SAVE_SESSION = 'assn';
 static char sCrashLogPath[B_PATH_NAME_LENGTH];
@@ -775,10 +776,12 @@ BrowserApp::_CreateNewWindow(const BString& url, bool fullscreen, bool privateWi
 		fLastWindowFrame.OffsetTo(50, 50);
 
 	BPrivate::Network::BUrlContext* context = fContext;
+	BReference<BPrivate::Network::BUrlContext> privateContext;
 	if (privateWindow) {
 		// Private context: empty cookie jar (default), no persistence.
 		// Created with ref count 1.
-		context = new BPrivate::Network::BUrlContext();
+		privateContext.SetTo(new BPrivate::Network::BUrlContext(), true);
+		context = privateContext.Get();
 	}
 
 	BrowserWindow* window = new BrowserWindow(fLastWindowFrame, fSettings,
@@ -786,10 +789,6 @@ BrowserApp::_CreateNewWindow(const BString& url, bool fullscreen, bool privateWi
 		privateWindow);
 
 	if (privateWindow) {
-		// BrowserWindow stores context in a BReference, which increments ref count.
-		// We release our initial reference so the window owns it.
-		context->Release();
-
 		// Set visual indicator
 		window->SetTitle(BString("(Private) ").Append(window->Title()));
 	}

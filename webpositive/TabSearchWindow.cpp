@@ -54,7 +54,7 @@ TabSearchWindow::TabSearchWindow(TabManager* manager)
 	AddChild(BGroupLayoutBuilder(B_VERTICAL, 10)
 		.Add(fSearchControl)
 		.Add(new BScrollView("scroll", fTabList, 0, false, true))
-		.SetInsets(10)
+		.SetInsets(10, 10, 10, 10)
 	);
 
 	_UpdateList();
@@ -116,7 +116,7 @@ TabSearchWindow::QuitRequested()
 {
 	if (fTabManager) {
 		BMessage msg(TAB_SEARCH_WINDOW_QUIT); // TAB_SEARCH_WINDOW_QUIT
-		fTabManager->Target().PostMessage(&msg);
+		fTabManager->Target().SendMessage(&msg);
 	}
 	return true;
 }
@@ -131,16 +131,16 @@ TabSearchWindow::_UpdateList()
 	if (!fTabManager) return;
 
 	BMessenger target = fTabManager->Target();
+	BLooper* looper;
+	target.Target(&looper);
 	// If we can't lock, we assume the window is busy or dead, so we skip updating
-	if (target.LockTargetWithTimeout(100000) != B_OK)
-		return;
-
-	BAutolock lock(target.Target(NULL));
-
-	for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
-		BString label = fTabManager->TabLabel(i);
-		BView* view = fTabManager->ViewForTab(i);
-		fTabList->AddItem(new TabListItem(label.String(), view));
+	if (looper && looper->LockWithTimeout(100000) == B_OK) {
+		for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
+			BString label = fTabManager->TabLabel(i);
+			BView* view = fTabManager->ViewForTab(i);
+			fTabList->AddItem(new TabListItem(label.String(), view));
+		}
+		looper->Unlock();
 	}
 }
 
@@ -151,20 +151,20 @@ TabSearchWindow::_FilterList()
 	if (!fTabManager) return;
 
 	BMessenger target = fTabManager->Target();
-	if (target.LockTargetWithTimeout(100000) != B_OK)
-		return;
+	BLooper* looper;
+	target.Target(&looper);
+	if (looper && looper->LockWithTimeout(100000) == B_OK) {
+		BString filter = fSearchControl->Text();
+		for (int32 i = fTabList->CountItems() - 1; i >= 0; i--)
+			delete fTabList->RemoveItem(i);
 
-	BAutolock lock(target.Target(NULL));
-
-	BString filter = fSearchControl->Text();
-	for (int32 i = fTabList->CountItems() - 1; i >= 0; i--)
-		delete fTabList->RemoveItem(i);
-
-	for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
-		BString label = fTabManager->TabLabel(i);
-		BView* view = fTabManager->ViewForTab(i);
-		if (filter.Length() == 0 || label.IFindFirst(filter) >= 0) {
-			fTabList->AddItem(new TabListItem(label.String(), view));
+		for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
+			BString label = fTabManager->TabLabel(i);
+			BView* view = fTabManager->ViewForTab(i);
+			if (filter.Length() == 0 || label.IFindFirst(filter) >= 0) {
+				fTabList->AddItem(new TabListItem(label.String(), view));
+			}
 		}
+		looper->Unlock();
 	}
 }

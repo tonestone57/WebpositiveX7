@@ -112,7 +112,7 @@ PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCoo
 		.Add(fZoomControl)
 		.Add(fUserAgentControl)
 		.Add(fClearDataButton)
-		.SetInsets(10)
+		.SetInsets(10, 10, 10, 10)
 	);
 
 	CenterOnScreen();
@@ -122,7 +122,7 @@ PermissionsWindow::PermissionsWindow(BRect frame, BPrivate::Network::BNetworkCoo
 PermissionsWindow::~PermissionsWindow()
 {
 	if (fTarget.IsValid())
-		fTarget.PostMessage(PERMISSIONS_WINDOW_CLOSED);
+		fTarget.SendMessage(PERMISSIONS_WINDOW_CLOSED);
 
 	_ClearPermissions();
 }

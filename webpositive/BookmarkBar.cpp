@@ -580,9 +580,16 @@ BookmarkBar::FrameResized(float width, float height)
 	float currentX = 0;
 	bool needsOverflow = false;
 
-	float left, top, right, bottom;
-	be_control_look->GetMenuItemInsets(&left, &top, &right, &bottom);
+	float left = 5, top = 2, right = 5, bottom = 2;
+	// be_control_look->GetMenuItemInsets(&left, &top, &right, &bottom);
 	float itemPadding = left + right;
+
+	class AccessMenuItem : public BMenuItem {
+	public:
+		static void GetContentSize(BMenuItem* item, float* w, float* h) {
+			static_cast<AccessMenuItem*>(item)->BMenuItem::GetContentSize(w, h);
+		}
+	};
 
 	// First pass: try to fit everything without overflow menu
 	for (size_t k = 0; k < allItems.size(); k++) {
@@ -591,7 +598,7 @@ BookmarkBar::FrameResized(float width, float height)
 			itemWidth = allItems[k]->Frame().Width();
 		else {
 			float w, h;
-			allItems[k]->GetContentSize(&w, &h);
+			AccessMenuItem::GetContentSize(allItems[k], &w, &h);
 			itemWidth = w + itemPadding;
 		}
 
@@ -621,7 +628,7 @@ BookmarkBar::FrameResized(float width, float height)
 				itemWidth = allItems[k]->Frame().Width();
 			else {
 				float w, h;
-				allItems[k]->GetContentSize(&w, &h);
+				AccessMenuItem::GetContentSize(allItems[k], &w, &h);
 				itemWidth = w + itemPadding;
 			}
 

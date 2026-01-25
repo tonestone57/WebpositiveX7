@@ -21,6 +21,7 @@ class BMessageRunner;
 class BScrollView;
 class BWebDownload;
 class SettingsMessage;
+class DownloadProgressView;
 
 
 class DownloadWindow : public BWindow {

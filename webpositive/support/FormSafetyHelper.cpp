@@ -23,8 +23,7 @@ FormSafetyHelper::FormSafetyHelper(BrowserWindow* window)
 	fFormCheckPending(false),
 	fForceClose(false),
 	fTabsToCheck(0),
-	fDirtyTabs(0),
-	fFormCheckTimeoutRunner(NULL)
+	fDirtyTabs(0)
 {
 }
 
@@ -88,7 +87,7 @@ FormSafetyHelper::QuitRequested()
 			continue;
 
 		fTabsToCheck++;
-		view->WebPage()->ExecuteJavaScript(checkScript);
+		view->WebPage()->EvaluateJavaScript(checkScript);
 	}
 
 	if (fTabsToCheck == 0) {
