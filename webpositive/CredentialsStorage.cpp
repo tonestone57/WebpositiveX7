@@ -185,12 +185,15 @@ CredentialsStorage::PutCredentials(const HashString& key,
 		return status;
 
 	if (fPersistent) {
+		// TODO: BPasswordKey header is missing. Restore persistent storage when available.
+		/*
 		BPasswordKey passwordKey;
 		passwordKey.SetIdentifier(key.GetString());
 		passwordKey.SetPassword(credentials.Password());
 		passwordKey.SetSecondaryInfo(credentials.Username());
 		passwordKey.SetPurpose(B_KEY_PURPOSE_WEB);
 		return fKeyStore.AddKey("WebPositive", passwordKey);
+		*/
 	}
 	return B_OK;
 }
@@ -213,7 +216,8 @@ CredentialsStorage::RemoveCredentials(const HashString& key)
 	if (fCredentialMap.ContainsKey(key)) {
 		fCredentialMap.Remove(key);
 		if (fPersistent) {
-			fKeyStore.RemoveKey("WebPositive", B_KEY_TYPE_PASSWORD, key.GetString());
+			// TODO: Restore persistent storage removal
+			// fKeyStore.RemoveKey("WebPositive", B_KEY_TYPE_PASSWORD, key.GetString());
 		}
 	}
 }
@@ -230,6 +234,8 @@ CredentialsStorage::_LoadSettings()
 
 	fSettingsLoaded = true;
 
+	// TODO: Restore persistent storage loading
+	/*
 	BKeyList passwords;
 	if (fKeyStore.GetKeys("WebPositive", B_KEY_TYPE_PASSWORD, &passwords) == B_OK) {
 		for (int32 i = 0; i < passwords.CountItems(); i++) {
@@ -240,6 +246,7 @@ CredentialsStorage::_LoadSettings()
 			}
 		}
 	}
+	*/
 
 	// Migration from legacy flat file
 	BPath path;

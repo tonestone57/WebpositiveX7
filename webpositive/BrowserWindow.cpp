@@ -1489,19 +1489,25 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case ZOOM_FACTOR_INCREASE:
 			if (CurrentWebView()) {
 				CurrentWebView()->IncreaseZoomFactor(fZoomTextOnly);
+				// TODO: WebKit API change: ZoomFactor() getter removed?
+				/*
 				float z = 1.0;
 				if (CurrentWebView()->WebPage()) z = CurrentWebView()->ZoomFactor();
 				BString domain = BUrl(CurrentWebView()->MainFrameURL().String(), true).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
+				*/
 			}
 			break;
 		case ZOOM_FACTOR_DECREASE:
 			if (CurrentWebView()) {
 				CurrentWebView()->DecreaseZoomFactor(fZoomTextOnly);
+				// TODO: WebKit API change: ZoomFactor() getter removed?
+				/*
 				float z = 1.0;
 				if (CurrentWebView()->WebPage()) z = CurrentWebView()->ZoomFactor();
 				BString domain = BUrl(CurrentWebView()->MainFrameURL().String(), true).Host();
 				SitePermissionsManager::Instance()->SetZoom(domain.String(), z);
+				*/
 			}
 			break;
 		case ZOOM_FACTOR_RESET:
@@ -1515,12 +1521,15 @@ BrowserWindow::MessageReceived(BMessage* message)
 		{
 			fZoomTextOnly = !fZoomTextOnly;
 			fZoomTextOnlyMenuItem->SetMarked(fZoomTextOnly);
+			// TODO: WebKit API change: ZoomFactor()/SetZoomFactor() removed?
+			/*
 			BWebView* webView = CurrentWebView();
 			if (webView != NULL && webView->WebPage()) {
 				float zoomFactor = webView->ZoomFactor();
 				webView->SetZoomFactor(1.0);
 				webView->SetZoomFactor(zoomFactor);
 			}
+			*/
 			break;
 		}
 
@@ -1686,7 +1695,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					"}"
 					"toggleReaderMode(";
 				script << (fReaderMode ? "true" : "false") << ");";
-				CurrentWebView()->EvaluateJavaScript(script);
+				EvaluateJavaScript(CurrentWebView(), script);
 			}
 			break;
 
@@ -1701,24 +1710,8 @@ BrowserWindow::MessageReceived(BMessage* message)
 			fDarkMode = !fDarkMode;
 			fDarkModeMenuItem->SetMarked(fDarkMode);
 			// Apply to current page
-			if (CurrentWebView() && CurrentWebView()->WebPage()) {
-				BString script = "if (typeof toggleDarkMode === 'undefined') {"
-					"  toggleDarkMode = function(enable) {"
-					"    if (enable) {"
-					"      var style = document.createElement('style');"
-					"      style.id = 'webpositive-dark-mode';"
-					"      style.innerHTML = 'html { filter: invert(100%); } img, video { filter: invert(100%); }';"
-					"      document.head.appendChild(style);"
-					"    } else {"
-					"      var style = document.getElementById('webpositive-dark-mode');"
-					"      if (style) style.remove();"
-					"    }"
-					"  };"
-					"}"
-					"toggleDarkMode(";
-				script << (fDarkMode ? "true" : "false") << ");";
-				CurrentWebView()->EvaluateJavaScript(script);
-			}
+			if (CurrentWebView())
+				CurrentWebView()->SetDarkMode(fDarkMode);
 			break;
 
 		case SHOW_PAGE_SOURCE:
@@ -1743,7 +1736,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					"  console.log('INSPECT_DOM_CHUNK:' + i + ':' + chunk);"
 					"}"
 					"console.log('INSPECT_DOM_END');";
-				CurrentWebView()->EvaluateJavaScript(script);
+				EvaluateJavaScript(CurrentWebView(), script);
 			}
 			break;
 
@@ -2802,26 +2795,28 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 	if (view && view->WebPage()) {
 		// TODO: WebKit API change: BWebSettings setters removed.
 		// Need to find new way to apply settings (likely via BWebView or WebContext properties).
-		// BWebSettings* settings = view->WebPage()->Settings();
-		/*
+		BWebSettings* settings = view->WebPage()->Settings();
 		if (settings) {
-			settings->SetJavaScriptEnabled(allowJS);
+			settings->SetJavascriptEnabled(allowJS);
+			/*
 			settings->SetCookiesEnabled(allowCookies);
 
 			// Enable Media Source Extensions
 			bool enableMSE = fAppSettings->GetValue(kSettingsKeyEnableMSE, true);
 			settings->SetMediaSourceEnabled(enableMSE);
-		*/
+			*/
+		}
 
-			// Only apply global cache setting if we are NOT currently in a forced reload (bypass cache) state
-			if (!fIsBypassingCache) {
-				if (fAppSettings->GetValue(kSettingsKeyDisableCache, false)) {
-					view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
-				} else {
-					view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
-				}
+		// Only apply global cache setting if we are NOT currently in a forced reload (bypass cache) state
+		if (!fIsBypassingCache) {
+			if (fAppSettings->GetValue(kSettingsKeyDisableCache, false)) {
+				view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
+			} else {
+				view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
 			}
+		}
 		/*
+		if (settings) {
 			// Force Desktop
 			if (forceDesktop) {
 				settings->SetUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15");
@@ -2871,7 +2866,7 @@ BrowserWindow::LoadCommitted(const BString& url, BWebView* view)
 		BString script = "var style = document.createElement('style');"
 			"style.innerHTML = '* { animation: none !important; transition: none !important; }';"
 			"document.head.appendChild(style);";
-		view->EvaluateJavaScript(script);
+		EvaluateJavaScript(view, script);
 	}
 
 	if (view != CurrentWebView())
@@ -2983,37 +2978,22 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 
 	if (view && view->WebPage()) {
 		// Apply Per-Site Zoom
-		if (found) {
-			view->SetZoomFactor(zoom);
-		} else {
-			view->SetZoomFactor(1.0);
-		}
+		// TODO: SetZoomFactor missing from API. Use JS fallback.
+		BString script;
+		script.SetToFormat("document.body.style.zoom = '%f';", found ? zoom : 1.0);
+		EvaluateJavaScript(view, script);
 	}
 
 	if (found && !allowPopups) {
 		// Enforce No Popups via JS
 		if (view && view->WebPage()) {
-			view->EvaluateJavaScript(
+			EvaluateJavaScript(view,
 				"window.open = function() { console.log('Popups blocked by WebPositive permissions'); return null; };");
 		}
 	}
 
-	if (fDarkMode && view && view->WebPage()) {
-		BString script = "if (typeof toggleDarkMode === 'undefined') {"
-			"  toggleDarkMode = function(enable) {"
-			"    if (enable) {"
-			"      var style = document.createElement('style');"
-			"      style.id = 'webpositive-dark-mode';"
-			"      style.innerHTML = 'html { filter: invert(100%); } img, video { filter: invert(100%); }';"
-			"      document.head.appendChild(style);"
-			"    } else {"
-			"      var style = document.getElementById('webpositive-dark-mode');"
-			"      if (style) style.remove();"
-			"    }"
-			"  };"
-			"}"
-			"toggleDarkMode(true);";
-		view->EvaluateJavaScript(script);
+	if (fDarkMode && view) {
+		view->SetDarkMode(true);
 	}
 
 	if (fReaderMode && view && view->WebPage()) {
@@ -3033,7 +3013,7 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			"  };"
 			"}"
 			"toggleReaderMode(true);";
-		view->EvaluateJavaScript(script);
+		EvaluateJavaScript(view, script);
 	}
 
 	// Ad Blocking
@@ -3044,7 +3024,7 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 			".doubleclick, .ad-banner, .banner-ad, .sponsor "
 			"{ display: none !important; }';"
 			"document.head.appendChild(style);";
-		view->EvaluateJavaScript(script);
+		EvaluateJavaScript(view, script);
 	}
 
 	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());

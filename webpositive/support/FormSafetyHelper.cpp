@@ -8,6 +8,10 @@
 #include "TabManager.h"
 #include "WebView.h"
 #include "WebPage.h"
+#include "WebFrame.h"
+
+#include <JavaScriptCore/JSStringRef.h>
+#include <JavaScriptCore/JSContextRef.h>
 
 #include <Alert.h>
 #include <Catalog.h>
@@ -87,7 +91,15 @@ FormSafetyHelper::QuitRequested()
 			continue;
 
 		fTabsToCheck++;
-		view->EvaluateJavaScript(checkScript);
+
+		if (view->WebPage() && view->WebPage()->MainFrame()) {
+			JSGlobalContextRef ctx = view->WebPage()->MainFrame()->GlobalContext();
+			if (ctx) {
+				JSStringRef scriptJS = JSStringCreateWithUTF8CString(checkScript.String());
+				JSEvaluateScript(ctx, scriptJS, NULL, NULL, 0, NULL);
+				JSStringRelease(scriptJS);
+			}
+		}
 	}
 
 	if (fTabsToCheck == 0) {
