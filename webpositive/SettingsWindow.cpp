@@ -77,10 +77,10 @@ enum {
 	MSG_PROXY_USERNAME_CHANGED					= 'psuc',
 	MSG_PROXY_PASSWORD_CHANGED					= 'pswc',
 
-	MSG_HTTPS_ONLY_CHANGED						= 'honly',
-	MSG_BLOCK_ADS_CHANGED						= 'blads',
+	MSG_HTTPS_ONLY_CHANGED						= 'hony',
+	MSG_BLOCK_ADS_CHANGED						= 'blad',
 	MSG_DISABLE_CACHE_CHANGED					= 'dcch',
-	MSG_LOAD_IMAGES_CHANGED						= 'ldimg',
+	MSG_LOAD_IMAGES_CHANGED						= 'ldim',
 	MSG_LOW_RAM_MODE_CHANGED					= 'lram',
 	MSG_ENABLE_GPU_CHANGED						= 'egpu',
 	MSG_ENABLE_MSE_CHANGED						= 'emse',
@@ -1059,15 +1059,15 @@ SettingsWindow::_RevertSettings()
 		""));
 
 	BString proxyPassword = fSettings->GetValue(kSettingsKeyProxyPassword, "");
-	if (proxyPassword.Length() == 0
-		&& fUseProxyAuthCheckBox->Value() == B_CONTROL_ON) {
-		BKeyStore keyStore;
-		BPasswordKey key;
-		if (keyStore.GetKey("WebPositive", B_KEY_TYPE_PASSWORD, "ProxySettings",
-				key) == B_OK) {
-			proxyPassword = key.Password();
-		}
-	}
+	// if (proxyPassword.Length() == 0
+	// 	&& fUseProxyAuthCheckBox->Value() == B_CONTROL_ON) {
+	// 	BKeyStore keyStore;
+	// 	BPasswordKey key;
+	// 	if (keyStore.GetKey("WebPositive", B_KEY_TYPE_PASSWORD, "ProxySettings",
+	// 			key) == B_OK) {
+	// 		proxyPassword = key.Password();
+	// 	}
+	// }
 	fProxyPasswordControl->SetText(proxyPassword.String());
 
 	// Privacy settings
@@ -1169,10 +1169,10 @@ SettingsWindow::_UpdateProxySettings()
 		fProxyUsernameControl->Text());
 
 	// Securely store proxy password in KeyStore
-	BKeyStore keyStore;
+	// BKeyStore keyStore;
 	const char* password = fProxyPasswordControl->Text();
-	keyStore.SetPassword("WebPositive", "ProxySettings",
-		password, "");
+	// keyStore.SetPassword("WebPositive", "ProxySettings",
+	// 	password, "");
 
 	// Clear sensitive password from UI control
 	// Note: We need to use the password for SetProxyInfo before clearing,

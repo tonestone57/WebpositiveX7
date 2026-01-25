@@ -35,6 +35,10 @@
 #include "WebView.h"
 #include "WebWindow.h"
 
+#ifndef B_RGBA32_TYPE
+#define B_RGBA32_TYPE 'RGBA'
+#endif
+
 
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "URL Bar"
@@ -89,8 +93,10 @@ class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
 		const int32 kMaxChoices = 50;
 		count = history->CountItems();
 		for (int32 i = count - 1; i >= 0; i--) {
-			BrowsingHistoryItem item = history->HistoryItemAt(i);
-			const BString& choiceText = item.URL();
+			const BrowsingHistoryItem* item = history->HistoryItemAt(i);
+			if (item == NULL)
+				continue;
+			const BString& choiceText = item->URL();
 			int32 matchPos = choiceText.IFindFirst(pattern);
 			if (matchPos < 0)
 				continue;

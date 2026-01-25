@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <memory>
 
 /*static*/ status_t
 Sync::ExportProfile(const BPath& folder,

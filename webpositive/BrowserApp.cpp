@@ -36,6 +36,7 @@
 #include <Entry.h>
 #include <FindDirectory.h>
 #include <Locale.h>
+#include <MessageRunner.h>
 #include <Path.h>
 #include <Screen.h>
 #include <UrlContext.h>
@@ -68,8 +69,8 @@
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "WebPositive"
 
-extern const char* kApplicationSignature = "application/x-vnd.Haiku-WebPositive";
-extern const char* kApplicationName = B_TRANSLATE_SYSTEM_NAME("WebPositive");
+const char* kApplicationSignature = "application/x-vnd.Haiku-WebPositive";
+const char* kApplicationName = B_TRANSLATE_SYSTEM_NAME("WebPositive");
 static const uint32 PRELOAD_BROWSING_HISTORY = 'plbh';
 static const uint32 AUTO_SAVE_SESSION = 'assn';
 static char sCrashLogPath[B_PATH_NAME_LENGTH];
@@ -788,7 +789,7 @@ BrowserApp::_CreateNewWindow(const BString& url, bool fullscreen, bool privateWi
 	if (privateWindow) {
 		// BrowserWindow stores context in a BReference, which increments ref count.
 		// We release our initial reference so the window owns it.
-		context->Release();
+		// context->Release();
 
 		// Set visual indicator
 		window->SetTitle(BString("(Private) ").Append(window->Title()));

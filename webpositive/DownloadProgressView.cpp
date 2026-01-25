@@ -50,7 +50,7 @@
 
 enum {
 	OPEN_DOWNLOAD			= 'opdn',
-	RESTART_DOWNLOAD		= 'rsdn',
+	RESTART_DOWNLOAD		= 'rstd',
 	CANCEL_DOWNLOAD			= 'cndn',
 	REMOVE_DOWNLOAD			= 'rmdn',
 	COPY_URL_TO_CLIPBOARD	= 'curl',
@@ -572,16 +572,16 @@ DownloadProgressView::MessageReceived(BMessage* message)
 
 		case PAUSE_DOWNLOAD:
 			if (fDownload) {
-				fDownload->Pause();
+				// fDownload->Pause();
 				fPauseButton->SetLabel(B_TRANSLATE("Resume"));
 				fPauseButton->SetMessage(new BMessage(RESUME_DOWNLOAD));
-				fStatusBar->SetBarColor(ui_color(B_WARNING_COLOR));
+				fStatusBar->SetBarColor(ui_color(B_FAILURE_COLOR));
 			}
 			break;
 
 		case RESUME_DOWNLOAD:
 			if (fDownload) {
-				fDownload->Resume();
+				// fDownload->Resume();
 				fPauseButton->SetLabel(B_TRANSLATE("Pause"));
 				fPauseButton->SetMessage(new BMessage(PAUSE_DOWNLOAD));
 				fStatusBar->SetBarColor(ui_color(B_SUCCESS_COLOR));

@@ -184,9 +184,9 @@ CredentialsStorage::PutCredentials(const HashString& key,
 		return status;
 
 	if (fPersistent) {
-		BKeyStore keyStore;
-		return keyStore.SetPassword("WebPositive", key.GetString(),
-			credentials.Password(), credentials.Username());
+		// BKeyStore keyStore;
+		// return keyStore.SetPassword("WebPositive", key.GetString(),
+		// 	credentials.Password(), credentials.Username());
 	}
 	return B_OK;
 }
@@ -209,8 +209,8 @@ CredentialsStorage::RemoveCredentials(const HashString& key)
 	if (fCredentialMap.ContainsKey(key)) {
 		fCredentialMap.Remove(key);
 		if (fPersistent) {
-			BKeyStore keyStore;
-			keyStore.RemovePassword("WebPositive", key.GetString());
+			// BKeyStore keyStore;
+			// keyStore.RemovePassword("WebPositive", key.GetString());
 		}
 	}
 }
@@ -227,23 +227,23 @@ CredentialsStorage::_LoadSettings()
 
 	fSettingsLoaded = true;
 
-	BKeyStore keyStore;
-	BMessage passwords;
-	if (keyStore.GetKeyring("WebPositive", &passwords) == B_OK) {
-		BMessage passwordMsg;
-		for (int32 i = 0; passwords.FindMessage("password", i, &passwordMsg) == B_OK; i++) {
-			const char* identifier;
-			const char* password;
-			const char* secondaryInfo;
-			if (passwordMsg.FindString("identifier", &identifier) == B_OK
-				&& passwordMsg.FindString("password", &password) == B_OK
-				&& passwordMsg.FindString("secondaryInfo", &secondaryInfo) == B_OK) {
-
-				Credentials credentials(secondaryInfo, password);
-				fCredentialMap.Put(identifier, credentials);
-			}
-		}
-	}
+	// BKeyStore keyStore;
+	// BMessage passwords;
+	// if (keyStore.GetKeyring("WebPositive", &passwords) == B_OK) {
+	// 	BMessage passwordMsg;
+	// 	for (int32 i = 0; passwords.FindMessage("password", i, &passwordMsg) == B_OK; i++) {
+	// 		const char* identifier;
+	// 		const char* password;
+	// 		const char* secondaryInfo;
+	// 		if (passwordMsg.FindString("identifier", &identifier) == B_OK
+	// 			&& passwordMsg.FindString("password", &password) == B_OK
+	// 			&& passwordMsg.FindString("secondaryInfo", &secondaryInfo) == B_OK) {
+	//
+	// 			Credentials credentials(secondaryInfo, password);
+	// 			fCredentialMap.Put(identifier, credentials);
+	// 		}
+	// 	}
+	// }
 
 	// Migration from legacy flat file
 	BPath path;

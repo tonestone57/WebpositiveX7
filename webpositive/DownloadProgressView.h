@@ -17,6 +17,7 @@ class BStringView;
 class BWebDownload;
 class IconView;
 class SmallButton;
+class BCheckBox;
 
 
 enum {

@@ -73,7 +73,7 @@ SitePermissionsManager::Reload()
 bool
 SitePermissionsManager::CheckPermission(const char* url, bool& allowJS, bool& allowCookies, bool& allowPopups, float& zoom, bool& forceDesktop, BString& customUserAgent)
 {
-	BUrl bUrl(url);
+	BUrl bUrl(url, true);
 	BString host = bUrl.Host();
 	host.ToLower();
 	bool found = false;

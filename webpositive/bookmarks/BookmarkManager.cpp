@@ -18,6 +18,10 @@
 
 #include <vector>
 
+#ifndef B_RGBA32_TYPE
+#define B_RGBA32_TYPE 'RGBA'
+#endif
+
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "WebPositive Window"
 
@@ -449,7 +453,8 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 	buffer[size] = '\0';
 
 	BString content;
-	content.Adopt(buffer, size);
+	content.SetTo(buffer, size);
+	free(buffer);
 
 	BPath bookmarkPath;
 	status = GetBookmarkPath(bookmarkPath);
