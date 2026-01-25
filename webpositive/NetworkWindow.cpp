@@ -53,7 +53,7 @@ NetworkWindow::NetworkWindow(BRect frame)
 NetworkWindow::~NetworkWindow()
 {
 	if (fTarget.IsValid())
-		fTarget.PostMessage(NETWORK_WINDOW_CLOSED);
+		fTarget.SendMessage(NETWORK_WINDOW_CLOSED);
 
 	fPendingRequests.clear();
 	int32 count = fRequestListView->CountItems();
