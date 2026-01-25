@@ -50,6 +50,7 @@ extern const char* kSettingsKeyDisableCache;
 extern const char* kSettingsKeyLoadImages;
 extern const char* kSettingsKeyLowRAMMode;
 extern const char* kSettingsKeyEnableGPU;
+extern const char* kSettingsKeyEnableMSE;
 
 struct SearchEngine {
 	const char* name;

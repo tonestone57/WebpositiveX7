@@ -83,6 +83,7 @@ enum {
 	MSG_LOAD_IMAGES_CHANGED						= 'ldimg',
 	MSG_LOW_RAM_MODE_CHANGED					= 'lram',
 	MSG_ENABLE_GPU_CHANGED						= 'egpu',
+	MSG_ENABLE_MSE_CHANGED						= 'emse',
 
 	MSG_CHOOSE_DOWNLOAD_FOLDER					= 'swop',
 	MSG_HANDLE_DOWNLOAD_FOLDER					= 'oprs',
@@ -336,6 +337,7 @@ SettingsWindow::MessageReceived(BMessage* message)
 		case MSG_LOAD_IMAGES_CHANGED:
 		case MSG_LOW_RAM_MODE_CHANGED:
 		case MSG_ENABLE_GPU_CHANGED:
+		case MSG_ENABLE_MSE_CHANGED:
 			// These settings cannot change live, as we don't want partial
 			// input to be applied.
 			_ValidateControlsEnabledStatus();
@@ -562,6 +564,11 @@ SettingsWindow::_CreateGeneralPage(float spacing)
 		new BMessage(MSG_ENABLE_GPU_CHANGED));
 	fEnableGPUCheckBox->SetValue(B_CONTROL_OFF);
 
+	fEnableMSECheckBox = new BCheckBox("enable mse",
+		B_TRANSLATE("Enable Media Source Extensions"),
+		new BMessage(MSG_ENABLE_MSE_CHANGED));
+	fEnableMSECheckBox->SetValue(B_CONTROL_ON);
+
 	BView* view = BGroupLayoutBuilder(B_VERTICAL, 0)
 		.Add(BGridLayoutBuilder(spacing / 2, spacing / 2)
 			.Add(fStartPageControl->CreateLabelLayoutItem(), 0, 0)
@@ -597,6 +604,7 @@ SettingsWindow::_CreateGeneralPage(float spacing)
 		.Add(fShowBookmarksButton)
 		.Add(fLowRAMModeCheckBox)
 		.Add(fEnableGPUCheckBox)
+		.Add(fEnableMSECheckBox)
 		.Add(BSpaceLayoutItem::CreateVerticalStrut(spacing))
 
 		.AddGroup(B_HORIZONTAL)
@@ -790,6 +798,9 @@ SettingsWindow::_CanApplySettings() const
 	canApply = canApply || ((fEnableGPUCheckBox->Value() == B_CONTROL_ON)
 		!= fSettings->GetValue(kSettingsKeyEnableGPU, false));
 
+	canApply = canApply || ((fEnableMSECheckBox->Value() == B_CONTROL_ON)
+		!= fSettings->GetValue(kSettingsKeyEnableMSE, true));
+
 	canApply = canApply || (fDaysInHistory->Value()
 		!= BrowsingHistory::DefaultInstance()->MaxHistoryItemAge());
 
@@ -885,6 +896,8 @@ SettingsWindow::_ApplySettings()
 		fLowRAMModeCheckBox->Value() == B_CONTROL_ON);
 	fSettings->SetValue(kSettingsKeyEnableGPU,
 		fEnableGPUCheckBox->Value() == B_CONTROL_ON);
+	fSettings->SetValue(kSettingsKeyEnableMSE,
+		fEnableMSECheckBox->Value() == B_CONTROL_ON);
 
 	// New page policies
 	fSettings->SetValue(kSettingsKeyStartUpPolicy, _StartUpPolicy());
@@ -960,6 +973,8 @@ SettingsWindow::_RevertSettings()
 		fSettings->GetValue(kSettingsKeyLowRAMMode, false));
 	fEnableGPUCheckBox->SetValue(
 		fSettings->GetValue(kSettingsKeyEnableGPU, false));
+	fEnableMSECheckBox->SetValue(
+		fSettings->GetValue(kSettingsKeyEnableMSE, true));
 
 	fDaysInHistory->SetValue(
 		BrowsingHistory::DefaultInstance()->MaxHistoryItemAge());
