@@ -254,7 +254,7 @@ _ExportProfileThread(void* data)
 		errorMsg << ": " << strerror(status);
 		BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 			errorMsg.String(), B_TRANSLATE("OK"));
-		alert->Go();
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 	}
 
 	delete params;
@@ -273,7 +273,7 @@ _ImportProfileThread(void* data)
 		errorMsg << ": " << strerror(status);
 		BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
 			errorMsg.String(), B_TRANSLATE("OK"));
-		alert->Go();
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 	}
 
 	delete params;
