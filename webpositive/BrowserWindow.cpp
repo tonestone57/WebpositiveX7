@@ -254,7 +254,7 @@ _ExportProfileThread(void* data)
 		errorMsg << ": " << strerror(status);
 		BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 			errorMsg.String(), B_TRANSLATE("OK"));
-		alert->Go();
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 	}
 
 	delete params;
@@ -273,7 +273,7 @@ _ImportProfileThread(void* data)
 		errorMsg << ": " << strerror(status);
 		BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
 			errorMsg.String(), B_TRANSLATE("OK"));
-		alert->Go();
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 	}
 
 	delete params;
@@ -504,6 +504,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(CLOSE_TAB), 'W'));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Save page as" B_UTF8_ELLIPSIS),
 		new BMessage(SAVE_PAGE), 'S'));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Print" B_UTF8_ELLIPSIS),
+		new BMessage(PRINT_PAGE), 'P'));
 	menu->AddSeparatorItem();
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Import bookmarks" B_UTF8_ELLIPSIS),
 		new BMessage(IMPORT_BOOKMARKS)));
@@ -1113,6 +1115,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 			}
 			break;
 		}
+
+		case PRINT_PAGE:
+			if (CurrentWebView() && CurrentWebView()->WebPage())
+				CurrentWebView()->WebPage()->Print(true);
+			break;
 
 		case SHOW_HIDE_BOOKMARK_BAR:
 			_ShowBookmarkBar(fBookmarkBar->IsHidden());
@@ -1968,6 +1975,34 @@ BrowserWindow::MessageReceived(BMessage* message)
 			_ReopenClosedTab();
 			break;
 
+		case DUPLICATE_TAB:
+		{
+			BWebView* webView = NULL;
+			int32 tabIndex = -1;
+			if (message->FindInt32("tab index", &tabIndex) == B_OK)
+				webView = dynamic_cast<BWebView*>(fTabManager->ViewForTab(tabIndex));
+			else
+				webView = CurrentWebView();
+
+			if (webView) {
+				BString url = webView->MainFrameURL();
+				int32 targetIndex = (tabIndex >= 0) ? tabIndex + 1 : fTabManager->SelectedTabIndex() + 1;
+				// Create new tab at specific index
+				CreateNewTab(url, true, NULL, false, targetIndex);
+			}
+			break;
+		}
+
+		case SET_SEARCH_ENGINE:
+		{
+			BString url;
+			if (message->FindString("url", &url) == B_OK) {
+				fAppSettings->SetValue(kSettingsKeySearchPageURL, url);
+				fSearchPageURL = url;
+			}
+			break;
+		}
+
 		case REOPEN_CLOSED_TAB_WITH_INDEX:
 		{
 			int32 index;
@@ -2550,7 +2585,7 @@ BrowserWindow::IsBlankTab() const
 
 void
 BrowserWindow::CreateNewTab(const BString& _url, bool select,
-	BWebView* webView, bool lazy)
+	BWebView* webView, bool lazy, int32 index)
 {
 	bool applyNewPagePolicy = webView == NULL;
 	// Executed in app thread (new BWebPage needs to be created in app thread).
@@ -2559,7 +2594,7 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 
 	bool isNewWindow = fTabManager->CountTabs() == 0;
 
-	fTabManager->AddTab(webView, B_TRANSLATE("New tab"));
+	fTabManager->AddTab(webView, B_TRANSLATE("New tab"), index);
 
 	BString url(_url);
 	if (applyNewPagePolicy && url.Length() == 0)
@@ -2758,6 +2793,10 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 	// Implementing a "Open in Private Window" context menu option is not feasible
 	// without modifying the BWebView/WebKit implementation to expose HitTest information
 	// or context menu hooks, which are not available in the current API surface.
+	//
+	// "Open Image in New Tab" suffers from the same limitation. The context menu
+	// is handled internally by WebKit, and no hooks are currently exposed to
+	// WebPositive to extend it with image-specific actions.
 
 	PageUserData* userData = NULL;
 	if (view)

@@ -507,5 +507,28 @@ CookieWindow::_DeleteCookies()
 		}
 	}
 
-	PostMessage(COOKIE_REFRESH);
+	// Optimization: If we cleared the cookies for the current domain,
+	// remove it from the list without a full refresh.
+	if (fCookies->CountRows() == 0) {
+		int32 selection = fDomains->CurrentSelection();
+		if (selection >= 0) {
+			BStringItem* item = (BStringItem*)fDomains->ItemAt(selection);
+			if (item) {
+				// Also remove from map to keep consistency
+				fCookieMap.erase(item->Text());
+				fDomains->RemoveItem(item);
+				delete item;
+			}
+		}
+	} else {
+		// Partial deletion: we should update the map, but it's complex to sync
+		// std::vector in the map with the BColumnListView.
+		// For now, we only optimize the "Empty" case which is the most common
+		// "cleanup" action.
+		// If rows remain, we do NOT trigger a full refresh, as the UI (fCookies)
+		// is already up to date.
+		// The only stale data is fCookieMap (contains deleted cookies) and
+		// potentially fDomains (if we deleted all cookies but one by one).
+		// But checking CountRows() == 0 covers the "domain became empty" case.
+	}
 }

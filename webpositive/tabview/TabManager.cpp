@@ -590,6 +590,11 @@ WebTabView::MouseDown(BPoint where, uint32 buttons)
 		msg->AddInt32("tab index", ContainerView()->IndexOf(this));
 		menu->AddItem(new BMenuItem(B_TRANSLATE("Reload"), msg));
 
+		// Duplicate Tab
+		msg = new BMessage(DUPLICATE_TAB);
+		msg->AddInt32("tab index", ContainerView()->IndexOf(this));
+		menu->AddItem(new BMenuItem(B_TRANSLATE("Duplicate tab"), msg));
+
 		menu->AddSeparatorItem();
 
 		// Pin/Unpin
@@ -990,6 +995,9 @@ TabManager::CloseTab(int32 tabIndex)
 void
 TabManager::AddTab(BView* view, const char* label, int32 index)
 {
+	if (index < 0)
+		index = CountTabs();
+
 	fTabContainerView->AddTab(label, index);
 	fCardLayout->AddView(index, view);
 }

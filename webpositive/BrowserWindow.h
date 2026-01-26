@@ -120,6 +120,9 @@ enum {
 	REOPEN_CLOSED_TAB_WITH_INDEX	= 'rcti',
 	RELOAD							= 'reld',
 	RELOAD_BYPASS_CACHE				= 'rlbc',
+	PRINT_PAGE						= 'prnt',
+	DUPLICATE_TAB					= 'dptb',
+	SET_SEARCH_ENGINE				= 'ssng',
 	PIN_TAB							= 'ptab',
 	UNPIN_TAB						= 'uptb',
 	CLOSE_TAB						= 'cltb',
@@ -175,7 +178,8 @@ public:
 
 			bool				IsBlankTab() const;
 			void				CreateNewTab(const BString& url, bool select,
-									BWebView* webView = 0, bool lazy = false);
+									BWebView* webView = 0, bool lazy = false,
+									int32 index = -1);
 			void				RestartDownload(const BString& url);
 
 			BRect				WindowFrame() const;

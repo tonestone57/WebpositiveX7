@@ -161,7 +161,7 @@ DownloadWindow::DownloadWindow(BRect frame, bool visible,
 
 	fDownloadsScrollView = new DownloadContainerScrollView(downloadsGroupView);
 
-	fRemoveFinishedButton = new BButton(B_TRANSLATE("Remove finished"),
+	fRemoveFinishedButton = new BButton(B_TRANSLATE("Clean up"),
 		new BMessage(REMOVE_FINISHED_DOWNLOADS));
 	fRemoveFinishedButton->SetEnabled(false);
 
@@ -434,7 +434,7 @@ DownloadWindow::_DownloadStarted(BWebDownload* download)
 {
 	download->Start(BPath(fDownloadPath.String()));
 
-	int32 finishedCount = 0;
+	int32 cleanupCount = 0;
 	int32 missingCount = 0;
 	int32 index = 0;
 	for (int32 i = fDownloadViewsLayout->CountItems() - 1;
@@ -451,12 +451,12 @@ DownloadWindow::_DownloadStarted(BWebDownload* download)
 			delete view;
 			continue;
 		}
-		if (view->IsFinished())
-			finishedCount++;
+		if (view->IsFinished() || view->IsCanceled())
+			cleanupCount++;
 		if (view->IsMissing())
 			missingCount++;
 	}
-	fRemoveFinishedButton->SetEnabled(finishedCount > 0);
+	fRemoveFinishedButton->SetEnabled(cleanupCount > 0);
 	fRemoveMissingButton->SetEnabled(missingCount > 0);
 	DownloadProgressView* view = new DownloadProgressView(download);
 	if (!view->Init()) {
@@ -526,7 +526,7 @@ DownloadWindow::_RemoveFinishedDownloads()
 			item->View());
 		if (!view)
 			continue;
-		if (view->IsFinished()) {
+		if (view->IsFinished() || view->IsCanceled()) {
 			if (view->Download())
 				fDownloadsMap.erase(view->Download());
 			view->RemoveSelf();
@@ -543,7 +543,7 @@ DownloadWindow::_RemoveFinishedDownloads()
 void
 DownloadWindow::_RemoveMissingDownloads()
 {
-	int32 finishedCount = 0;
+	int32 cleanupCount = 0;
 	for (int32 i = fDownloadViewsLayout->CountItems() - 1;
 			BLayoutItem* item = fDownloadViewsLayout->ItemAt(i); i--) {
 		DownloadProgressView* view = dynamic_cast<DownloadProgressView*>(
@@ -555,11 +555,11 @@ DownloadWindow::_RemoveMissingDownloads()
 				fDownloadsMap.erase(view->Download());
 			view->RemoveSelf();
 			delete view;
-		} else if (view->IsFinished())
-			finishedCount++;
+		} else if (view->IsFinished() || view->IsCanceled())
+			cleanupCount++;
 	}
 	fRemoveMissingButton->SetEnabled(false);
-	fRemoveFinishedButton->SetEnabled(finishedCount > 0);
+	fRemoveFinishedButton->SetEnabled(cleanupCount > 0);
 	_SaveSettings();
 }
 
@@ -567,7 +567,7 @@ DownloadWindow::_RemoveMissingDownloads()
 void
 DownloadWindow::_ValidateButtonStatus()
 {
-	int32 finishedCount = 0;
+	int32 cleanupCount = 0;
 	int32 missingCount = 0;
 	for (int32 i = fDownloadViewsLayout->CountItems() - 1;
 			BLayoutItem* item = fDownloadViewsLayout->ItemAt(i); i--) {
@@ -575,12 +575,12 @@ DownloadWindow::_ValidateButtonStatus()
 			item->View());
 		if (!view)
 			continue;
-		if (view->IsFinished())
-			finishedCount++;
+		if (view->IsFinished() || view->IsCanceled())
+			cleanupCount++;
 		if (view->IsMissing())
 			missingCount++;
 	}
-	fRemoveFinishedButton->SetEnabled(finishedCount > 0);
+	fRemoveFinishedButton->SetEnabled(cleanupCount > 0);
 	fRemoveMissingButton->SetEnabled(missingCount > 0);
 }
 

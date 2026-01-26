@@ -572,16 +572,16 @@ DownloadProgressView::MessageReceived(BMessage* message)
 
 		case PAUSE_DOWNLOAD:
 			if (fDownload) {
-				// fDownload->Pause();
+				fDownload->Pause();
 				fPauseButton->SetLabel(B_TRANSLATE("Resume"));
 				fPauseButton->SetMessage(new BMessage(RESUME_DOWNLOAD));
-				fStatusBar->SetBarColor(ui_color(B_FAILURE_COLOR));
+				fStatusBar->SetBarColor(ui_color(B_WARNING_COLOR));
 			}
 			break;
 
 		case RESUME_DOWNLOAD:
 			if (fDownload) {
-				// fDownload->Resume();
+				fDownload->Resume();
 				fPauseButton->SetLabel(B_TRANSLATE("Pause"));
 				fPauseButton->SetMessage(new BMessage(PAUSE_DOWNLOAD));
 				fStatusBar->SetBarColor(ui_color(B_SUCCESS_COLOR));
@@ -792,6 +792,13 @@ bool
 DownloadProgressView::IsFinished() const
 {
 	return !fDownload && fStatusBar->CurrentValue() == 100;
+}
+
+
+bool
+DownloadProgressView::IsCanceled() const
+{
+	return !fDownload && fStatusBar->CurrentValue() < 100;
 }
 
 
