@@ -30,6 +30,7 @@
 #include "BrowsingHistory.h"
 #include "IconButton.h"
 #include "PageUserData.h"
+#include "SettingsKeys.h"
 #include "IconUtils.h"
 #include "TextViewCompleter.h"
 #include "WebView.h"
@@ -43,6 +44,7 @@
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "URL Bar"
 
+const uint32 kMsgSearchButtonClick = 'sbcl';
 
 class URLChoice : public BAutoCompleter::Choice {
 public:
@@ -664,6 +666,35 @@ URLInputGroup::URLInputGroup(BMessage* goMessage)
 	fPermissionsButton->SetExplicitMinSize(BSize(20, 20));
 	GroupLayout()->AddView(fPermissionsButton, 0.0f);
 
+	// Search Button (Magnifying Glass)
+	fSearchButton = new BButton(NULL, NULL, new BMessage(kMsgSearchButtonClick));
+
+	// Create Magnifying Glass Icon
+	BBitmap* searchIcon = new BBitmap(BRect(0, 0, 15, 15), B_RGBA32, true);
+	if (searchIcon->InitCheck() == B_OK) {
+		memset(searchIcon->Bits(), 0, searchIcon->BitsLength());
+		BView* drawer = new BView(searchIcon->Bounds(), "drawer", B_FOLLOW_NONE, 0);
+		searchIcon->AddChild(drawer);
+		if (searchIcon->Lock()) {
+			drawer->SetHighColor(ui_color(B_PANEL_TEXT_COLOR));
+			drawer->SetPenSize(1.5f);
+			drawer->StrokeEllipse(BRect(3, 3, 10, 10));
+			drawer->StrokeLine(BPoint(9, 9), BPoint(13, 13));
+			drawer->Sync();
+			searchIcon->Unlock();
+		}
+		searchIcon->RemoveChild(drawer);
+		delete drawer;
+		fSearchButton->SetIcon(searchIcon);
+		delete searchIcon;
+	} else {
+		fSearchButton->SetLabel("Q");
+		delete searchIcon;
+	}
+	fSearchButton->SetToolTip(B_TRANSLATE("Search Engine"));
+	fSearchButton->SetExplicitMinSize(BSize(20, 20));
+	GroupLayout()->AddView(fSearchButton, 0.0f);
+
 	fTextView = new URLTextView(this);
 	AddChild(fTextView);
 
@@ -710,6 +741,31 @@ URLInputGroup::AttachedToWindow()
 {
 	BGroupView::AttachedToWindow();
 	fWindowActive = Window()->IsActive();
+	fSearchButton->SetTarget(this);
+}
+
+void
+URLInputGroup::MessageReceived(BMessage* message)
+{
+	switch (message->what) {
+		case kMsgSearchButtonClick:
+		{
+			BPopUpMenu* menu = new BPopUpMenu("search engines");
+			for (int32 i = 0; kSearchEngines[i].url != NULL; i++) {
+				BMessage* msg = new BMessage(SET_SEARCH_ENGINE);
+				msg->AddString("url", kSearchEngines[i].url);
+				BMenuItem* item = new BMenuItem(kSearchEngines[i].name, msg);
+				menu->AddItem(item);
+			}
+			menu->SetTargetForItems(Window());
+			BRect buttonFrame = fSearchButton->Frame();
+			BPoint where = ConvertToScreen(buttonFrame.LeftBottom());
+			menu->Go(where, true, true, true);
+			break;
+		}
+		default:
+			BGroupView::MessageReceived(message);
+	}
 }
 
 

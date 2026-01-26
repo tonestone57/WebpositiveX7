@@ -122,6 +122,7 @@ enum {
 	RELOAD_BYPASS_CACHE				= 'rlbc',
 	PRINT_PAGE						= 'prnt',
 	DUPLICATE_TAB					= 'dptb',
+	SET_SEARCH_ENGINE				= 'ssng',
 	PIN_TAB							= 'ptab',
 	UNPIN_TAB						= 'uptb',
 	CLOSE_TAB						= 'cltb',

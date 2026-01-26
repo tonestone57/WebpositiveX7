@@ -1993,6 +1993,16 @@ BrowserWindow::MessageReceived(BMessage* message)
 			break;
 		}
 
+		case SET_SEARCH_ENGINE:
+		{
+			BString url;
+			if (message->FindString("url", &url) == B_OK) {
+				fAppSettings->SetValue(kSettingsKeySearchPageURL, url);
+				fSearchPageURL = url;
+			}
+			break;
+		}
+
 		case REOPEN_CLOSED_TAB_WITH_INDEX:
 		{
 			int32 index;
@@ -2783,6 +2793,10 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 	// Implementing a "Open in Private Window" context menu option is not feasible
 	// without modifying the BWebView/WebKit implementation to expose HitTest information
 	// or context menu hooks, which are not available in the current API surface.
+	//
+	// "Open Image in New Tab" suffers from the same limitation. The context menu
+	// is handled internally by WebKit, and no hooks are currently exposed to
+	// WebPositive to extend it with image-specific actions.
 
 	PageUserData* userData = NULL;
 	if (view)

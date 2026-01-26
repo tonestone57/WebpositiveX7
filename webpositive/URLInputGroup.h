@@ -42,6 +42,7 @@ private:
 			URLTextView*		fTextView;
 			BButton*			fGoButton;
 			BButton*			fPermissionsButton;
+			BButton*			fSearchButton;
 			bool				fWindowActive;
 			bool				fURLLocked;
 };
