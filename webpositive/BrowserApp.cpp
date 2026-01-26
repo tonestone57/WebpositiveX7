@@ -73,6 +73,7 @@ const char* kApplicationSignature = "application/x-vnd.Haiku-WebPositive";
 const char* kApplicationName = B_TRANSLATE_SYSTEM_NAME("WebPositive");
 static const uint32 PRELOAD_BROWSING_HISTORY = 'plbh';
 static const uint32 AUTO_SAVE_SESSION = 'assn';
+static const uint32 DOWNLOAD_QUIT_CONFIRMED = 'dlqc';
 static char sCrashLogPath[B_PATH_NAME_LENGTH];
 
 
@@ -143,7 +144,8 @@ BrowserApp::BrowserApp()
 	fSettingsWindow(NULL),
 	fConsoleWindow(NULL),
 	fCookieWindow(NULL),
-	fAutoSaver(NULL)
+	fAutoSaver(NULL),
+	fForceQuit(false)
 {
 #ifdef __i386__
 	// First let's check SSE2 is available
@@ -526,6 +528,30 @@ BrowserApp::MessageReceived(BMessage* message)
 		_SaveSession();
 		break;
 
+	case DOWNLOAD_QUIT_CONFIRMED:
+	{
+		int32 choice;
+		if (message->FindInt32("which", &choice) == B_OK) {
+			if (choice == 0) { // Quit
+				fForceQuit = true;
+				PostMessage(B_QUIT_REQUESTED);
+			} else if (choice == 1) { // Continue downloads
+				if (fWindowCount == 0) {
+					if (fDownloadWindow->Lock()) {
+						fDownloadWindow->SetWorkspaces(1 << current_workspace());
+						if (fDownloadWindow->IsHidden())
+							fDownloadWindow->Show();
+						else
+							fDownloadWindow->Activate();
+						fDownloadWindow->SetMinimizeOnClose(true);
+						fDownloadWindow->Unlock();
+					}
+				}
+			}
+		}
+		break;
+	}
+
 	default:
 		BApplication::MessageReceived(message);
 		break;
@@ -549,27 +575,13 @@ BrowserApp::RefsReceived(BMessage* message)
 bool
 BrowserApp::QuitRequested()
 {
-	if (fDownloadWindow->DownloadsInProgress()) {
+	if (!fForceQuit && fDownloadWindow->DownloadsInProgress()) {
 		BAlert* alert = new BAlert(B_TRANSLATE("Downloads in progress"),
 			B_TRANSLATE("There are still downloads in progress, do you really "
 			"want to quit WebPositive now?"), B_TRANSLATE("Quit"),
 			B_TRANSLATE("Continue downloads"));
-		int32 choice = alert->Go();
-		if (choice == 1) {
-			if (fWindowCount == 0) {
-				if (fDownloadWindow->Lock()) {
-					fDownloadWindow->SetWorkspaces(1 << current_workspace());
-					if (fDownloadWindow->IsHidden())
-						fDownloadWindow->Show();
-					else
-						fDownloadWindow->Activate();
-					fDownloadWindow->SetMinimizeOnClose(true);
-					fDownloadWindow->Unlock();
-					return false;
-				}
-			} else
-				return false;
-		}
+		alert->Go(new BInvoker(new BMessage(DOWNLOAD_QUIT_CONFIRMED), this));
+		return false;
 	}
 
 	fSession->MakeEmpty();

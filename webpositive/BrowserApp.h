@@ -93,6 +93,7 @@ private:
 			CookieWindow*		fCookieWindow;
 
 			BMessageRunner*		fAutoSaver;
+			bool				fForceQuit;
 			void				_SaveSession();
 };
 
