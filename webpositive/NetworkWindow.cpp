@@ -77,6 +77,9 @@ NetworkWindow::MessageReceived(BMessage* message)
 						fPendingRequests[url].push_back(item);
 					} catch (...) {
 						// Ignore map insertion failure, item stays in list
+						fRequestListView->RemoveItem(item);
+						delete item;
+						return;
 					}
 
 					if (fRequestListView->CountItems() > 500) {

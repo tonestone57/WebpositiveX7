@@ -227,9 +227,19 @@ BookmarkManager::CreateBookmarkFromMessage(BMessage* message)
 		// This string is only present if the message originated from Tracker (drag and drop).
 		fileName = "";
 	}
-	const BBitmap* miniIcon = NULL;
-	originatorData.FindData("miniIcon", B_COLOR_8_BIT_TYPE,
-		reinterpret_cast<const void**>(&miniIcon), NULL);
+	BBitmap* miniIcon = NULL;
+	const void* miniIconData = NULL;
+	ssize_t miniIconSize = 0;
+	if (originatorData.FindData("miniIcon", B_COLOR_8_BIT_TYPE,
+			&miniIconData, &miniIconSize) == B_OK) {
+		miniIcon = new BBitmap(BRect(0, 0, 15, 15), B_CMAP8);
+		if (miniIcon->InitCheck() == B_OK && miniIcon->BitsLength() == miniIconSize)
+			miniIcon->SetBits(miniIconData, miniIconSize, 0, B_CMAP8);
+		else {
+			delete miniIcon;
+			miniIcon = NULL;
+		}
+	}
 
 	BBitmap* largeIcon = NULL;
 	const void* largeIconData = NULL;
@@ -262,6 +272,7 @@ BookmarkManager::CreateBookmarkFromMessage(BMessage* message)
 		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
 	}
 	delete largeIcon;
+	delete miniIcon;
 }
 
 /*static*/ void
