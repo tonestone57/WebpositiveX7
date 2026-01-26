@@ -935,12 +935,14 @@ BrowserWindow::~BrowserWindow()
 	fFormSafetyHelper.reset();
 	if (fPermissionsWindow) {
 		if (fPermissionsWindow->Lock()) {
+			fPermissionsWindow->SetTarget(BMessenger());
 			fPermissionsWindow->PrepareToQuit();
 			fPermissionsWindow->Quit();
 		}
 	}
 	if (fNetworkWindow) {
 		if (fNetworkWindow->Lock()) {
+			fNetworkWindow->SetTarget(BMessenger());
 			fNetworkWindow->PrepareToQuit();
 			fNetworkWindow->Quit();
 		}
