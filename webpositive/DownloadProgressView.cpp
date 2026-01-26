@@ -795,6 +795,13 @@ DownloadProgressView::IsFinished() const
 }
 
 
+bool
+DownloadProgressView::IsCanceled() const
+{
+	return !fDownload && fStatusBar->CurrentValue() < 100;
+}
+
+
 void
 DownloadProgressView::DownloadFinished()
 {

@@ -52,6 +52,7 @@ public:
 			const BString&		URL() const;
 			bool				IsMissing() const;
 			bool				IsFinished() const;
+			bool				IsCanceled() const;
 
 			void				DownloadFinished();
 			void				CancelDownload();
