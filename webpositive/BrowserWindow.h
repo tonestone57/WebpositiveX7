@@ -120,6 +120,7 @@ enum {
 	REOPEN_CLOSED_TAB_WITH_INDEX	= 'rcti',
 	RELOAD							= 'reld',
 	RELOAD_BYPASS_CACHE				= 'rlbc',
+	PRINT_PAGE						= 'prnt',
 	PIN_TAB							= 'ptab',
 	UNPIN_TAB						= 'uptb',
 	CLOSE_TAB						= 'cltb',

@@ -504,6 +504,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 		new BMessage(CLOSE_TAB), 'W'));
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Save page as" B_UTF8_ELLIPSIS),
 		new BMessage(SAVE_PAGE), 'S'));
+	menu->AddItem(new BMenuItem(B_TRANSLATE("Print" B_UTF8_ELLIPSIS),
+		new BMessage(PRINT_PAGE), 'P'));
 	menu->AddSeparatorItem();
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Import bookmarks" B_UTF8_ELLIPSIS),
 		new BMessage(IMPORT_BOOKMARKS)));
@@ -1113,6 +1115,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 			}
 			break;
 		}
+
+		case PRINT_PAGE:
+			if (CurrentWebView() && CurrentWebView()->WebPage())
+				CurrentWebView()->WebPage()->Print(true);
+			break;
 
 		case SHOW_HIDE_BOOKMARK_BAR:
 			_ShowBookmarkBar(fBookmarkBar->IsHidden());
