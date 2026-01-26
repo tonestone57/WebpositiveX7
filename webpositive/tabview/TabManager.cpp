@@ -995,6 +995,9 @@ TabManager::CloseTab(int32 tabIndex)
 void
 TabManager::AddTab(BView* view, const char* label, int32 index)
 {
+	if (index < 0)
+		index = CountTabs();
+
 	fTabContainerView->AddTab(label, index);
 	fCardLayout->AddView(index, view);
 }

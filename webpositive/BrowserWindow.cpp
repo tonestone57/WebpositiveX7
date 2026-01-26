@@ -1986,16 +1986,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 			if (webView) {
 				BString url = webView->MainFrameURL();
-				// Create new tab (appends to end)
-				CreateNewTab(url, true);
-
-				// Move to be next to the source tab
-				int32 newIndex = fTabManager->CountTabs() - 1;
 				int32 targetIndex = (tabIndex >= 0) ? tabIndex + 1 : fTabManager->SelectedTabIndex() + 1;
-
-				if (newIndex != targetIndex && targetIndex < newIndex) {
-					fTabManager->MoveTab(newIndex, targetIndex);
-				}
+				// Create new tab at specific index
+				CreateNewTab(url, true, NULL, false, targetIndex);
 			}
 			break;
 		}
@@ -2582,7 +2575,7 @@ BrowserWindow::IsBlankTab() const
 
 void
 BrowserWindow::CreateNewTab(const BString& _url, bool select,
-	BWebView* webView, bool lazy)
+	BWebView* webView, bool lazy, int32 index)
 {
 	bool applyNewPagePolicy = webView == NULL;
 	// Executed in app thread (new BWebPage needs to be created in app thread).
@@ -2591,7 +2584,7 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 
 	bool isNewWindow = fTabManager->CountTabs() == 0;
 
-	fTabManager->AddTab(webView, B_TRANSLATE("New tab"));
+	fTabManager->AddTab(webView, B_TRANSLATE("New tab"), index);
 
 	BString url(_url);
 	if (applyNewPagePolicy && url.Length() == 0)

@@ -177,7 +177,8 @@ public:
 
 			bool				IsBlankTab() const;
 			void				CreateNewTab(const BString& url, bool select,
-									BWebView* webView = 0, bool lazy = false);
+									BWebView* webView = 0, bool lazy = false,
+									int32 index = -1);
 			void				RestartDownload(const BString& url);
 
 			BRect				WindowFrame() const;
