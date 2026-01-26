@@ -192,6 +192,11 @@ CookieWindow::CookieWindow(BRect frame,
 CookieWindow::~CookieWindow()
 {
 	_EmptyDomainList();
+	while (fCookies->CountRows() > 0) {
+		BRow* row = fCookies->RowAt(0);
+		fCookies->RemoveRow(row);
+		delete row;
+	}
 }
 
 
@@ -486,14 +491,14 @@ CookieWindow::_DeleteCookies()
 	if (rowsToDelete.empty()) {
 		// A domain was selected in the domain list, but no specific cookies
 		// selected -> delete all cookies for this domain.
-		int32 count = fCookies->CountRows();
-		for (int32 i = 0; i < count; i++) {
-			row = (CookieRow*)fCookies->RowAt(i);
+		while (fCookies->CountRows() > 0) {
+			row = (CookieRow*)fCookies->RowAt(0);
 			BPrivate::Network::BNetworkCookie& cookie = row->Cookie();
 			cookie.SetExpirationDate(0);
 			fCookieJar.AddCookie(cookie);
+			fCookies->RemoveRow(row);
+			delete row;
 		}
-		fCookies->Clear();
 	} else {
 		// Delete selected cookies
 		for (size_t i = 0; i < rowsToDelete.size(); i++) {
