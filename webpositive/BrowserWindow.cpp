@@ -1975,6 +1975,31 @@ BrowserWindow::MessageReceived(BMessage* message)
 			_ReopenClosedTab();
 			break;
 
+		case DUPLICATE_TAB:
+		{
+			BWebView* webView = NULL;
+			int32 tabIndex = -1;
+			if (message->FindInt32("tab index", &tabIndex) == B_OK)
+				webView = dynamic_cast<BWebView*>(fTabManager->ViewForTab(tabIndex));
+			else
+				webView = CurrentWebView();
+
+			if (webView) {
+				BString url = webView->MainFrameURL();
+				// Create new tab (appends to end)
+				CreateNewTab(url, true);
+
+				// Move to be next to the source tab
+				int32 newIndex = fTabManager->CountTabs() - 1;
+				int32 targetIndex = (tabIndex >= 0) ? tabIndex + 1 : fTabManager->SelectedTabIndex() + 1;
+
+				if (newIndex != targetIndex && targetIndex < newIndex) {
+					fTabManager->MoveTab(newIndex, targetIndex);
+				}
+			}
+			break;
+		}
+
 		case REOPEN_CLOSED_TAB_WITH_INDEX:
 		{
 			int32 index;
