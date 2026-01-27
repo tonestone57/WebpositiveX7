@@ -64,6 +64,11 @@ TabSearchWindow::TabSearchWindow(TabManager* manager)
 
 TabSearchWindow::~TabSearchWindow()
 {
+	if (fTabManager) {
+		BMessage msg(TAB_SEARCH_WINDOW_QUIT);
+		fTabManager->Target().SendMessage(&msg);
+	}
+
 	for (int32 i = fTabList->CountItems() - 1; i >= 0; i--)
 		delete fTabList->RemoveItem(i);
 }
@@ -114,10 +119,6 @@ TabSearchWindow::MessageReceived(BMessage* message)
 bool
 TabSearchWindow::QuitRequested()
 {
-	if (fTabManager) {
-		BMessage msg(TAB_SEARCH_WINDOW_QUIT); // TAB_SEARCH_WINDOW_QUIT
-		fTabManager->Target().SendMessage(&msg);
-	}
 	return true;
 }
 
