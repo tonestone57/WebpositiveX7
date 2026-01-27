@@ -1095,6 +1095,11 @@ TabManager::MoveTab(int32 fromIndex, int32 toIndex)
 				delete item->View();
 				delete item;
 			}
+			// Notify BrowserWindow to update its state (e.g. CurrentWebView)
+			// as the view might have been the current one.
+			BMessage message(TAB_CHANGED);
+			message.AddInt32("tab index", SelectedTabIndex());
+			fTarget.SendMessage(&message);
 		}
 		return;
 	}
