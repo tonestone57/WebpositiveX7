@@ -3605,6 +3605,8 @@ BrowserWindow::_GetOrCreateUserData(BWebView* view)
 
 	if (userData->Id() == 0) {
 		userData->SetId(fNextTabId++);
+		if (fNextTabId == 0)
+			fNextTabId = 1;
 	}
 
 	return userData;
