@@ -2616,7 +2616,7 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 
 		if (lazy) {
 			_SetPageIcon(webView, NULL); // Ensure userData exists
-			PageUserData* userData = static_cast<PageUserData*>(webView->GetUserData());
+			PageUserData* userData = _GetOrCreateUserData(webView);
 			if (userData) {
 				userData->SetIsLazy(true);
 				userData->SetPendingURL(url);
@@ -2634,6 +2634,9 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 		fURLInputGroup->SetPageIcon(NULL);
 		fURLInputGroup->SetText(url.String());
 		fURLInputGroup->MakeFocus(true);
+	} else {
+		// Ensure userData and ID exist for background tabs
+		_GetOrCreateUserData(webView);
 	}
 
 	_ShowInterface(true);
@@ -2967,7 +2970,7 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 		fIsBypassingCache = false;
 	}
 
-	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+	PageUserData* userData = _GetOrCreateUserData(view);
 	if (userData != NULL)
 		userData->SetIsLoading(false);
 

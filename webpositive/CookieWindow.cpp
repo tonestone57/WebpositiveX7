@@ -521,8 +521,17 @@ CookieWindow::_DeleteCookies()
 			if (item) {
 				// Also remove from map to keep consistency
 				fCookieMap.erase(item->Text());
-				fDomains->RemoveItem(item);
-				delete item;
+
+				if (fDomains->CountItemsUnder(item, true) > 0) {
+					// The item has children, we cannot remove it.
+					// Mark it as empty and disabled.
+					((DomainItem*)item)->fEmpty = true;
+					item->SetEnabled(false);
+					fDomains->InvalidateItem(selection);
+				} else {
+					fDomains->RemoveItem(item);
+					delete item;
+				}
 			}
 		}
 	} else {
