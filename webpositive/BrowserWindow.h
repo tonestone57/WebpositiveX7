@@ -267,6 +267,8 @@ private:
 			void				_CheckMemoryPressure();
 			void				_DiscardBackgroundTabs();
 
+			PageUserData*		_GetOrCreateUserData(BWebView* view);
+
 private:
 			struct ClosedTabInfo {
 				BString url;
@@ -371,6 +373,7 @@ private:
 			std::unique_ptr<BMessageRunner>		fMemoryPressureRunner;
 
 			bool				fExpectingDomInspection;
+			uint32				fNextTabId;
 };
 
 

@@ -34,7 +34,8 @@ public:
 		fHttpsUpgraded(false),
 		fIsLazy(false),
 		fIsDiscarded(false),
-		fPreview(NULL)
+		fPreview(NULL),
+		fId(0)
 	{
 	}
 
@@ -220,6 +221,16 @@ public:
 		return fPreview;
 	}
 
+	void SetId(uint32 id)
+	{
+		fId = id;
+	}
+
+	uint32 Id() const
+	{
+		return fId;
+	}
+
 private:
 	BView*		fFocusedView;
 	BBitmap*	fPageIcon;
@@ -236,6 +247,7 @@ private:
 	bool		fIsDiscarded;
 	BString		fAllowedInsecureHost;
 	BBitmap*	fPreview;
+	uint32		fId;
 };
 
 
