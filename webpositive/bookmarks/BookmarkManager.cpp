@@ -435,6 +435,39 @@ BookmarkManager::_ExportBookmarksRecursively(BDirectory& directory, BFile& file,
 	return B_OK;
 }
 
+/*static*/ BString
+BookmarkManager::_ExtractAttribute(const BString& tag, const char* attribute)
+{
+	BString attr(attribute);
+	attr << "=";
+	int32 pos = tag.IFindFirst(attr);
+	if (pos < 0) return "";
+
+	pos += attr.Length();
+	// Handle quoting
+	char quote = 0;
+	if (tag.ByteAt(pos) == '"' || tag.ByteAt(pos) == '\'') {
+		quote = tag.ByteAt(pos);
+		pos++;
+	}
+
+	int32 endPos;
+	if (quote != 0) {
+		endPos = tag.FindFirst(quote, pos);
+	} else {
+		endPos = tag.FindFirst(" ", pos);
+		if (endPos < 0) endPos = tag.FindFirst(">", pos); // Should not happen given how tag is constructed
+		if (endPos < 0) endPos = tag.Length();
+	}
+
+	if (endPos > pos) {
+		BString value;
+		tag.CopyInto(value, pos, endPos - pos);
+		return value;
+	}
+	return "";
+}
+
 /*static*/ status_t
 BookmarkManager::ImportBookmarks(const BPath& path)
 {
@@ -503,11 +536,7 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 					if (nextTagUpper.StartsWith("H3")) {
 						// Folder name
 						BString endTag = "</H3>";
-						// Note: This is case sensitive search, but should be fine for now
-						// or we can use IFindFirst if available (not in Haiku public API?)
-						// We'll search for </H3> or </h3>
-						int32 closeH3 = content.FindFirst(endTag, nextTagEnd);
-						if (closeH3 < 0) closeH3 = content.FindFirst("</h3>", nextTagEnd);
+						int32 closeH3 = content.IFindFirst(endTag, nextTagEnd);
 
 						if (closeH3 > 0) {
 							BString folderName;
@@ -516,6 +545,8 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 							folderName.ReplaceAll("&lt;", "<");
 							folderName.ReplaceAll("&gt;", ">");
 							folderName.ReplaceAll("&amp;", "&");
+							folderName.ReplaceAll("&quot;", "\"");
+							folderName.ReplaceAll("&#39;", "'");
 
 							pendingFolderName = folderName;
 							pos = closeH3 + 5;
@@ -524,28 +555,23 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 					} else if (nextTagUpper.StartsWith("A")) {
 						// Bookmark
 						BString tagContent = nextTag;
-						int32 hrefPos = tagContent.IFindFirst("HREF=\"");
-						if (hrefPos >= 0) {
-							int32 hrefEnd = tagContent.FindFirst("\"", hrefPos + 6);
-							if (hrefEnd > 0) {
-								BString url;
-								tagContent.CopyInto(url, hrefPos + 6, hrefEnd - hrefPos - 6);
+						BString url = _ExtractAttribute(tagContent, "HREF");
+						if (url.Length() > 0) {
+							int32 closeA = content.IFindFirst("</A>", nextTagEnd);
 
-								int32 closeA = content.FindFirst("</A>", nextTagEnd);
-								if (closeA < 0) closeA = content.FindFirst("</a>", nextTagEnd);
+							if (closeA > 0) {
+								BString title;
+								content.CopyInto(title, nextTagEnd + 1, closeA - nextTagEnd - 1);
 
-								if (closeA > 0) {
-									BString title;
-									content.CopyInto(title, nextTagEnd + 1, closeA - nextTagEnd - 1);
+								title.ReplaceAll("&lt;", "<");
+								title.ReplaceAll("&gt;", ">");
+								title.ReplaceAll("&amp;", "&");
+								title.ReplaceAll("&quot;", "\"");
+								title.ReplaceAll("&#39;", "'");
 
-									title.ReplaceAll("&lt;", "<");
-									title.ReplaceAll("&gt;", ">");
-									title.ReplaceAll("&amp;", "&");
-
-									_CreateBookmark(dirStack.back(), title, title, url, NULL, NULL);
-									pos = closeA + 4;
-									continue;
-								}
+								_CreateBookmark(dirStack.back(), title, title, url, NULL, NULL);
+								pos = closeA + 4;
+								continue;
 							}
 						}
 					}

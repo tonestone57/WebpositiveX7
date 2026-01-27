@@ -4279,9 +4279,12 @@ BrowserWindow::_LoadFavicon(const BString& url, BWebView* view)
 				file.GetSize(&size);
 				off_t expectedSize = sizeof(width) + sizeof(height) + (off_t)width * height * 4;
 
-				if (size == expectedSize) {
+				if (size >= expectedSize) {
 					BBitmap* icon = new BBitmap(BRect(0, 0, width - 1, height - 1), B_RGBA32);
 					if (icon->InitCheck() == B_OK) {
+						// Ensure padding bytes are clear (fragility fix)
+						memset(icon->Bits(), 0, icon->BitsLength());
+
 						int32 bytesPerRow = icon->BytesPerRow();
 						int32 rowLen = width * 4;
 						uint8* bits = (uint8*)icon->Bits();

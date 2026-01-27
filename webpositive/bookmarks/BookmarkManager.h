@@ -40,6 +40,7 @@ private:
 
 	static status_t _ExportBookmarksRecursively(BDirectory& directory, BFile& file,
 		int32 indentLevel);
+	static BString _ExtractAttribute(const BString& tag, const char* attribute);
 };
 
 #endif // BOOKMARK_MANAGER_H
