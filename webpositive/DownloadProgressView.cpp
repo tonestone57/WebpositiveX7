@@ -72,7 +72,7 @@ static const time_t kSecondsPerHour = 60 * 60;
 
 class TextEntryWindow : public BWindow {
 public:
-	TextEntryWindow(const char* title, const char* label, const char* initialText, BMessage* message, BHandler* target)
+	TextEntryWindow(const char* title, const char* label, const char* initialText, BMessage* message, BMessenger target)
 		:
 		BWindow(BRect(0, 0, 300, 100), title, B_MODAL_WINDOW,
 			B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS | B_CLOSE_ON_ESCAPE),
@@ -102,7 +102,7 @@ public:
 			case 'ok':
 				if (fMessage) {
 					fMessage->AddString("text", fTextControl->Text());
-					BMessenger(fTarget).SendMessage(fMessage);
+					fTarget.SendMessage(fMessage);
 				}
 				Quit();
 				break;
@@ -112,7 +112,7 @@ public:
 	}
 
 private:
-	BHandler* fTarget;
+	BMessenger fTarget;
 	BMessage* fMessage;
 	BTextControl* fTextControl;
 };
@@ -595,7 +595,7 @@ DownloadProgressView::MessageReceived(BMessage* message)
 				B_TRANSLATE("MIME type:"),
 				"", // Initial text (empty or current type)
 				new BMessage(MIME_TYPE_SET),
-				this);
+				BMessenger(this));
 			window->Show();
 			break;
 		}

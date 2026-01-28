@@ -435,7 +435,8 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fIsBypassingCache(false),
 	fIsPrivate(privateWindow),
 	fButtonResetRunner(NULL),
-	fExpectingDomInspection(false)
+	fExpectingDomInspection(false),
+	fNextTabId(1)
 {
 	fFormSafetyHelper.reset(new FormSafetyHelper(this));
 
@@ -1588,12 +1589,24 @@ BrowserWindow::MessageReceived(BMessage* message)
 			int32 which;
 			if (message->FindInt32("which", &which) == B_OK && which == 1) {
 				BString url;
-				BWebView* view;
+				uint32 tabId;
 				if (message->FindString("url", &url) == B_OK
-					&& message->FindPointer("view", (void**)&view) == B_OK) {
+					&& message->FindUInt32("tabId", &tabId) == B_OK) {
 
-					// Verify view still exists
-					if (fTabManager->HasView(view)) {
+					// Find view by ID
+					BWebView* view = NULL;
+					for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
+						BWebView* tab = dynamic_cast<BWebView*>(fTabManager->ViewForTab(i));
+						if (tab) {
+							PageUserData* userData = static_cast<PageUserData*>(tab->GetUserData());
+							if (userData && userData->Id() == tabId) {
+								view = tab;
+								break;
+							}
+						}
+					}
+
+					if (view) {
 						BString httpUrl = url;
 						if (httpUrl.StartsWith("https://")) {
 							httpUrl.ReplaceFirst("https://", "http://");
@@ -2456,12 +2469,7 @@ BrowserWindow::SetCurrentWebView(BWebView* webView)
 		// Remember the currently focused view before switching tabs,
 		// so that we can revert the focus when switching back to this tab
 		// later.
-		PageUserData* userData = static_cast<PageUserData*>(
-			CurrentWebView()->GetUserData());
-		if (userData == NULL) {
-		userData = new PageUserData(CurrentFocus());
-			CurrentWebView()->SetUserData(userData);
-		}
+		PageUserData* userData = _GetOrCreateUserData(CurrentWebView());
 		userData->SetFocusedView(CurrentFocus());
 		userData->SetURLInputContents(fURLInputGroup->Text());
 		int32 selectionStart;
@@ -2608,7 +2616,7 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 
 		if (lazy) {
 			_SetPageIcon(webView, NULL); // Ensure userData exists
-			PageUserData* userData = static_cast<PageUserData*>(webView->GetUserData());
+			PageUserData* userData = _GetOrCreateUserData(webView);
 			if (userData) {
 				userData->SetIsLazy(true);
 				userData->SetPendingURL(url);
@@ -2626,6 +2634,9 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 		fURLInputGroup->SetPageIcon(NULL);
 		fURLInputGroup->SetText(url.String());
 		fURLInputGroup->MakeFocus(true);
+	} else {
+		// Ensure userData and ID exist for background tabs
+		_GetOrCreateUserData(webView);
 	}
 
 	_ShowInterface(true);
@@ -2640,11 +2651,7 @@ BrowserWindow::RestartDownload(const BString& url)
 	BWebView* view = dynamic_cast<BWebView*>(
 		fTabManager->ViewForTab(fTabManager->CountTabs() - 1));
 	if (view != NULL) {
-		PageUserData* data = static_cast<PageUserData*>(view->GetUserData());
-		if (data == NULL) {
-			data = new(std::nothrow) PageUserData(NULL);
-			view->SetUserData(data);
-		}
+		PageUserData* data = _GetOrCreateUserData(view);
 		if (data != NULL)
 			data->SetIsDownloadRestart(true);
 	}
@@ -2963,7 +2970,7 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 		fIsBypassingCache = false;
 	}
 
-	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+	PageUserData* userData = _GetOrCreateUserData(view);
 	if (userData != NULL)
 		userData->SetIsLoading(false);
 
@@ -2988,7 +2995,8 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 
 		BMessage* msg = new BMessage(LOAD_INSECURE_CONFIRMED);
 		msg->AddString("url", url);
-		msg->AddPointer("view", view);
+		if (userData)
+			msg->AddUInt32("tabId", userData->Id());
 		alert->Go(new BInvoker(msg, this));
 	}
 
@@ -3567,11 +3575,8 @@ BrowserWindow::_TabChanged(int32 index)
 void
 BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon, bool save)
 {
-	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
-	if (userData == NULL) {
-		userData = new PageUserData(NULL);
-		view->SetUserData(userData);
-	}
+	PageUserData* userData = _GetOrCreateUserData(view);
+
 	// The PageUserData makes a copy of the icon, which we pass on to
 	// the TabManager for display in the respective tab.
 	userData->SetPageIcon(icon);
@@ -3583,6 +3588,28 @@ BrowserWindow::_SetPageIcon(BWebView* view, const BBitmap* icon, bool save)
 	fTabManager->SetTabIcon(view, userData->PageIcon());
 	if (view == CurrentWebView())
 		fURLInputGroup->SetPageIcon(icon);
+}
+
+
+PageUserData*
+BrowserWindow::_GetOrCreateUserData(BWebView* view)
+{
+	if (view == NULL)
+		return NULL;
+
+	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+	if (userData == NULL) {
+		userData = new PageUserData(NULL);
+		view->SetUserData(userData);
+	}
+
+	if (userData->Id() == 0) {
+		userData->SetId(fNextTabId++);
+		if (fNextTabId == 0)
+			fNextTabId = 1;
+	}
+
+	return userData;
 }
 
 
@@ -4252,9 +4279,12 @@ BrowserWindow::_LoadFavicon(const BString& url, BWebView* view)
 				file.GetSize(&size);
 				off_t expectedSize = sizeof(width) + sizeof(height) + (off_t)width * height * 4;
 
-				if (size == expectedSize) {
+				if (size >= expectedSize) {
 					BBitmap* icon = new BBitmap(BRect(0, 0, width - 1, height - 1), B_RGBA32);
 					if (icon->InitCheck() == B_OK) {
+						// Ensure padding bytes are clear (fragility fix)
+						memset(icon->Bits(), 0, icon->BitsLength());
+
 						int32 bytesPerRow = icon->BytesPerRow();
 						int32 rowLen = width * 4;
 						uint8* bits = (uint8*)icon->Bits();
