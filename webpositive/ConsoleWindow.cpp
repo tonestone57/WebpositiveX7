@@ -43,9 +43,7 @@ ConsoleWindow::ConsoleWindow(BRect frame)
 	BWindow(frame, B_TRANSLATE("Script console"), B_TITLED_WINDOW,
 		B_NORMAL_WINDOW_FEEL, B_AUTO_UPDATE_SIZE_LIMITS
 			| B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE),
-	fQuitting(false),
-	fPreviousText(""),
-	fRepeatCounter(0)
+	fQuitting(false)
 {
 	SetLayout(new BGroupLayout(B_VERTICAL, 0.0));
 
@@ -57,6 +55,7 @@ ConsoleWindow::ConsoleWindow(BRect frame)
 	fCopyMessagesButton = new BButton(B_TRANSLATE("Copy"),
 		new BMessage(B_COPY));
 	fErrorsOnlyCheckBox = new BCheckBox("Errors only", new BMessage(FILTER_ERRORS_ONLY));
+	fErrorsOnlyCheckBox->SetTarget(this);
 
 	AddChild(BGroupLayoutBuilder(B_VERTICAL, 0.0)
 		.Add(new BScrollView("Console messages scroll",
@@ -90,55 +89,31 @@ ConsoleWindow::MessageReceived(BMessage* message)
 	switch (message->what) {
 		case ADD_CONSOLE_MESSAGE:
 		{
-			BString source = message->FindString("source");
-			int32 lineNumber = message->FindInt32("line");
-			int32 columnNumber = message->FindInt32("column");
-			BString text = message->FindString("string");
-			// Crude filtering for errors only
-			if (fErrorsOnlyCheckBox->Value() == B_CONTROL_ON) {
-				if (text.FindFirst("Error") == B_ERROR && text.FindFirst("error") == B_ERROR && text.FindFirst("Exception") == B_ERROR) {
-					// Likely not an error, skip
-					break;
-				}
-			}
+			ConsoleMessage msg;
+			msg.source = message->FindString("source");
+			msg.line = message->FindInt32("line");
+			msg.column = message->FindInt32("column");
+			msg.text = message->FindString("string");
+			msg.isError = (msg.text.FindFirst("Error") != B_ERROR
+				|| msg.text.FindFirst("error") != B_ERROR
+				|| msg.text.FindFirst("Exception") != B_ERROR);
 
-			BString finalText;
-			finalText.SetToFormat("%s:%" B_PRIi32 ":%" B_PRIi32 ": %s\n",
-				source.String(), lineNumber, columnNumber, text.String());
+			fAllMessages.push_back(msg);
+			if (fAllMessages.size() > 500)
+				fAllMessages.pop_front();
 
-			if (finalText == fPreviousText) {
-				finalText = "";
-				static BStringFormat format(B_TRANSLATE("{0, plural,"
-					"one{Last line repeated # time.}"
-					"other{Last line repeated # times.}}"));
-				format.Format(finalText, ++fRepeatCounter);
-				// preserve the repeated line
-				if (fRepeatCounter > 1) {
-					int32 index = fMessagesListView->CountItems() - 1;
-					BStringItem* item = (BStringItem*)fMessagesListView->ItemAt(index);
-					item->SetText(finalText.String());
-					fMessagesListView->InvalidateItem(index);
-					break;
-				}
-			} else {
-				fPreviousText = finalText;
-				fRepeatCounter = 0;
-			}
-			BStringItem* item = new BStringItem(finalText.String());
-			if (fMessagesListView->AddItem(item)) {
-				if (fMessagesListView->CountItems() > 500)
-					delete fMessagesListView->RemoveItem(0);
-			} else {
-				delete item;
-			}
+			_UpdateMessageList();
 			break;
 		}
 		case CLEAR_CONSOLE_MESSAGES:
 		{
-			fPreviousText = "";
-			int32 count = fMessagesListView->CountItems();
-			for (int32 i = count - 1; i >= 0; i--)
-				delete fMessagesListView->RemoveItem(i);
+			fAllMessages.clear();
+			_UpdateMessageList();
+			break;
+		}
+		case FILTER_ERRORS_ONLY:
+		{
+			_UpdateMessageList();
 			break;
 		}
 		case B_COPY:
@@ -199,4 +174,59 @@ ConsoleWindow::_CopyToClipboard()
 		}
 		be_clipboard->Unlock();
 	}
+}
+
+
+void
+ConsoleWindow::_UpdateMessageList()
+{
+	// Clear existing items
+	int32 count = fMessagesListView->CountItems();
+	for (int32 i = count - 1; i >= 0; i--)
+		delete fMessagesListView->RemoveItem(i);
+
+	bool errorsOnly = fErrorsOnlyCheckBox->Value() == B_CONTROL_ON;
+	BString previousText = "";
+	int32 repeatCounter = 0;
+
+	static BStringFormat repeatFormat(B_TRANSLATE("{0, plural,"
+		"one{Last line repeated # time.}"
+		"other{Last line repeated # times.}}"));
+
+	for (std::deque<ConsoleMessage>::iterator it = fAllMessages.begin();
+			it != fAllMessages.end(); ++it) {
+
+		if (errorsOnly && !it->isError)
+			continue;
+
+		BString finalText;
+		finalText.SetToFormat("%s:%" B_PRIi32 ":%" B_PRIi32 ": %s\n",
+			it->source.String(), it->line, it->column, it->text.String());
+
+		if (finalText == previousText) {
+			repeatCounter++;
+			BString repeatText;
+			repeatFormat.Format(repeatText, repeatCounter);
+			repeatText += "\n";
+
+			int32 lastIdx = fMessagesListView->CountItems() - 1;
+			if (lastIdx >= 0) {
+				if (repeatCounter > 1) {
+					// Update existing repeat message
+					BStringItem* item = (BStringItem*)fMessagesListView->ItemAt(lastIdx);
+					item->SetText(repeatText.String());
+				} else {
+					// Add new repeat message
+					fMessagesListView->AddItem(new BStringItem(repeatText.String()));
+				}
+			}
+		} else {
+			previousText = finalText;
+			repeatCounter = 0;
+			fMessagesListView->AddItem(new BStringItem(finalText.String()));
+		}
+	}
+
+	if (fMessagesListView->CountItems() > 0)
+		fMessagesListView->ScrollTo(fMessagesListView->CountItems() - 1);
 }

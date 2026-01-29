@@ -13,6 +13,7 @@
 #include <String.h>
 #include <Window.h>
 
+#include <deque>
 
 class BListView;
 class BButton;
@@ -31,15 +32,23 @@ public:
 
 private:
 			void				_CopyToClipboard();
+			void				_UpdateMessageList();
 
 private:
+			struct ConsoleMessage {
+				BString text;
+				BString source;
+				int32 line;
+				int32 column;
+				bool isError;
+			};
+
 			bool				fQuitting;
 			BListView*			fMessagesListView;
 			BButton* 			fClearMessagesButton;
 			BButton* 			fCopyMessagesButton;
 			BCheckBox*			fErrorsOnlyCheckBox;
-			BString				fPreviousText;
-			int32				fRepeatCounter;
+			std::deque<ConsoleMessage> fAllMessages;
 };
 
 
