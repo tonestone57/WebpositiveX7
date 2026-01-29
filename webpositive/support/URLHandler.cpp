@@ -50,15 +50,16 @@ URLHandler::_EncodeURIComponent(const BString& search)
 	// search string to WebKit, if we want queries like "4+3" to not be
 	// searched as "4 3".
 	const BString escCharList = " $&`:<>[]{}\"+#%@/;=?\\^|~\',";
-	BString result = search;
+	BString result;
 	char hexcode[4];
 
-	for (int32 i = 0; i < result.Length(); i++) {
-		if (escCharList.FindFirst(result[i]) != B_ERROR) {
-			sprintf(hexcode, "%02X", (unsigned int)result[i]);
-			result.SetByteAt(i, '%');
-			result.Insert(hexcode, i + 1);
-			i += 2;
+	for (int32 i = 0; i < search.Length(); i++) {
+		char c = search[i];
+		if (escCharList.FindFirst(c) != B_ERROR) {
+			sprintf(hexcode, "%%%02X", (unsigned int)(unsigned char)c);
+			result << hexcode;
+		} else {
+			result << c;
 		}
 	}
 
