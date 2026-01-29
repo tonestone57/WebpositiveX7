@@ -34,6 +34,7 @@ public:
 private:
 			void				_CopyToClipboard();
 			void				_UpdateMessageList();
+			void				_AppendMessage(const ConsoleMessage& message);
 
 private:
 			struct ConsoleMessage {
@@ -50,6 +51,9 @@ private:
 			BButton* 			fCopyMessagesButton;
 			BCheckBox*			fErrorsOnlyCheckBox;
 			std::deque<ConsoleMessage> fAllMessages;
+
+			BString				fPreviousText;
+			int32				fRepeatCounter;
 };
 
 

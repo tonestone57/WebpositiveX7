@@ -43,7 +43,8 @@ ConsoleWindow::ConsoleWindow(BRect frame)
 	BWindow(frame, B_TRANSLATE("Script console"), B_TITLED_WINDOW,
 		B_NORMAL_WINDOW_FEEL, B_AUTO_UPDATE_SIZE_LIMITS
 			| B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE),
-	fQuitting(false)
+	fQuitting(false),
+	fRepeatCounter(0)
 {
 	SetLayout(new BGroupLayout(B_VERTICAL, 0.0));
 
@@ -102,8 +103,15 @@ ConsoleWindow::MessageReceived(BMessage* message)
 			if (fAllMessages.size() > 500)
 				fAllMessages.pop_front();
 
-			if (!IsHidden())
-				_UpdateMessageList();
+			if (!IsHidden()) {
+				_AppendMessage(msg);
+				// Periodically re-sync list to prevent unbounded growth from collapsed items
+				// or drift from deque popping
+				if (fMessagesListView->CountItems() > 2000)
+					_UpdateMessageList();
+				else if (fMessagesListView->CountItems() > 0)
+					fMessagesListView->ScrollTo(fMessagesListView->CountItems() - 1);
+			}
 			break;
 		}
 		case CLEAR_CONSOLE_MESSAGES:
@@ -195,48 +203,55 @@ ConsoleWindow::_UpdateMessageList()
 	for (int32 i = count - 1; i >= 0; i--)
 		delete fMessagesListView->RemoveItem(i);
 
+	fPreviousText = "";
+	fRepeatCounter = 0;
+
+	for (std::deque<ConsoleMessage>::iterator it = fAllMessages.begin();
+			it != fAllMessages.end(); ++it) {
+		_AppendMessage(*it);
+	}
+
+	if (fMessagesListView->CountItems() > 0)
+		fMessagesListView->ScrollTo(fMessagesListView->CountItems() - 1);
+}
+
+
+void
+ConsoleWindow::_AppendMessage(const ConsoleMessage& message)
+{
 	bool errorsOnly = fErrorsOnlyCheckBox->Value() == B_CONTROL_ON;
-	BString previousText = "";
-	int32 repeatCounter = 0;
+
+	if (errorsOnly && !message.isError)
+		return;
 
 	static BStringFormat repeatFormat(B_TRANSLATE("{0, plural,"
 		"one{Last line repeated # time.}"
 		"other{Last line repeated # times.}}"));
 
-	for (std::deque<ConsoleMessage>::iterator it = fAllMessages.begin();
-			it != fAllMessages.end(); ++it) {
+	BString finalText;
+	finalText.SetToFormat("%s:%" B_PRIi32 ":%" B_PRIi32 ": %s\n",
+		message.source.String(), message.line, message.column, message.text.String());
 
-		if (errorsOnly && !it->isError)
-			continue;
+	if (finalText == fPreviousText) {
+		fRepeatCounter++;
+		BString repeatText;
+		repeatFormat.Format(repeatText, fRepeatCounter);
+		repeatText += "\n";
 
-		BString finalText;
-		finalText.SetToFormat("%s:%" B_PRIi32 ":%" B_PRIi32 ": %s\n",
-			it->source.String(), it->line, it->column, it->text.String());
-
-		if (finalText == previousText) {
-			repeatCounter++;
-			BString repeatText;
-			repeatFormat.Format(repeatText, repeatCounter);
-			repeatText += "\n";
-
-			int32 lastIdx = fMessagesListView->CountItems() - 1;
-			if (lastIdx >= 0) {
-				if (repeatCounter > 1) {
-					// Update existing repeat message
-					BStringItem* item = (BStringItem*)fMessagesListView->ItemAt(lastIdx);
-					item->SetText(repeatText.String());
-				} else {
-					// Add new repeat message
-					fMessagesListView->AddItem(new BStringItem(repeatText.String()));
-				}
+		int32 lastIdx = fMessagesListView->CountItems() - 1;
+		if (lastIdx >= 0) {
+			if (fRepeatCounter > 1) {
+				// Update existing repeat message
+				BStringItem* item = (BStringItem*)fMessagesListView->ItemAt(lastIdx);
+				item->SetText(repeatText.String());
+			} else {
+				// Add new repeat message
+				fMessagesListView->AddItem(new BStringItem(repeatText.String()));
 			}
-		} else {
-			previousText = finalText;
-			repeatCounter = 0;
-			fMessagesListView->AddItem(new BStringItem(finalText.String()));
 		}
+	} else {
+		fPreviousText = finalText;
+		fRepeatCounter = 0;
+		fMessagesListView->AddItem(new BStringItem(finalText.String()));
 	}
-
-	if (fMessagesListView->CountItems() > 0)
-		fMessagesListView->ScrollTo(fMessagesListView->CountItems() - 1);
 }
