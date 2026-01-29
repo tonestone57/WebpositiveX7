@@ -42,6 +42,7 @@ const uint32 kRenameBookmarkMsg = 'rena';
 const uint32 kFolderMsg = 'fold';
 
 const uint32 kMsgInitialBookmarksLoaded = 'ibld';
+const uint32 kMsgBookmarksLoadingFinished = 'blfi';
 
 struct LoaderParams {
 	node_ref dirRef;
@@ -134,6 +135,8 @@ LoadBookmarksThread(void* data)
 	} else {
 		delete items;
 	}
+
+	params->target.SendMessage(kMsgBookmarksLoadingFinished);
 
 	delete params;
 	return B_OK;
@@ -289,12 +292,14 @@ BookmarkBar::MessageReceived(BMessage* message)
 					delete data;
 				}
 				delete list;
-
-				if (addedAny) {
-					BRect rect = Bounds();
-					FrameResized(rect.Width(), rect.Height());
-				}
 			}
+			break;
+		}
+
+		case kMsgBookmarksLoadingFinished:
+		{
+			BRect rect = Bounds();
+			FrameResized(rect.Width(), rect.Height());
 			break;
 		}
 
