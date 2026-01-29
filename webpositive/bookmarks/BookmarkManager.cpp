@@ -394,8 +394,7 @@ BookmarkManager::_ExportBookmarksRecursively(BDirectory& directory, BFile& file,
 			continue;
 
 		BString indent;
-		for (int32 i = 0; i < indentLevel; i++)
-			indent << "    ";
+		indent.SetTo(' ', indentLevel * 4);
 
 		if (entry.IsDirectory()) {
 			BString folderName(name);
