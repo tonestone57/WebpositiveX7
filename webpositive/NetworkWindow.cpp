@@ -56,9 +56,13 @@ NetworkWindow::~NetworkWindow()
 		fTarget.SendMessage(NETWORK_WINDOW_CLOSED);
 
 	fPendingRequests.clear();
-	int32 count = fRequestListView->CountItems();
-	for (int32 i = count - 1; i >= 0; i--)
-		delete fRequestListView->RemoveItem(i);
+	// Items in fAllRequests own the memory
+	for (std::deque<NetworkRequestItem*>::iterator it = fAllRequests.begin();
+			it != fAllRequests.end(); ++it) {
+		delete *it;
+	}
+	fAllRequests.clear();
+	fRequestListView->MakeEmpty(); // List view doesn't own items anymore
 }
 
 void
@@ -72,39 +76,7 @@ NetworkWindow::MessageReceived(BMessage* message)
 				BString displayText;
 				displayText.SetToFormat("[Pending] %s (Headers: N/A)", url.String());
 				NetworkRequestItem* item = new NetworkRequestItem(displayText, url);
-				if (fRequestListView->AddItem(item)) {
-					try {
-						fPendingRequests[url].push_back(item);
-					} catch (...) {
-						// Ignore map insertion failure, item stays in list
-						fRequestListView->RemoveItem(item);
-						delete item;
-						return;
-					}
-
-					if (fRequestListView->CountItems() > 500) {
-						NetworkRequestItem* oldItem
-							= (NetworkRequestItem*)fRequestListView->ItemAt(0);
-						if (oldItem->IsPending()) {
-							std::deque<NetworkRequestItem*>& list
-								= fPendingRequests[oldItem->Url()];
-							// Robust removal: find and remove oldItem regardless of position
-							for (std::deque<NetworkRequestItem*>::iterator it = list.begin();
-									it != list.end(); ++it) {
-								if (*it == oldItem) {
-									list.erase(it);
-									break;
-								}
-							}
-							if (list.empty())
-								fPendingRequests.erase(oldItem->Url());
-						}
-						delete fRequestListView->RemoveItem(0);
-					}
-					fRequestListView->ScrollTo(fRequestListView->CountItems() - 1);
-				} else {
-					delete item;
-				}
+				_AppendRequest(item);
 			}
 			break;
 		}
@@ -126,8 +98,10 @@ NetworkWindow::MessageReceived(BMessage* message)
 					item->SetText(displayText);
 					item->SetPending(false);
 
-					fRequestListView->InvalidateItem(
-						fRequestListView->IndexOf(item));
+					if (!IsHidden()) {
+						fRequestListView->InvalidateItem(
+							fRequestListView->IndexOf(item));
+					}
 
 					it->second.pop_front();
 					if (it->second.empty())
@@ -139,9 +113,12 @@ NetworkWindow::MessageReceived(BMessage* message)
 		case CLEAR_NETWORK_REQUESTS:
 		{
 			fPendingRequests.clear();
-			int32 count = fRequestListView->CountItems();
-			for (int32 i = count - 1; i >= 0; i--)
-				delete fRequestListView->RemoveItem(i);
+			for (std::deque<NetworkRequestItem*>::iterator it = fAllRequests.begin();
+					it != fAllRequests.end(); ++it) {
+				delete *it;
+			}
+			fAllRequests.clear();
+			fRequestListView->MakeEmpty();
 			break;
 		}
 		default:
@@ -163,6 +140,15 @@ NetworkWindow::QuitRequested()
 
 
 void
+NetworkWindow::Show()
+{
+	if (IsHidden())
+		_UpdateList();
+	BWindow::Show();
+}
+
+
+void
 NetworkWindow::SetTarget(const BMessenger& target)
 {
 	fTarget = target;
@@ -173,4 +159,58 @@ void
 NetworkWindow::PrepareToQuit()
 {
 	fQuitting = true;
+}
+
+
+void
+NetworkWindow::_AppendRequest(NetworkRequestItem* item)
+{
+	try {
+		fAllRequests.push_back(item);
+		fPendingRequests[item->Url()].push_back(item);
+	} catch (...) {
+		delete item;
+		return;
+	}
+
+	if (fAllRequests.size() > 500) {
+		NetworkRequestItem* oldItem = fAllRequests.front();
+		if (oldItem->IsPending()) {
+			std::deque<NetworkRequestItem*>& list
+				= fPendingRequests[oldItem->Url()];
+			for (std::deque<NetworkRequestItem*>::iterator it = list.begin();
+					it != list.end(); ++it) {
+				if (*it == oldItem) {
+					list.erase(it);
+					break;
+				}
+			}
+			if (list.empty())
+				fPendingRequests.erase(oldItem->Url());
+		}
+		fAllRequests.pop_front();
+
+		if (!IsHidden())
+			fRequestListView->RemoveItem(0);
+
+		delete oldItem;
+	}
+
+	if (!IsHidden()) {
+		fRequestListView->AddItem(item);
+		fRequestListView->ScrollTo(fRequestListView->CountItems() - 1);
+	}
+}
+
+
+void
+NetworkWindow::_UpdateList()
+{
+	fRequestListView->MakeEmpty();
+	for (std::deque<NetworkRequestItem*>::iterator it = fAllRequests.begin();
+			it != fAllRequests.end(); ++it) {
+		fRequestListView->AddItem(*it);
+	}
+	if (fRequestListView->CountItems() > 0)
+		fRequestListView->ScrollTo(fRequestListView->CountItems() - 1);
 }

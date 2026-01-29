@@ -58,14 +58,20 @@ public:
 	virtual ~NetworkWindow();
 	virtual void MessageReceived(BMessage* message);
 	virtual bool QuitRequested();
+	virtual void Show();
 
 	void SetTarget(const BMessenger& target);
 	void PrepareToQuit();
 
 private:
+	void _AppendRequest(NetworkRequestItem* item);
+	void _UpdateList();
+
+private:
 	BListView* fRequestListView;
 	BButton* fClearButton;
 	std::map<BString, std::deque<NetworkRequestItem*> > fPendingRequests;
+	std::deque<NetworkRequestItem*> fAllRequests;
 	BMessenger fTarget;
 	bool fQuitting;
 };
