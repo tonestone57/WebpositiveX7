@@ -102,7 +102,8 @@ ConsoleWindow::MessageReceived(BMessage* message)
 			if (fAllMessages.size() > 500)
 				fAllMessages.pop_front();
 
-			_UpdateMessageList();
+			if (!IsHidden())
+				_UpdateMessageList();
 			break;
 		}
 		case CLEAR_CONSOLE_MESSAGES:
@@ -137,6 +138,15 @@ ConsoleWindow::QuitRequested()
 	if (!IsHidden())
 		Hide();
 	return false;
+}
+
+
+void
+ConsoleWindow::Show()
+{
+	if (IsHidden())
+		_UpdateMessageList();
+	BWindow::Show();
 }
 
 

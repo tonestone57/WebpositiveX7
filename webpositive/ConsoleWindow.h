@@ -27,6 +27,7 @@ public:
 
 	virtual	void				MessageReceived(BMessage* message);
 	virtual	bool				QuitRequested();
+	virtual	void				Show();
 
 			void				PrepareToQuit();
 
