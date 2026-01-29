@@ -130,6 +130,30 @@ struct DomainNode {
 };
 
 
+static DomainNode*
+PruneTree(DomainNode* node)
+{
+	std::map<BString, DomainNode*> newChildren;
+	std::map<BString, DomainNode*>::iterator it;
+
+	for (it = node->children.begin(); it != node->children.end(); ++it) {
+		DomainNode* child = it->second;
+		DomainNode* prunedChild = PruneTree(child);
+		newChildren[prunedChild->domain] = prunedChild;
+	}
+	node->children = newChildren;
+
+	if (node->fake && node->children.size() == 1) {
+		DomainNode* child = node->children.begin()->second;
+		node->children.clear();
+		delete node;
+		return child;
+	}
+
+	return node;
+}
+
+
 CookieWindow::CookieWindow(BRect frame,
 	BPrivate::Network::BNetworkCookieJar& jar)
 	:
@@ -407,6 +431,10 @@ CookieWindow::_BuildDomainList()
 				DomainItem* item = new DomainItem(child->domain, child->fake);
 				if (item == NULL)
 					continue;
+
+				if (child->fake)
+					item->SetEnabled(false);
+
 				item->SetOutlineLevel(level);
 				if (!list->AddItem(item)) {
 					delete item;
@@ -417,46 +445,26 @@ CookieWindow::_BuildDomainList()
 		}
 	};
 
+	std::map<BString, DomainNode*> optimizedChildren;
+	std::map<BString, DomainNode*>::iterator it;
+	for (it = rootNode->children.begin(); it != rootNode->children.end(); ++it) {
+		DomainNode* pruned = PruneTree(it->second);
+		optimizedChildren[pruned->domain] = pruned;
+	}
+	rootNode->children = optimizedChildren;
+
 	TreeFlattener::Flatten(rootNode.get(), fDomains, 0);
 
-	int32 i = 0;
-	int32 firstNotEmpty = i;
-	// Collapse empty items to keep the list short
-	while (i < fDomains->FullListCountItems())
-	{
-		DomainItem* item = (DomainItem*)fDomains->FullListItemAt(i);
-		if (item->fEmpty == true) {
-			if (fDomains->CountItemsUnder(item, true) == 1) {
-				// The item has no cookies, and only a single child. We can
-				// remove it and move its child one level up in the tree.
-
-				int32 count = fDomains->CountItemsUnder(item, false);
-				int32 index = fDomains->FullListIndexOf(item) + 1;
-				for (int32 j = 0; j < count; j++) {
-					BListItem* child = fDomains->FullListItemAt(index + j);
-					child->SetOutlineLevel(child->OutlineLevel() - 1);
-				}
-
-				fDomains->RemoveItem(item);
-				delete item;
-
-				// The moved child is at the same index the removed item was.
-				// We continue the loop without incrementing i to process it.
-				continue;
-			} else {
-				// The item has no cookies, but has multiple children. Mark it
-				// as disabled so it is not selectable.
-				item->SetEnabled(false);
-				if (i == firstNotEmpty)
-					firstNotEmpty++;
-			}
-		}
-
-		i++;
+	// Select first item if available
+	int32 firstSelectable = 0;
+	while (firstSelectable < fDomains->FullListCountItems()) {
+		if (fDomains->FullListItemAt(firstSelectable)->IsEnabled())
+			break;
+		firstSelectable++;
 	}
 
-	if (firstNotEmpty < fDomains->FullListCountItems())
-		fDomains->Select(firstNotEmpty);
+	if (firstSelectable < fDomains->FullListCountItems())
+		fDomains->Select(firstSelectable);
 }
 
 

@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 #include <vector>
 
@@ -22,7 +23,6 @@
 #include <Message.h>
 #include <MessageRunner.h>
 #include <Path.h>
-#include <Url.h>
 
 #include "BrowserApp.h"
 
@@ -635,10 +635,68 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 }
 
 
+static bool
+IsDomainMatch(const char* url, const char* targetDomain)
+{
+	// 1. Skip scheme
+	const char* start = strstr(url, "://");
+	if (start)
+		start += 3;
+	else
+		start = url;
+
+	// 2. Find end of authority
+	const char* end = start;
+	while (*end && *end != '/' && *end != '?' && *end != '#') {
+		end++;
+	}
+
+	// 3. Find host start (after userinfo)
+	const char* hostStart = start;
+	const char* at = start;
+	while (at < end) {
+		if (*at == '@')
+			hostStart = at + 1;
+		at++;
+	}
+
+	// 4. Find host end (before port)
+	const char* hostEnd = end;
+	// Check for IPv6 brackets
+	bool inBrackets = false;
+	const char* p = hostStart;
+	while (p < end) {
+		if (*p == '[') inBrackets = true;
+		else if (*p == ']') inBrackets = false;
+		else if (*p == ':' && !inBrackets) {
+			hostEnd = p;
+			break;
+		}
+		p++;
+	}
+
+	size_t hostLen = hostEnd - hostStart;
+	size_t targetLen = strlen(targetDomain);
+
+	if (hostLen < targetLen)
+		return false;
+
+	// 5. Compare
+	if (strncasecmp(hostStart + hostLen - targetLen, targetDomain, targetLen) == 0) {
+		if (hostLen == targetLen)
+			return true;
+		// Check for dot before domain
+		if (hostStart[hostLen - targetLen - 1] == '.')
+			return true;
+	}
+
+	return false;
+}
+
+
 void
 BrowsingHistory::_RemoveItemsForDomain(const char* domain)
 {
-	BString targetDomain(domain);
 	int32 writeIndex = 0;
 	bool changed = false;
 	int32 count = (int32)fHistoryList.size();
@@ -648,12 +706,8 @@ BrowsingHistory::_RemoveItemsForDomain(const char* domain)
 		bool remove = false;
 
 		// Fast pre-filter
-		if (item->URL().IFindFirst(targetDomain) >= 0) {
-			BUrl url(item->URL().String());
-			if (url.Host() == targetDomain ||
-				(url.Host().EndsWith(targetDomain) &&
-				 url.Host().Length() > targetDomain.Length() &&
-				 url.Host()[url.Host().Length() - targetDomain.Length() - 1] == '.')) {
+		if (item->URL().IFindFirst(domain) >= 0) {
+			if (IsDomainMatch(item->URL().String(), domain)) {
 				remove = true;
 			}
 		}

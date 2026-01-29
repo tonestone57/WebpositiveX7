@@ -43,21 +43,36 @@ URLHandler::IsValidDomainChar(char ch)
 		|| ch == '[' || ch == ']' || ch == '@';
 }
 
-/*static*/ BString
-URLHandler::_EncodeURIComponent(const BString& search)
+
+static bool
+ShouldEscape(char c)
 {
 	// We have to take care of some of the escaping before we hand over the
 	// search string to WebKit, if we want queries like "4+3" to not be
 	// searched as "4 3".
-	const BString escCharList = " $&`:<>[]{}\"+#%@/;=?\\^|~\',";
+	switch (c) {
+		case ' ': case '$': case '&': case '`': case ':': case '<': case '>':
+		case '[': case ']': case '{': case '}': case '"': case '+': case '#':
+		case '%': case '@': case '/': case ';': case '=': case '?': case '\\':
+		case '^': case '|': case '~': case '\'': case ',':
+			return true;
+		default:
+			return false;
+	}
+}
+
+
+/*static*/ BString
+URLHandler::_EncodeURIComponent(const BString& search)
+{
 	BString result;
-	char hexcode[4];
+	static const char* kHexChars = "0123456789ABCDEF";
 
 	for (int32 i = 0; i < search.Length(); i++) {
 		char c = search[i];
-		if (escCharList.FindFirst(c) != B_ERROR) {
-			sprintf(hexcode, "%%%02X", (unsigned int)(unsigned char)c);
-			result << hexcode;
+		if (ShouldEscape(c)) {
+			result << '%' << kHexChars[((unsigned char)c >> 4) & 0x0f]
+				<< kHexChars[(unsigned char)c & 0x0f];
 		} else {
 			result << c;
 		}
