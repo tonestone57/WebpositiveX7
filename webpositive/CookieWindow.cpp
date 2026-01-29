@@ -357,19 +357,23 @@ CookieWindow::_BuildDomainList()
 
 	std::map<BString, std::vector<BPrivate::Network::BNetworkCookie> >::iterator mapIt;
 	for (mapIt = fCookieMap.begin(); mapIt != fCookieMap.end(); ++mapIt) {
-		BString domain = mapIt->first;
+		const BString& domain = mapIt->first;
 
 		// Decompose domain into parts to build the tree.
 		// We want to process from root down to leaf.
 		// e.g. "mail.google.com" -> ["com", "google.com", "mail.google.com"]
 
 		std::vector<BString> path;
-		BString temp = domain;
+		int32 offset = 0;
+		int32 length = domain.Length();
 		while (true) {
-			path.push_back(temp);
-			int firstDot = temp.FindFirst('.');
+			BString part;
+			part.SetTo(domain.String() + offset, length - offset);
+			path.push_back(part);
+
+			int32 firstDot = domain.FindFirst('.', offset);
 			if (firstDot < 0) break;
-			temp.Remove(0, firstDot + 1);
+			offset = firstDot + 1;
 		}
 
 		DomainNode* current = rootNode.get();
