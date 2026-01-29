@@ -30,6 +30,8 @@ NetworkWindow::NetworkWindow(BRect frame)
 	SetLayout(new BGroupLayout(B_VERTICAL, 0.0));
 
 	fRequestListView = new BListView("Network requests");
+	// The list view is just a view, the data is owned by fAllRequests
+	fRequestListView->SetOwnership(false);
 
 	fClearButton = new BButton(B_TRANSLATE("Clear"),
 		new BMessage(CLEAR_NETWORK_REQUESTS));
