@@ -145,7 +145,8 @@ enum {
 	LOAD_INSECURE_CONFIRMED			= 'lisc',
 	OPEN_MANY_BOOKMARKS_CONFIRMED	= 'ombc',
 	FORM_SAFETY_ALERT_CONFIRMED		= 'fsac',
-	SELECT_TAB_BY_VIEW				= 'stbv'
+	SELECT_TAB_BY_VIEW				= 'stbv',
+	FAVICON_LOADED					= 'favl'
 };
 
 
