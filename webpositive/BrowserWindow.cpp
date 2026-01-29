@@ -208,6 +208,13 @@ struct FaviconSaveParams {
 };
 
 
+struct FaviconLoadParams {
+	BPath path;
+	BMessenger target;
+	uint32 tabId;
+};
+
+
 static status_t
 _SaveFaviconThread(void* data)
 {
@@ -238,6 +245,71 @@ _SaveFaviconThread(void* data)
 	}
 
 	delete params->icon;
+	delete params;
+	return B_OK;
+}
+
+
+static status_t
+_LoadFaviconThread(void* data)
+{
+	FaviconLoadParams* params = static_cast<FaviconLoadParams*>(data);
+
+	BFile file(params->path.Path(), B_READ_ONLY);
+	if (file.InitCheck() == B_OK) {
+		int32 width, height;
+		if (file.Read(&width, sizeof(width)) == sizeof(width) &&
+			file.Read(&height, sizeof(height)) == sizeof(height)) {
+
+			if (width > 0 && width < 256 && height > 0 && height < 256) {
+				// Verify file size matches expected packed size
+				off_t size;
+				file.GetSize(&size);
+				off_t expectedSize = sizeof(width) + sizeof(height) + (off_t)width * height * 4;
+
+				if (size >= expectedSize) {
+					// Use B_BITMAP_NO_SERVER_LINK for background thread safety
+					BBitmap* icon = new(std::nothrow) BBitmap(BRect(0, 0, width - 1, height - 1),
+						B_BITMAP_NO_SERVER_LINK, B_RGBA32);
+					if (icon != NULL && icon->InitCheck() == B_OK) {
+						// Ensure padding bytes are clear (fragility fix)
+						memset(icon->Bits(), 0, icon->BitsLength());
+
+						int32 bytesPerRow = icon->BytesPerRow();
+						int32 rowLen = width * 4;
+						uint8* bits = (uint8*)icon->Bits();
+						bool success = true;
+						for (int32 i = 0; i < height; i++) {
+							if (file.Read(bits + (i * bytesPerRow), rowLen) != rowLen) {
+								success = false;
+								break;
+							}
+						}
+						if (success) {
+							BMessage msg(FAVICON_LOADED);
+							msg.AddPointer("icon", icon);
+							msg.AddUInt32("tabId", params->tabId);
+							if (params->target.SendMessage(&msg) != B_OK) {
+								delete icon;
+							}
+						} else {
+							delete icon;
+						}
+					} else {
+						delete icon;
+					}
+				} else {
+					// Invalid size or legacy file with padding. Discard.
+					// We can't safely read legacy files because we don't know the original padding.
+					// Deleting the file forces a fresh fetch next time.
+					file.Unset();
+					BEntry entry(params->path.Path());
+					entry.Remove();
+				}
+			}
+		}
+	}
+
 	delete params;
 	return B_OK;
 }
@@ -1640,6 +1712,35 @@ BrowserWindow::MessageReceived(BMessage* message)
 				if (fTabManager->HasView(view))
 					fTabManager->SelectTab(view);
 			}
+			break;
+		}
+
+		case FAVICON_LOADED:
+		{
+			BBitmap* icon;
+			if (message->FindPointer("icon", (void**)&icon) != B_OK)
+				break;
+
+			uint32 tabId;
+			if (message->FindUInt32("tabId", &tabId) == B_OK) {
+				// Find view by ID
+				BWebView* view = NULL;
+				for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
+					BWebView* tab = dynamic_cast<BWebView*>(fTabManager->ViewForTab(i));
+					if (tab) {
+						PageUserData* userData = static_cast<PageUserData*>(tab->GetUserData());
+						if (userData && userData->Id() == tabId) {
+							view = tab;
+							break;
+						}
+					}
+				}
+
+				if (view) {
+					_SetPageIcon(view, icon, false);
+				}
+			}
+			delete icon;
 			break;
 		}
 
@@ -4267,48 +4368,25 @@ BrowserWindow::_LoadFavicon(const BString& url, BWebView* view)
 	if (_GetFaviconPath(url, path) != B_OK)
 		return;
 
-	BFile file(path.Path(), B_READ_ONLY);
-	if (file.InitCheck() == B_OK) {
-		int32 width, height;
-		if (file.Read(&width, sizeof(width)) == sizeof(width) &&
-			file.Read(&height, sizeof(height)) == sizeof(height)) {
+	FaviconLoadParams* params = new(std::nothrow) FaviconLoadParams;
+	if (params == NULL)
+		return;
 
-			if (width > 0 && width < 256 && height > 0 && height < 256) {
-				// Verify file size matches expected packed size
-				off_t size;
-				file.GetSize(&size);
-				off_t expectedSize = sizeof(width) + sizeof(height) + (off_t)width * height * 4;
+	params->path = path;
+	params->target = BMessenger(this);
 
-				if (size >= expectedSize) {
-					BBitmap* icon = new BBitmap(BRect(0, 0, width - 1, height - 1), B_RGBA32);
-					if (icon->InitCheck() == B_OK) {
-						// Ensure padding bytes are clear (fragility fix)
-						memset(icon->Bits(), 0, icon->BitsLength());
+	if (userData == NULL)
+		userData = _GetOrCreateUserData(view);
+	params->tabId = userData->Id();
 
-						int32 bytesPerRow = icon->BytesPerRow();
-						int32 rowLen = width * 4;
-						uint8* bits = (uint8*)icon->Bits();
-						bool success = true;
-						for (int32 i = 0; i < height; i++) {
-							if (file.Read(bits + (i * bytesPerRow), rowLen) != rowLen) {
-								success = false;
-								break;
-							}
-						}
-						if (success) {
-							_SetPageIcon(view, icon, false); // Don't save back to disk
-						}
-					}
-					delete icon;
-				} else {
-					// Invalid size or legacy file with padding. Discard.
-					// We can't safely read legacy files because we don't know the original padding.
-					// Deleting the file forces a fresh fetch next time.
-					file.Unset();
-					BEntry entry(path.Path());
-					entry.Remove();
-				}
-			}
+	thread_id thread = spawn_thread(_LoadFaviconThread, "Load Favicon",
+		B_LOW_PRIORITY, params);
+	if (thread >= 0) {
+		if (resume_thread(thread) != B_OK) {
+			kill_thread(thread);
+			delete params;
 		}
+	} else {
+		delete params;
 	}
 }
