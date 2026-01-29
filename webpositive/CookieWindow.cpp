@@ -457,7 +457,7 @@ CookieWindow::_BuildDomainList()
 
 
 void
-CookieWindow::_ShowCookiesForDomain(BString domain)
+CookieWindow::_ShowCookiesForDomain(const BString& domain)
 {
 	BString label;
 	label.SetToFormat(B_TRANSLATE("Cookies for %s"), domain.String());
