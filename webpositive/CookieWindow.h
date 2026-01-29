@@ -42,7 +42,7 @@ public:
 private:
 			void				_BuildDomainList();
 			void				_EmptyDomainList();
-			void				_ShowCookiesForDomain(BString domain);
+			void				_ShowCookiesForDomain(const BString& domain);
 			void				_DeleteCookies();
 
 private:
