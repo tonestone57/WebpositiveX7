@@ -348,6 +348,8 @@ FontSelectionView::UpdateFontsMenu()
 	font_style currentStyle;
 	font.GetFamilyAndStyle(&currentFamily, &currentStyle);
 
+	bool isFixed = strcmp(Name(), "fixed") == 0;
+
 	for (int32 i = 0; i < numFamilies; i++) {
 		font_family family;
 		uint32 flags;
@@ -356,7 +358,7 @@ FontSelectionView::UpdateFontsMenu()
 
 		// if we're setting the fixed font, we only want to show fixed and
 		// full-and-half-fixed fonts
-		if (strcmp(Name(), "fixed") == 0
+		if (isFixed
 			&& (flags & (B_IS_FIXED | B_PRIVATE_FONT_IS_FULL_AND_HALF_FIXED)) == 0) {
 			continue;
 		}
