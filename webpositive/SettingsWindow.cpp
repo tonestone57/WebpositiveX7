@@ -1175,7 +1175,9 @@ SettingsWindow::_UpdateProxySettings()
 	passwordKey.SetIdentifier("ProxySettings");
 	passwordKey.SetPassword(password);
 	passwordKey.SetPurpose(B_KEY_PURPOSE_WEB);
-	keyStore.AddKey("WebPositive", passwordKey);
+	status_t status = keyStore.AddKey("WebPositive", passwordKey);
+	if (status != B_OK)
+		fprintf(stderr, "Failed to store proxy password: %s\n", strerror(status));
 
 	// Clear sensitive password from UI control
 	// Note: We need to use the password for SetProxyInfo before clearing,
