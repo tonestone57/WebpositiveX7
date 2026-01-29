@@ -15,6 +15,7 @@
 #include <NodeInfo.h>
 #include <Roster.h>
 #include <stdio.h>
+#include <strings.h>
 
 #include <vector>
 
@@ -511,29 +512,27 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 	BString pendingFolderName;
 
 	int32 pos = 0;
+	const char* contentStr = content.String();
+
 	while (pos < content.Length()) {
 		int32 tagStart = content.FindFirst("<", pos);
 		if (tagStart < 0) break;
 		int32 tagEnd = content.FindFirst(">", tagStart);
 		if (tagEnd < 0) break;
 
-		BString tag = content.String() + tagStart + 1;
-		tag.Truncate(tagEnd - tagStart - 1);
-		BString tagUpper = tag;
-		tagUpper.ToUpper();
+		const char* tagData = contentStr + tagStart + 1;
+		int32 tagLen = tagEnd - tagStart - 1;
 
-		if (tagUpper.StartsWith("DT")) {
+		if (tagLen >= 2 && strncasecmp(tagData, "DT", 2) == 0) {
 			// Found DT, look for H3 or A in next tag
 			int32 nextTagStart = content.FindFirst("<", tagEnd);
 			if (nextTagStart > 0) {
 				int32 nextTagEnd = content.FindFirst(">", nextTagStart);
 				if (nextTagEnd > 0) {
-					BString nextTag = content.String() + nextTagStart + 1;
-					nextTag.Truncate(nextTagEnd - nextTagStart - 1);
-					BString nextTagUpper = nextTag;
-					nextTagUpper.ToUpper();
+					const char* nextTagData = contentStr + nextTagStart + 1;
+					int32 nextTagLen = nextTagEnd - nextTagStart - 1;
 
-					if (nextTagUpper.StartsWith("H3")) {
+					if (nextTagLen >= 2 && strncasecmp(nextTagData, "H3", 2) == 0) {
 						// Folder name
 						BString endTag = "</H3>";
 						int32 closeH3 = content.IFindFirst(endTag, nextTagEnd);
@@ -552,9 +551,11 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 							pos = closeH3 + 5;
 							continue;
 						}
-					} else if (nextTagUpper.StartsWith("A")) {
+					} else if (nextTagLen >= 1 && strncasecmp(nextTagData, "A", 1) == 0) {
 						// Bookmark
-						BString tagContent = nextTag;
+						BString tagContent;
+						tagContent.SetTo(nextTagData, nextTagLen);
+
 						BString url = _ExtractAttribute(tagContent, "HREF");
 						if (url.Length() > 0) {
 							int32 closeA = content.IFindFirst("</A>", nextTagEnd);
@@ -577,7 +578,7 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 					}
 				}
 			}
-		} else if (tagUpper.StartsWith("DL")) {
+		} else if (tagLen >= 2 && strncasecmp(tagData, "DL", 2) == 0) {
 			if (!pendingFolderName.IsEmpty()) {
 				BPath currentPath = dirStack.back();
 				currentPath.Append(pendingFolderName);
@@ -585,7 +586,7 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 				dirStack.push_back(currentPath);
 				pendingFolderName = "";
 			}
-		} else if (tagUpper.StartsWith("/DL")) {
+		} else if (tagLen >= 3 && strncasecmp(tagData, "/DL", 3) == 0) {
 			if (dirStack.size() > 1)
 				dirStack.pop_back();
 		}
