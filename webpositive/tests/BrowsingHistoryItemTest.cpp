@@ -86,6 +86,54 @@ int main()
 	assert(itemB > itemA);
 	printf("Test 4 Passed: Sorting by URL\n");
 
+	// Test Serialization (New Format)
+	{
+		BString url("http://www.haiku-os.org");
+		BrowsingHistoryItem item(url);
+		item.SetInvocationCount(5);
+		// Set a specific time (e.g. 1000 seconds since epoch)
+		BDateTime dt;
+		dt.SetTime_t(1000);
+		item.SetDateTime(dt);
+
+		BMessage archive;
+		assert(item.Archive(&archive) == B_OK);
+
+		// Verify fields
+		int64 t;
+		assert(archive.FindInt64("date_val", &t) == B_OK);
+		assert(t == 1000);
+
+		BMessage sub;
+		assert(archive.FindMessage("date time", &sub) != B_OK); // Should NOT have old format
+
+		// Unarchive
+		BrowsingHistoryItem item2(&archive);
+		assert(item2 == item);
+		assert(item2.DateTime().Time_t() == 1000);
+		printf("Test 5 Passed: Serialization (New Format)\n");
+	}
+
+	// Test Serialization (Legacy Format)
+	{
+		BString url("http://old.com");
+		BMessage archive;
+		archive.AddString("url", url);
+		archive.AddUInt32("invokations", 3);
+
+		BDateTime dt;
+		dt.SetTime_t(2000);
+		BMessage dtMsg;
+		dt.Archive(&dtMsg); // Uses BDateTime::Archive
+		archive.AddMessage("date time", &dtMsg);
+
+		BrowsingHistoryItem item(&archive);
+		assert(item.URL() == url);
+		assert(item.InvocationCount() == 3);
+		assert(item.DateTime().Time_t() == 2000);
+		printf("Test 6 Passed: Serialization (Legacy Format)\n");
+	}
+
 	printf("All BrowsingHistoryItem tests passed!\n");
 	return 0;
 }

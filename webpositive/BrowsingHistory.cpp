@@ -49,9 +49,16 @@ BrowsingHistoryItem::BrowsingHistoryItem(const BMessage* archive)
 {
 	if (!archive)
 		return;
-	BMessage dateTimeArchive;
-	if (archive->FindMessage("date time", &dateTimeArchive) == B_OK)
-		fDateTime = BDateTime(&dateTimeArchive);
+
+	int64 timeVal;
+	if (archive->FindInt64("date_val", &timeVal) == B_OK) {
+		fDateTime.SetTime_t((time_t)timeVal);
+	} else {
+		BMessage dateTimeArchive;
+		if (archive->FindMessage("date time", &dateTimeArchive) == B_OK)
+			fDateTime = BDateTime(&dateTimeArchive);
+	}
+
 	archive->FindString("url", &fURL);
 	archive->FindUInt32("invokations", &fInvocationCount);
 }
@@ -67,10 +74,9 @@ BrowsingHistoryItem::Archive(BMessage* archive) const
 {
 	if (!archive)
 		return B_BAD_VALUE;
-	BMessage dateTimeArchive;
-	status_t status = fDateTime.Archive(&dateTimeArchive);
-	if (status == B_OK)
-		status = archive->AddMessage("date time", &dateTimeArchive);
+
+	status_t status = archive->AddInt64("date_val", (int64)fDateTime.Time_t());
+
 	if (status == B_OK)
 		status = archive->AddString("url", fURL.String());
 	if (status == B_OK)
