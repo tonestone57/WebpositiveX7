@@ -78,6 +78,27 @@ int main()
 	assert(outURL == "http://127.0.0.1");
 	printf("Test 7 Passed: IP Address\n");
 
+	// Test 8: Complex Encoding
+	input = "duck a+b/c";
+	searchPageURL = "https://duckduckgo.com/?q=%s";
+	// "duck " triggers search engine? No, "duck" is not a shortcut in mock kSearchEngines.
+	// CheckURL logic: "duck a+b/c" -> no protocol, no dots -> _VisitSearchEngine -> default search URL
+	// Search query: "duck a+b/c"
+	// Encoding: space -> %20 (or +?), + -> %2B, / -> %2F
+	// ShouldEscape returns true for ' ', '+', '/'
+	// So "duck%20a%2Bb%2Fc"
+
+	action = URLHandler::CheckURL(input, outURL, searchPageURL);
+	assert(action == URLHandler::LOAD_URL);
+
+	// Construct expected manually to verify
+	BString expected = "https://duckduckgo.com/?q=duck%20a%2Bb%2Fc";
+	if (outURL != expected) {
+		printf("Test 8 Failed: Expected '%s', Got '%s'\n", expected.String(), outURL.String());
+	}
+	assert(outURL == expected);
+	printf("Test 8 Passed: Complex Encoding\n");
+
 	printf("All tests passed!\n");
 	return 0;
 }
