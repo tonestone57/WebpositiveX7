@@ -141,7 +141,7 @@ PruneTree(DomainNode* node)
 		DomainNode* child = it->second;
 		DomainNode* prunedChild = PruneTree(child);
 
-		if (prunedChild != child) {
+		if (it->first != prunedChild->domain) {
 			keysToRemove.push_back(it->first);
 			nodesToInsert.push_back(prunedChild);
 		}
@@ -462,7 +462,7 @@ CookieWindow::_BuildDomainList()
 	std::map<BString, DomainNode*>::iterator it;
 	for (it = rootNode->children.begin(); it != rootNode->children.end(); ++it) {
 		DomainNode* pruned = PruneTree(it->second);
-		if (pruned != it->second) {
+		if (it->first != pruned->domain) {
 			keysToRemove.push_back(it->first);
 			nodesToInsert.push_back(pruned);
 		}

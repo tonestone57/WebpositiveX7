@@ -5,7 +5,9 @@
 #include <iostream>
 #include <string>
 
-// Include mocks explicitly to define static members/implementations
+// Include mocks explicitly to define static members/implementations.
+// Note: These must be included before any source files that might include the real system headers
+// to ensure the mocks take precedence in this test environment.
 #include "File.h"
 #include "Directory.h"
 #include "NetworkCookieJar.h"
