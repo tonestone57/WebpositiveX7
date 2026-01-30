@@ -258,17 +258,29 @@ BookmarkBar::MessageReceived(BMessage* message)
 						// Optimize batch loading by adding directly to the overflow menu if we
 						// know the bar is full.
 						if (CountItems() > 0) {
-							BMenuItem* last = ItemAt(CountItems() - 1);
-							float maxRight = Bounds().Width();
-							if (IndexOf(fOverflowMenu) != B_ERROR || fOverflowMenu->CountItems() > 0)
-								maxRight -= 32;
-
-							if (last->Frame().right > maxRight) {
+							// Optimization: if we already have items in overflow, we are definitely full.
+							// This avoids calculating Frame() (which triggers layout) for every item
+							// when we are already overflowing.
+							if (fOverflowMenu->CountItems() > 0) {
 								if (fOverflowMenu->AddItem(item))
 									addedToOverflow = true;
 								else {
 									delete item;
 									continue;
+								}
+							} else {
+								BMenuItem* last = ItemAt(CountItems() - 1);
+								float maxRight = Bounds().Width();
+								if (IndexOf(fOverflowMenu) != B_ERROR || fOverflowMenu->CountItems() > 0)
+									maxRight -= 32;
+
+								if (last->Frame().right > maxRight) {
+									if (fOverflowMenu->AddItem(item))
+										addedToOverflow = true;
+									else {
+										delete item;
+										continue;
+									}
 								}
 							}
 						}
@@ -744,17 +756,26 @@ BookmarkBar::_AddItem(ino_t inode, BEntry* entry, bool layout)
 	// know the bar is full. This avoids the O(n^2) behavior of FrameResized
 	// moving items one by one to the overflow menu.
 	if (!layout && CountItems() > 0) {
-		BMenuItem* last = ItemAt(CountItems() - 1);
-		float maxRight = Bounds().Width();
-		if (IndexOf(fOverflowMenu) != B_ERROR || fOverflowMenu->CountItems() > 0)
-			maxRight -= 32;
-
-		if (last->Frame().right > maxRight) {
+		if (fOverflowMenu->CountItems() > 0) {
 			if (fOverflowMenu->AddItem(item))
 				addedToOverflow = true;
 			else {
 				delete item;
 				return;
+			}
+		} else {
+			BMenuItem* last = ItemAt(CountItems() - 1);
+			float maxRight = Bounds().Width();
+			if (IndexOf(fOverflowMenu) != B_ERROR || fOverflowMenu->CountItems() > 0)
+				maxRight -= 32;
+
+			if (last->Frame().right > maxRight) {
+				if (fOverflowMenu->AddItem(item))
+					addedToOverflow = true;
+				else {
+					delete item;
+					return;
+				}
 			}
 		}
 	}
