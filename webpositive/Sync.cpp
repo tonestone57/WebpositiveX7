@@ -80,8 +80,9 @@ Sync::ExportCookies(const BPath& path,
 
 	BPrivate::Network::BNetworkCookieJar::Iterator it = cookieJar.GetIterator();
 	const BPrivate::Network::BNetworkCookie* cookie;
+	BString line;
 	while ((cookie = it.Next()) != NULL) {
-		BString line;
+		line.Truncate(0);
 
 		// domain
 		if (cookie->HttpOnly())

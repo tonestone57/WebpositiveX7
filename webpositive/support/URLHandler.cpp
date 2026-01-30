@@ -65,19 +65,38 @@ ShouldEscape(char c)
 /*static*/ BString
 URLHandler::_EncodeURIComponent(const BString& search)
 {
-	BString result;
-	static const char* kHexChars = "0123456789ABCDEF";
+	int32 length = search.Length();
+	int32 encodedLength = 0;
 
-	for (int32 i = 0; i < search.Length(); i++) {
+	// First pass: calculate required length
+	for (int32 i = 0; i < length; i++) {
+		if (ShouldEscape(search[i]))
+			encodedLength += 3;
+		else
+			encodedLength++;
+	}
+
+	BString result;
+	char* buffer = result.LockBuffer(encodedLength);
+	if (buffer == NULL)
+		return result;
+
+	static const char* kHexChars = "0123456789ABCDEF";
+	int32 outIndex = 0;
+
+	// Second pass: encode
+	for (int32 i = 0; i < length; i++) {
 		char c = search[i];
 		if (ShouldEscape(c)) {
-			result << '%' << kHexChars[((unsigned char)c >> 4) & 0x0f]
-				<< kHexChars[(unsigned char)c & 0x0f];
+			buffer[outIndex++] = '%';
+			buffer[outIndex++] = kHexChars[((unsigned char)c >> 4) & 0x0f];
+			buffer[outIndex++] = kHexChars[(unsigned char)c & 0x0f];
 		} else {
-			result << c;
+			buffer[outIndex++] = c;
 		}
 	}
 
+	result.UnlockBuffer(encodedLength);
 	return result;
 }
 

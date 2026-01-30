@@ -1,34 +1,82 @@
+#include <assert.h>
 #include <stdio.h>
-#include <vector>
+#include <string.h> // Ensure system headers are found first or available
+#include <stdlib.h> // Ensure system headers are found first or available
+#include <iostream>
 #include <string>
 
-// Mocks must be included before the class we test if we want to override things,
-// but here we are linking against the class source which includes mocks.
-#include "../Sync.h"
-#include "../bookmarks/BookmarkManager.h"
-#include "../BrowsingHistory.h"
+// Include mocks explicitly to define static members/implementations.
+// Note: These must be included before any source files that might include the real system headers
+// to ensure the mocks take precedence in this test environment.
+#include "File.h"
+#include "Directory.h"
+#include "NetworkCookieJar.h"
+#include "BookmarkManager.h"
+#include "BrowsingHistory.h"
 
-// We need to subclass or mock BNetworkCookieJar.
-// It is in BPrivate::Network namespace.
-// But it is not a virtual interface usually.
-// Let's see how I can mock it.
-// In the source code I included <NetworkCookieJar.h>.
-// I should create a mock for it in tests/mocks/NetworkCookieJar.h
+// Define static content for BFile mock
+std::string BFile::content = "";
 
-// Wait, I can't easily add a mock for NetworkCookieJar if it is not already mocked.
-// I will check if it exists in mocks.
-// It does not.
+// Define create_directory mock
+status_t create_directory(const char* path, mode_t mode) { return B_OK; }
+
+// Include the source file under test.
+#include "../Sync.cpp"
 
 int main() {
     printf("Running SyncTest...\n");
-    // TODO: Implement tests.
-    // Given the complexity of mocking Haiku file system and Network stack from scratch,
-    // and that existing tests use a specific set of mocks,
-    // I will rely on the fact that I reviewed the code and it compiles.
-    // The existing mocks for BFile/BDirectory are quite simple (empty implementations mostly).
-    // So functional testing of file IO is not really possible with current mocks
-    // without extending them significantly to store data in memory.
 
-    printf("SyncTest skipped due to mock limitations.\n");
+    BPrivate::Network::BNetworkCookieJar jar;
+
+    // Add some cookies
+    BPrivate::Network::BNetworkCookie c1;
+    c1.SetDomain("example.com");
+    c1.SetPath("/");
+    c1.SetName("session");
+    c1.SetValue("12345");
+    c1.SetSecure(true);
+    c1.SetHttpOnly(true);
+    c1.SetHostOnly(false);
+    c1.SetExpirationDate(1700000000);
+    jar.AddCookie(c1);
+
+    BPrivate::Network::BNetworkCookie c2;
+    c2.SetDomain("test.org");
+    c2.SetPath("/foo");
+    c2.SetName("tracking");
+    c2.SetValue("abc");
+    c2.SetSecure(false);
+    c2.SetHttpOnly(false);
+    c2.SetHostOnly(true);
+    c2.SetExpirationDate(1800000000);
+    jar.AddCookie(c2);
+
+    BPath path("/tmp/cookies.txt");
+    BFile::content = ""; // Clear buffer
+
+    status_t status = Sync::ExportCookies(path, jar);
+
+    assert(status == B_OK);
+
+    // Verify content
+    // Header
+    assert(BFile::content.find("# Netscape HTTP Cookie File") != std::string::npos);
+
+    // Cookie 1
+    std::string line1 = "#HttpOnly_example.com\tTRUE\t/\tTRUE\t1700000000\tsession\t12345";
+    if (BFile::content.find(line1) == std::string::npos) {
+        printf("FAILED: Could not find line1\n");
+        printf("Content:\n%s\n", BFile::content.c_str());
+        return 1;
+    }
+
+    // Cookie 2
+    std::string line2 = "test.org\tFALSE\t/foo\tFALSE\t1800000000\ttracking\tabc";
+    if (BFile::content.find(line2) == std::string::npos) {
+        printf("FAILED: Could not find line2\n");
+        return 1;
+    }
+
+    printf("SyncTest Passed!\n");
     return 0;
 }
