@@ -173,6 +173,8 @@ public:
 // Prevent including real headers
 #define _DIRECTORY_H
 #define _FILE_H
+#define _PATH_H
+#define _FIND_DIRECTORY_H
 #define _NETWORK_COOKIE_H
 #define _NETWORK_COOKIE_JAR_H
 #define _STRING_H

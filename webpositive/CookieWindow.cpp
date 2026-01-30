@@ -133,15 +133,27 @@ struct DomainNode {
 static DomainNode*
 PruneTree(DomainNode* node)
 {
-	std::map<BString, DomainNode*> newChildren;
+	std::vector<BString> keysToRemove;
+	std::vector<DomainNode*> nodesToInsert;
 	std::map<BString, DomainNode*>::iterator it;
 
 	for (it = node->children.begin(); it != node->children.end(); ++it) {
 		DomainNode* child = it->second;
 		DomainNode* prunedChild = PruneTree(child);
-		newChildren[prunedChild->domain] = prunedChild;
+
+		if (prunedChild != child) {
+			keysToRemove.push_back(it->first);
+			nodesToInsert.push_back(prunedChild);
+		}
 	}
-	node->children = newChildren;
+
+	if (!keysToRemove.empty()) {
+		for (size_t i = 0; i < keysToRemove.size(); i++)
+			node->children.erase(keysToRemove[i]);
+
+		for (size_t i = 0; i < nodesToInsert.size(); i++)
+			node->children[nodesToInsert[i]->domain] = nodesToInsert[i];
+	}
 
 	if (node->fake && node->children.size() == 1) {
 		DomainNode* child = node->children.begin()->second;
@@ -445,13 +457,24 @@ CookieWindow::_BuildDomainList()
 		}
 	};
 
-	std::map<BString, DomainNode*> optimizedChildren;
+	std::vector<BString> keysToRemove;
+	std::vector<DomainNode*> nodesToInsert;
 	std::map<BString, DomainNode*>::iterator it;
 	for (it = rootNode->children.begin(); it != rootNode->children.end(); ++it) {
 		DomainNode* pruned = PruneTree(it->second);
-		optimizedChildren[pruned->domain] = pruned;
+		if (pruned != it->second) {
+			keysToRemove.push_back(it->first);
+			nodesToInsert.push_back(pruned);
+		}
 	}
-	rootNode->children = optimizedChildren;
+
+	if (!keysToRemove.empty()) {
+		for (size_t i = 0; i < keysToRemove.size(); i++)
+			rootNode->children.erase(keysToRemove[i]);
+
+		for (size_t i = 0; i < nodesToInsert.size(); i++)
+			rootNode->children[nodesToInsert[i]->domain] = nodesToInsert[i];
+	}
 
 	TreeFlattener::Flatten(rootNode.get(), fDomains, 0);
 
