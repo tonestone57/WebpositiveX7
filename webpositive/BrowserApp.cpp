@@ -84,7 +84,7 @@ static void write_int(int fd, const char* label, long long value)
 	char buffer[32];
 	int i = 0;
 	bool neg = value < 0;
-	unsigned long long v = neg ? -value : value;
+	unsigned long long v = neg ? 0 - (unsigned long long)value : (unsigned long long)value;
 	if (v == 0) buffer[i++] = '0';
 	while (v > 0) {
 		buffer[i++] = (v % 10) + '0';
@@ -168,7 +168,7 @@ BrowserApp::BrowserApp()
 		snprintf(sCrashLogPath, sizeof(sCrashLogPath), "%s/WebPositive_Crash.log", desktopPath.Path());
 	} else {
 		// Fallback
-		strncpy(sCrashLogPath, "/boot/home/Desktop/WebPositive_Crash.log", sizeof(sCrashLogPath));
+		snprintf(sCrashLogPath, sizeof(sCrashLogPath), "/boot/home/Desktop/WebPositive_Crash.log");
 	}
 
 	BString cookieStorePath = kApplicationName;
@@ -481,10 +481,10 @@ BrowserApp::MessageReceived(BMessage* message)
 		break;
 	}
 	case NEW_TAB: {
-		BrowserWindow* window;
-		if (message->FindPointer("window",
-			reinterpret_cast<void**>(&window)) != B_OK)
+		void* windowPtr = NULL;
+		if (message->FindPointer("window", &windowPtr) != B_OK)
 			break;
+		BrowserWindow* window = static_cast<BrowserWindow*>(windowPtr);
 		BString url;
 		message->FindString("url", &url);
 		bool select = false;
@@ -670,8 +670,9 @@ BrowserApp::_RefsReceived(BMessage* message, int32* _pagesCreated,
 		pagesCreated = *_pagesCreated;
 
 	BrowserWindow* window = NULL;
-	if (message->FindPointer("window", (void**)&window) != B_OK)
-		window = NULL;
+	void* windowPtr = NULL;
+	if (message->FindPointer("window", &windowPtr) == B_OK)
+		window = static_cast<BrowserWindow*>(windowPtr);
 
 	bool fullscreen;
 	if (message->FindBool("fullscreen", &fullscreen) != B_OK)

@@ -642,14 +642,20 @@ DownloadProgressView::MessageReceived(BMessage* message)
 					dev_t device;
 					ino_t directory;
 					const char* name;
-					if (message->FindInt32("device",
-							reinterpret_cast<int32*>(&device)) != B_OK
-						|| message->FindInt64("to directory",
-							reinterpret_cast<int64*>(&directory)) != B_OK
+
+					int32 deviceID;
+					int64 directoryID;
+
+					if (message->FindInt32("device", &deviceID) != B_OK
+						|| message->FindInt64("to directory", &directoryID) != B_OK
 						|| message->FindString("name", &name) != B_OK
 						|| strlen(name) == 0) {
 						break;
 					}
+
+					device = (dev_t)deviceID;
+					directory = (ino_t)directoryID;
+
 					// Construct the BEntry and update fPath
 					entry_ref ref(device, directory, name);
 					BEntry entry(&ref);

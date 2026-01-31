@@ -222,7 +222,7 @@ SettingsWindow::MessageReceived(BMessage* message)
 		case MSG_SEARCH_PAGE_CHANGED_MENU:
 		{
 			BString searchString;
-			BMenuItem* source;
+			void* sourcePtr = NULL;
 			if (message->FindString("searchstring", &searchString) == B_OK) {
 				fSearchPageControl->SetText(searchString);
 				fSearchPageControl->SetEnabled(false);
@@ -231,8 +231,8 @@ SettingsWindow::MessageReceived(BMessage* message)
 			} else
 				fSearchPageControl->SetEnabled(true);
 
-			if (message->FindPointer("source", (void**)&source) == B_OK)
-				source->SetMarked(true);
+			if (message->FindPointer("source", &sourcePtr) == B_OK)
+				static_cast<BMenuItem*>(sourcePtr)->SetMarked(true);
 
 			_ValidateControlsEnabledStatus();
 			break;

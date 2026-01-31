@@ -1713,8 +1713,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case SELECT_TAB_BY_VIEW:
 		{
-			BView* view = NULL;
-			if (message->FindPointer("view", (void**)&view) == B_OK) {
+			void* viewPtr = NULL;
+			if (message->FindPointer("view", &viewPtr) == B_OK) {
+				BView* view = static_cast<BView*>(viewPtr);
 				if (fTabManager->HasView(view))
 					fTabManager->SelectTab(view);
 			}
@@ -1723,9 +1724,10 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case FAVICON_LOADED:
 		{
-			BBitmap* icon;
-			if (message->FindPointer("icon", (void**)&icon) != B_OK)
+			void* iconPtr = NULL;
+			if (message->FindPointer("icon", &iconPtr) != B_OK)
 				break;
+			BBitmap* icon = static_cast<BBitmap*>(iconPtr);
 
 			uint32 tabId;
 			if (message->FindUInt32("tabId", &tabId) == B_OK) {
@@ -1945,10 +1947,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case B_EDITING_CAPABILITIES_RESULT:
 		{
-			BWebView* webView;
-			if (message->FindPointer("view",
-					reinterpret_cast<void**>(&webView)) != B_OK
-				|| webView != CurrentWebView()) {
+			void* webViewPtr = NULL;
+			if (message->FindPointer("view", &webViewPtr) != B_OK
+				|| static_cast<BWebView*>(webViewPtr) != CurrentWebView()) {
 				break;
 			}
 			bool canCut;
@@ -2368,8 +2369,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 		{
 			fButtonResetRunner.reset();
 
-			BButton* button = NULL;
-			if (message->FindPointer("button", (void**)&button) == B_OK) {
+			void* buttonPtr = NULL;
+			if (message->FindPointer("button", &buttonPtr) == B_OK) {
+				BButton* button = static_cast<BButton*>(buttonPtr);
 				button->SetValue(B_CONTROL_OFF);
 			}
 			break;

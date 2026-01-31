@@ -36,9 +36,7 @@
 #include "WebView.h"
 #include "WebWindow.h"
 
-#ifndef B_RGBA32_TYPE
-#define B_RGBA32_TYPE 'RGBA'
-#endif
+#include "support/WebConstants.h"
 
 
 #undef B_TRANSLATION_CONTEXT
@@ -79,7 +77,7 @@ class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
 	{
 		int32 count = CountChoices();
 		for (int32 i = 0; i < count; i++) {
-			delete reinterpret_cast<BAutoCompleter::Choice*>(
+			delete static_cast<BAutoCompleter::Choice*>(
 				fChoices.ItemAtFast(i));
 		}
 		fChoices.MakeEmpty();
@@ -127,16 +125,16 @@ class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
 
 	virtual const BAutoCompleter::Choice* ChoiceAt(int32 index) const
 	{
-		return reinterpret_cast<BAutoCompleter::Choice*>(
+		return static_cast<BAutoCompleter::Choice*>(
 			fChoices.ItemAt(index));
 	}
 
 	static int _CompareChoices(const void* a, const void* b)
 	{
 		const URLChoice* aChoice
-			= *reinterpret_cast<const URLChoice* const *>(a);
+			= *static_cast<const URLChoice* const *>(a);
 		const URLChoice* bChoice
-			= *reinterpret_cast<const URLChoice* const *>(b);
+			= *static_cast<const URLChoice* const *>(b);
 		if (*aChoice < *bChoice)
 			return -1;
 		else if (*aChoice == *bChoice)
