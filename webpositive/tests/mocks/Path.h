@@ -4,11 +4,15 @@
 #include "SupportDefs.h"
 #include "String.h"
 
+struct entry_ref;
+
 class BPath {
 public:
     BPath() {}
     BPath(const char* p) : path(p ? p : "") {}
+    BPath(const entry_ref* ref) {}
     BPath(const BPath& other) : path(other.path) {}
+    status_t SetTo(const char* p) { path = p ? p : ""; return B_OK; }
     const char* Path() const { return path.c_str(); }
     const char* Leaf() const {
         size_t pos = path.find_last_of('/');

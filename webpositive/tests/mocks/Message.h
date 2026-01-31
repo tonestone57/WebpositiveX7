@@ -2,10 +2,9 @@
 #define _MOCK_MESSAGE_H
 #include "SupportDefs.h"
 #include "String.h"
+#include "Entry.h"
 #include <map>
 #include <string>
-
-typedef int type_code;
 
 class BFile;
 
@@ -16,6 +15,13 @@ public:
     status_t FindInt64(const char* name, int64* value) const {
         if (int64s.count(name)) {
             *value = int64s.at(name);
+            return B_OK;
+        }
+        return B_ERROR;
+    }
+    status_t FindString(const char* name, const char** value) const {
+        if (strings.count(name)) {
+            *value = strings.at(name).c_str();
             return B_OK;
         }
         return B_ERROR;
@@ -62,6 +68,16 @@ public:
     }
     status_t AddString(const char* name, const BString& value) {
         return AddString(name, value.String());
+    }
+
+    status_t FindData(const char* name, type_code type, const void** data, ssize_t* numBytes) const {
+        return B_ERROR;
+    }
+    status_t FindRef(const char* name, entry_ref* ref) const {
+        return B_OK;
+    }
+    status_t FindRef(const char* name, int32 index, entry_ref* ref) const {
+        return B_OK;
     }
 
     status_t FindMessage(const char* name, BMessage* message) const {

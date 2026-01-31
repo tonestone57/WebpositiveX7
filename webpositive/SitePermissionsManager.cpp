@@ -41,30 +41,27 @@ SitePermissionsManager::Reload()
 	BAutolock lock(fLock);
 	fPermissionMap.clear();
 
-	BPath path;
-	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
-		path.Append(kApplicationName);
-		path.Append("SitePermissions");
-		SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.Path());
+	BString path(kApplicationName);
+	path << "/SitePermissions";
+	SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.String());
 
-		int32 i = 0;
-		BMessage domainMsg;
-		while (settings.FindMessage("domain", i++, &domainMsg) == B_OK) {
-			BString name;
-			if (domainMsg.FindString("name", &name) == B_OK) {
-				name.ToLower();
-				PermissionEntry entry;
-				entry.domain = name;
+	int32 i = 0;
+	BMessage domainMsg;
+	while (settings.FindMessage("domain", i++, &domainMsg) == B_OK) {
+		BString name;
+		if (domainMsg.FindString("name", &name) == B_OK) {
+			name.ToLower();
+			PermissionEntry entry;
+			entry.domain = name;
 
-				if (domainMsg.FindBool("js", &entry.js) != B_OK) entry.js = true;
-				if (domainMsg.FindBool("cookies", &entry.cookies) != B_OK) entry.cookies = true;
-				if (domainMsg.FindBool("popups", &entry.popups) != B_OK) entry.popups = false;
-				if (domainMsg.FindFloat("zoom", &entry.zoom) != B_OK) entry.zoom = 1.0;
-				if (domainMsg.FindBool("forceDesktop", &entry.forceDesktop) != B_OK) entry.forceDesktop = false;
-				if (domainMsg.FindString("customUserAgent", &entry.customUserAgent) != B_OK) entry.customUserAgent = "";
+			if (domainMsg.FindBool("js", &entry.js) != B_OK) entry.js = true;
+			if (domainMsg.FindBool("cookies", &entry.cookies) != B_OK) entry.cookies = true;
+			if (domainMsg.FindBool("popups", &entry.popups) != B_OK) entry.popups = false;
+			if (domainMsg.FindFloat("zoom", &entry.zoom) != B_OK) entry.zoom = 1.0;
+			if (domainMsg.FindBool("forceDesktop", &entry.forceDesktop) != B_OK) entry.forceDesktop = false;
+			if (domainMsg.FindString("customUserAgent", &entry.customUserAgent) != B_OK) entry.customUserAgent = "";
 
-				fPermissionMap[name] = entry;
-			}
+			fPermissionMap[name] = entry;
 		}
 	}
 }
@@ -170,28 +167,25 @@ SitePermissionsManager::GetPermissions()
 void
 SitePermissionsManager::_Save()
 {
-	BPath path;
-	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
-		path.Append(kApplicationName);
-		path.Append("SitePermissions");
-		SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.Path());
-		settings.MakeEmpty();
+	BString path(kApplicationName);
+	path << "/SitePermissions";
+	SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.String());
+	settings.MakeEmpty();
 
-		std::map<BString, PermissionEntry>::iterator it;
-		for (it = fPermissionMap.begin(); it != fPermissionMap.end(); ++it) {
-			BMessage domainMsg;
-			// Ensure we pass const char*
-			domainMsg.AddString("name", it->second.domain.String());
-			domainMsg.AddBool("js", it->second.js);
-			domainMsg.AddBool("cookies", it->second.cookies);
-			domainMsg.AddBool("popups", it->second.popups);
-			domainMsg.AddFloat("zoom", it->second.zoom);
-			domainMsg.AddBool("forceDesktop", it->second.forceDesktop);
-			if (it->second.customUserAgent.Length() > 0)
-				domainMsg.AddString("customUserAgent", it->second.customUserAgent);
+	std::map<BString, PermissionEntry>::iterator it;
+	for (it = fPermissionMap.begin(); it != fPermissionMap.end(); ++it) {
+		BMessage domainMsg;
+		// Ensure we pass const char*
+		domainMsg.AddString("name", it->second.domain.String());
+		domainMsg.AddBool("js", it->second.js);
+		domainMsg.AddBool("cookies", it->second.cookies);
+		domainMsg.AddBool("popups", it->second.popups);
+		domainMsg.AddFloat("zoom", it->second.zoom);
+		domainMsg.AddBool("forceDesktop", it->second.forceDesktop);
+		if (it->second.customUserAgent.Length() > 0)
+			domainMsg.AddString("customUserAgent", it->second.customUserAgent);
 
-			settings.AddMessage("domain", &domainMsg);
-		}
-		settings.Save();
+		settings.AddMessage("domain", &domainMsg);
 	}
+	settings.Save();
 }

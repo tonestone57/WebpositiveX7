@@ -55,14 +55,14 @@ const char* kSettingsKeyEnableMSE = "enable mse";
 
 
 const struct SearchEngine kSearchEngines[] = {
-	{ "Baidu",      "https://www.baidu.com/search?wd=%s",             "a " },
-	{ "Bing",       "https://bing.com/search?q=%s",                   "b " },
-	{ "DuckDuckGo", "https://duckduckgo.com/?q=%s",                   "d " },
-	{ "Ecosia",     "https://www.ecosia.org/search?q=%s",             "e " },
-	{ "Google",     "https://google.com/search?q=%s",                 "g " },
-	{ "Qwant",      "https://www.qwant.com/?q=%s",                    "q " },
-	{ "Wikipedia",  "https://en.wikipedia.org/w/index.php?search=%s", "w " },
-	{ "Yandex",     "https://yandex.com/search/?text=%s",             "y " },
-	{ "Yahoo",      "https://search.yahoo.com/search?p=%s",           "z " },
+	{ "Baidu",      "https://www.baidu.com/search?wd=%s",             "a" },
+	{ "Bing",       "https://bing.com/search?q=%s",                   "b" },
+	{ "DuckDuckGo", "https://duckduckgo.com/?q=%s",                   "d" },
+	{ "Ecosia",     "https://www.ecosia.org/search?q=%s",             "e" },
+	{ "Google",     "https://google.com/search?q=%s",                 "g" },
+	{ "Qwant",      "https://www.qwant.com/?q=%s",                    "q" },
+	{ "Wikipedia",  "https://en.wikipedia.org/w/index.php?search=%s", "w" },
+	{ "Yandex",     "https://yandex.com/search/?text=%s",             "y" },
+	{ "Yahoo",      "https://search.yahoo.com/search?p=%s",           "z" },
 	{ NULL, NULL, NULL }
 };

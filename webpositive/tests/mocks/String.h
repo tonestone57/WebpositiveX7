@@ -28,6 +28,9 @@ public:
         }
     }
     void ReplaceAll(const char* a, const BString& b) { ReplaceAll(a, b.String()); }
+    void ReplaceAll(char a, char b) {
+        std::replace(s.begin(), s.end(), a, b);
+    }
 
     int32 FindFirst(char c) const {
         size_t pos = s.find(c);
@@ -35,6 +38,12 @@ public:
     }
     int32 FindFirst(const char* str) const {
         size_t pos = s.find(str);
+        return pos == std::string::npos ? B_ERROR : (int32)pos;
+    }
+    int32 FindFirst(const char* str, int32 offset) const {
+        if (offset < 0) offset = 0;
+        if (offset >= (int32)s.length()) return B_ERROR;
+        size_t pos = s.find(str, offset);
         return pos == std::string::npos ? B_ERROR : (int32)pos;
     }
 
@@ -46,6 +55,35 @@ public:
         std::transform(upperStr.begin(), upperStr.end(), upperStr.begin(), ::toupper);
         size_t pos = upperS.find(upperStr);
         return pos == std::string::npos ? B_ERROR : (int32)pos;
+    }
+    int32 IFindFirst(const BString& str) const { return IFindFirst(str.String()); }
+    int32 IFindFirst(const char* str, int32 offset) const {
+        std::string upperS = s;
+        std::string upperStr = str;
+        std::transform(upperS.begin(), upperS.end(), upperS.begin(), ::toupper);
+        std::transform(upperStr.begin(), upperStr.end(), upperStr.begin(), ::toupper);
+        size_t pos = upperS.find(upperStr, offset);
+        return pos == std::string::npos ? B_ERROR : (int32)pos;
+    }
+    int32 IFindFirst(const BString& str, int32 offset) const { return IFindFirst(str.String(), offset); }
+    int32 FindFirst(char c, int32 offset) const {
+        if (offset < 0) offset = 0;
+        if (offset >= (int32)s.length()) return B_ERROR;
+        size_t pos = s.find(c, offset);
+        return pos == std::string::npos ? B_ERROR : (int32)pos;
+    }
+    int32 FindLast(char c) const {
+        size_t pos = s.rfind(c);
+        return pos == std::string::npos ? B_ERROR : (int32)pos;
+    }
+
+    char ByteAt(int32 index) const { return s[index]; }
+    bool IsEmpty() const { return s.empty(); }
+    void SetTo(char c, int32 count) { s.assign(count, c); }
+
+    void ReplaceFirst(const char* a, const char* b) {
+        size_t pos = s.find(a);
+        if (pos != std::string::npos) s.replace(pos, strlen(a), b);
     }
 
     void Append(const char* str, int32 len) { s.append(str, len); }
@@ -82,6 +120,18 @@ public:
     void Remove(int32 fromOffset, int32 charCount) {
         if (fromOffset < 0 || fromOffset >= (int32)s.length()) return;
         s.erase(fromOffset, charCount);
+    }
+
+    void SetTo(const char* str, int32 length) {
+        if (str == nullptr) {
+            s.clear();
+            return;
+        }
+        if (length < 0) {
+            s = str;
+        } else {
+            s.assign(str, length);
+        }
     }
 
     int Compare(const char* str, int32 n) const {

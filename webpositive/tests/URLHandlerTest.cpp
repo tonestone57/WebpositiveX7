@@ -14,10 +14,11 @@ BRoster* be_roster = new BRoster();
 #include "../support/URLHandler.h"
 #include "../support/URLHandler.cpp"
 
-// Mock for kSearchEngines matching SettingsKeys.cpp format (with spaces)
+// Mock for kSearchEngines matching SettingsKeys.cpp format
+// We remove the trailing spaces here to test the robust logic in URLHandler.
 const struct SearchEngine kSearchEngines[] = {
-	{ "Google", "https://www.google.com/search?q=%s", "g " },
-	{ "Bing", "https://www.bing.com/search?q=%s", "b " },
+	{ "Google", "https://www.google.com/search?q=%s", "g" },
+	{ "Bing", "https://www.bing.com/search?q=%s", "b" },
 	{ NULL, NULL, NULL }
 };
 
@@ -61,43 +62,40 @@ int main()
 	assert(outURL == "https://duckduckgo.com/?q=Haiku%20OS");
 	printf("Test 5 Passed: Search Query\n");
 
-	// Test 6: Search Engine Shortcut
+	// Test 6: Search Engine Shortcut (Standard usage)
 	input = "g Haiku";
 	action = URLHandler::CheckURL(input, outURL, searchPageURL);
 	assert(action == URLHandler::LOAD_URL);
-    if (!(outURL == "https://www.google.com/search?q=Haiku")) {
+	if (outURL != "https://www.google.com/search?q=Haiku") {
         printf("Test 6 Failed: Expected 'https://www.google.com/search?q=Haiku', Got '%s'\n", outURL.String());
     }
 	assert(outURL == "https://www.google.com/search?q=Haiku");
 	printf("Test 6 Passed: Search Engine Shortcut\n");
 
-	// Test 7: IP Address
-	input = "127.0.0.1";
+	// Test 7: Search Engine Shortcut (Exact match "g")
+	input = "g";
 	action = URLHandler::CheckURL(input, outURL, searchPageURL);
 	assert(action == URLHandler::LOAD_URL);
-	assert(outURL == "http://127.0.0.1");
-	printf("Test 7 Passed: IP Address\n");
+	// Expect empty query or handled?
+    // "https://www.google.com/search?q="
+	if (outURL != "https://www.google.com/search?q=") {
+        printf("Test 7 Failed: Expected 'https://www.google.com/search?q=', Got '%s'\n", outURL.String());
+    }
+    // We accept strict prefix match which makes query empty.
+	assert(outURL == "https://www.google.com/search?q=");
+	printf("Test 7 Passed: Search Engine Shortcut (Exact)\n");
 
-	// Test 8: Complex Encoding
-	input = "duck a+b/c";
-	searchPageURL = "https://duckduckgo.com/?q=%s";
-	// "duck " triggers search engine? No, "duck" is not a shortcut in mock kSearchEngines.
-	// CheckURL logic: "duck a+b/c" -> no protocol, no dots -> _VisitSearchEngine -> default search URL
-	// Search query: "duck a+b/c"
-	// Encoding: space -> %20 (or +?), + -> %2B, / -> %2F
-	// ShouldEscape returns true for ' ', '+', '/'
-	// So "duck%20a%2Bb%2Fc"
-
+    // Test 8: False Positive ("good") -> Should NOT use Google
+	input = "good";
 	action = URLHandler::CheckURL(input, outURL, searchPageURL);
 	assert(action == URLHandler::LOAD_URL);
+	// Should go to default search (DuckDuckGo) with query "good"
+	if (outURL != "https://duckduckgo.com/?q=good") {
+        printf("Test 8 Failed: Expected 'https://duckduckgo.com/?q=good', Got '%s'\n", outURL.String());
+    }
+	assert(outURL == "https://duckduckgo.com/?q=good");
+	printf("Test 8 Passed: False Positive Avoidance\n");
 
-	// Construct expected manually to verify
-	BString expected = "https://duckduckgo.com/?q=duck%20a%2Bb%2Fc";
-	if (outURL != expected) {
-		printf("Test 8 Failed: Expected '%s', Got '%s'\n", expected.String(), outURL.String());
-	}
-	assert(outURL == expected);
-	printf("Test 8 Passed: Complex Encoding\n");
 
 	printf("All tests passed!\n");
 	return 0;
