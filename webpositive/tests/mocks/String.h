@@ -37,6 +37,12 @@ public:
         size_t pos = s.find(str);
         return pos == std::string::npos ? B_ERROR : (int32)pos;
     }
+    int32 FindFirst(const char* str, int32 offset) const {
+        if (offset < 0) offset = 0;
+        if (offset >= (int32)s.length()) return B_ERROR;
+        size_t pos = s.find(str, offset);
+        return pos == std::string::npos ? B_ERROR : (int32)pos;
+    }
 
     // Case insensitive find
     int32 IFindFirst(const char* str) const {
@@ -82,6 +88,18 @@ public:
     void Remove(int32 fromOffset, int32 charCount) {
         if (fromOffset < 0 || fromOffset >= (int32)s.length()) return;
         s.erase(fromOffset, charCount);
+    }
+
+    void SetTo(const char* str, int32 length) {
+        if (str == nullptr) {
+            s.clear();
+            return;
+        }
+        if (length < 0) {
+            s = str;
+        } else {
+            s.assign(str, length);
+        }
     }
 
     int Compare(const char* str, int32 n) const {
