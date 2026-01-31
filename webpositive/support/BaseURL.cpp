@@ -9,7 +9,11 @@
 BString
 baseURL(const BString& string)
 {
-	int32 baseURLStart = string.FindFirst("://") + 3;
+	int32 protoPos = string.FindFirst("://");
+	if (protoPos < 0)
+		return string;
+
+	int32 baseURLStart = protoPos + 3;
 	int32 baseURLEnd = string.FindFirst("/", baseURLStart + 1);
 	BString result;
 	result.SetTo(string.String() + baseURLStart, baseURLEnd - baseURLStart);

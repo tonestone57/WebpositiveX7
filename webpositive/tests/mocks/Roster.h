@@ -8,6 +8,7 @@ public:
     BRoster() {}
     status_t Launch(const char* signature) { return B_OK; }
     status_t Launch(const char* signature, int argc, const char* const* argv) { return B_OK; }
+    status_t Launch(const entry_ref* ref) { return B_OK; }
 };
 
 extern BRoster* be_roster;
