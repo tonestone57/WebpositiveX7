@@ -2,6 +2,7 @@
 #define _MOCK_ROSTER_H
 
 #include "SupportDefs.h"
+#include "Entry.h"
 
 class BRoster {
 public:

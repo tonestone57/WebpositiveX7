@@ -113,11 +113,17 @@ URLHandler::_VisitSearchEngine(const BString& search, BString& outURL, const BSt
 
 	// Check if the string starts with one of the search engine shortcuts
 	for (int32 i = 0; kSearchEngines[i].url != NULL; i++) {
-		if (searchQuery.Compare(kSearchEngines[i].shortcut,
-				strlen(kSearchEngines[i].shortcut)) == 0) {
-			engine = kSearchEngines[i].url;
-			searchQuery.Remove(0, strlen(kSearchEngines[i].shortcut));
-			break;
+		int32 shortcutLen = strlen(kSearchEngines[i].shortcut);
+		if (searchQuery.Compare(kSearchEngines[i].shortcut, shortcutLen) == 0) {
+			if (searchQuery.Length() == shortcutLen) {
+				engine = kSearchEngines[i].url;
+				searchQuery.Remove(0, shortcutLen);
+				break;
+			} else if (searchQuery[shortcutLen] == ' ') {
+				engine = kSearchEngines[i].url;
+				searchQuery.Remove(0, shortcutLen + 1);
+				break;
+			}
 		}
 	}
 
