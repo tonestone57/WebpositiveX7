@@ -495,8 +495,7 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 	buffer[size] = '\0';
 
 	BString content;
-	content.SetTo(buffer, size);
-	free(buffer);
+	content.Adopt(buffer, size);
 
 	BPath bookmarkPath;
 	status = GetBookmarkPath(bookmarkPath);

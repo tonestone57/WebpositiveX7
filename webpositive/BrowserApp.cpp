@@ -168,7 +168,7 @@ BrowserApp::BrowserApp()
 		snprintf(sCrashLogPath, sizeof(sCrashLogPath), "%s/WebPositive_Crash.log", desktopPath.Path());
 	} else {
 		// Fallback
-		strncpy(sCrashLogPath, "/boot/home/Desktop/WebPositive_Crash.log", sizeof(sCrashLogPath));
+		snprintf(sCrashLogPath, sizeof(sCrashLogPath), "/boot/home/Desktop/WebPositive_Crash.log");
 	}
 
 	BString cookieStorePath = kApplicationName;
