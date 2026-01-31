@@ -2,6 +2,7 @@
 #define _MOCK_MESSAGE_H
 #include "SupportDefs.h"
 #include "String.h"
+#include "Entry.h"
 #include <map>
 #include <string>
 
