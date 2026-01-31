@@ -50,14 +50,17 @@ ShouldEscape(char c)
 	// We have to take care of some of the escaping before we hand over the
 	// search string to WebKit, if we want queries like "4+3" to not be
 	// searched as "4 3".
+	if (isalnum((unsigned char)c))
+		return false;
+
 	switch (c) {
-		case ' ': case '$': case '&': case '`': case ':': case '<': case '>':
-		case '[': case ']': case '{': case '}': case '"': case '+': case '#':
-		case '%': case '@': case '/': case ';': case '=': case '?': case '\\':
-		case '^': case '|': case '~': case '\'': case ',':
-			return true;
-		default:
+		case '-':
+		case '_':
+		case '.':
+		case '~':
 			return false;
+		default:
+			return true;
 	}
 }
 
@@ -105,17 +108,15 @@ URLHandler::_VisitSearchEngine(const BString& search, BString& outURL, const BSt
 {
 	BString searchQuery = search;
 
-	BString searchPrefix;
-	search.CopyCharsInto(searchPrefix, 0, 2);
-
 	// Default search URL
 	BString engine(searchPageURL);
 
 	// Check if the string starts with one of the search engine shortcuts
 	for (int32 i = 0; kSearchEngines[i].url != NULL; i++) {
-		if (kSearchEngines[i].shortcut == searchPrefix) {
+		if (searchQuery.Compare(kSearchEngines[i].shortcut,
+				strlen(kSearchEngines[i].shortcut)) == 0) {
 			engine = kSearchEngines[i].url;
-			searchQuery.Remove(0, 2);
+			searchQuery.Remove(0, strlen(kSearchEngines[i].shortcut));
 			break;
 		}
 	}
