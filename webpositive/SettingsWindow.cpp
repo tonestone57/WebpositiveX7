@@ -1178,8 +1178,6 @@ SettingsWindow::_UpdateProxySettings()
 	if (status != B_OK)
 		fprintf(stderr, "Failed to store proxy password: %s\n", strerror(status));
 
-	// Note: We need to use the password for SetProxyInfo
-	BString passwordStr(password);
 	fOriginalProxyPassword = password;
 
 	// Clear plaintext password from settings file if present
@@ -1190,20 +1188,13 @@ SettingsWindow::_UpdateProxySettings()
 		if (fUseProxyAuthCheckBox->Value() == B_CONTROL_ON) {
 			BWebSettings::Default()->SetProxyInfo(fProxyAddressControl->Text(),
 				proxyPort, B_PROXY_TYPE_HTTP, fProxyUsernameControl->Text(),
-				passwordStr.String());
+				password);
 		} else {
 			BWebSettings::Default()->SetProxyInfo(fProxyAddressControl->Text(),
 				proxyPort, B_PROXY_TYPE_HTTP, "", "");
 		}
 	} else
 		BWebSettings::Default()->SetProxyInfo();
-
-	// Wipe the password string from memory
-	if (passwordStr.Length() > 0) {
-		char* ptr = passwordStr.LockBuffer(passwordStr.Length());
-		memset(ptr, 0, passwordStr.Length());
-		passwordStr.UnlockBuffer(0);
-	}
 }
 
 
