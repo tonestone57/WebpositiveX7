@@ -481,10 +481,10 @@ BrowserApp::MessageReceived(BMessage* message)
 		break;
 	}
 	case NEW_TAB: {
-		BrowserWindow* window;
-		if (message->FindPointer("window",
-			reinterpret_cast<void**>(&window)) != B_OK)
+		void* windowPtr = NULL;
+		if (message->FindPointer("window", &windowPtr) != B_OK)
 			break;
+		BrowserWindow* window = static_cast<BrowserWindow*>(windowPtr);
 		BString url;
 		message->FindString("url", &url);
 		bool select = false;
@@ -670,8 +670,9 @@ BrowserApp::_RefsReceived(BMessage* message, int32* _pagesCreated,
 		pagesCreated = *_pagesCreated;
 
 	BrowserWindow* window = NULL;
-	if (message->FindPointer("window", (void**)&window) != B_OK)
-		window = NULL;
+	void* windowPtr = NULL;
+	if (message->FindPointer("window", &windowPtr) == B_OK)
+		window = static_cast<BrowserWindow*>(windowPtr);
 
 	bool fullscreen;
 	if (message->FindBool("fullscreen", &fullscreen) != B_OK)

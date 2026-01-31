@@ -132,9 +132,9 @@ class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
 	static int _CompareChoices(const void* a, const void* b)
 	{
 		const URLChoice* aChoice
-			= *reinterpret_cast<const URLChoice* const *>(a);
+			= *static_cast<const URLChoice* const *>(a);
 		const URLChoice* bChoice
-			= *reinterpret_cast<const URLChoice* const *>(b);
+			= *static_cast<const URLChoice* const *>(b);
 		if (*aChoice < *bChoice)
 			return -1;
 		else if (*aChoice == *bChoice)

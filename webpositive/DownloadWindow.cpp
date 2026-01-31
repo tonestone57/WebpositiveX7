@@ -257,10 +257,9 @@ DownloadWindow::MessageReceived(BMessage* message)
 		}
 		case B_DOWNLOAD_ADDED:
 		{
-			BWebDownload* download;
-			if (message->FindPointer("download", reinterpret_cast<void**>(
-					&download)) == B_OK) {
-				_DownloadStarted(download);
+			void* downloadPtr = NULL;
+			if (message->FindPointer("download", &downloadPtr) == B_OK) {
+				_DownloadStarted(static_cast<BWebDownload*>(downloadPtr));
 			}
 			break;
 		}
@@ -282,10 +281,10 @@ DownloadWindow::MessageReceived(BMessage* message)
 		}
 		case B_DOWNLOAD_STARTED:
 		{
-			BWebDownload* download;
-			if (message->FindPointer("download", reinterpret_cast<void**>(
-					&download)) != B_OK)
+			void* downloadPtr = NULL;
+			if (message->FindPointer("download", &downloadPtr) != B_OK)
 				break;
+			BWebDownload* download = static_cast<BWebDownload*>(downloadPtr);
 
 			std::map<BWebDownload*, DownloadProgressView*>::iterator it
 				= fDownloadsMap.find(download);
@@ -295,10 +294,10 @@ DownloadWindow::MessageReceived(BMessage* message)
 		}
 		case B_DOWNLOAD_PROGRESS:
 		{
-			BWebDownload* download;
-			if (message->FindPointer("download", reinterpret_cast<void**>(
-					&download)) != B_OK)
+			void* downloadPtr = NULL;
+			if (message->FindPointer("download", &downloadPtr) != B_OK)
 				break;
+			BWebDownload* download = static_cast<BWebDownload*>(downloadPtr);
 
 			std::map<BWebDownload*, DownloadProgressView*>::iterator it
 				= fDownloadsMap.find(download);
@@ -308,10 +307,9 @@ DownloadWindow::MessageReceived(BMessage* message)
 		}
 		case B_DOWNLOAD_REMOVED:
 		{
-			BWebDownload* download;
-			if (message->FindPointer("download", reinterpret_cast<void**>(
-					&download)) == B_OK) {
-				_DownloadFinished(download);
+			void* downloadPtr = NULL;
+			if (message->FindPointer("download", &downloadPtr) == B_OK) {
+				_DownloadFinished(static_cast<BWebDownload*>(downloadPtr));
 			}
 			break;
 		}
@@ -341,8 +339,9 @@ DownloadWindow::MessageReceived(BMessage* message)
 			break;
 		case REMOVE_DOWNLOAD_VIEW:
 		{
-			DownloadProgressView* view;
-			if (message->FindPointer("view", (void**)&view) == B_OK) {
+			void* viewPtr = NULL;
+			if (message->FindPointer("view", &viewPtr) == B_OK) {
+				DownloadProgressView* view = static_cast<DownloadProgressView*>(viewPtr);
 				if (view->Download())
 					fDownloadsMap.erase(view->Download());
 				view->RemoveSelf();
