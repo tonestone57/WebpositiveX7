@@ -4330,7 +4330,7 @@ BrowserWindow::_SaveFavicon(const BString& url, const BBitmap* icon)
 		return;
 
 	// Use clone + ImportBits logic instead of new BBitmap(icon)
-	BBitmap* saveIcon = new BBitmap(icon->Bounds(), B_RGBA32);
+	BBitmap* saveIcon = new BBitmap(icon->Bounds(), B_RGBA32_LITTLE);
 	if (saveIcon->ImportBits(icon->Bits(), icon->BitsLength(), icon->BytesPerRow(), 0, icon->ColorSpace()) != B_OK) {
 		delete saveIcon;
 		return;
