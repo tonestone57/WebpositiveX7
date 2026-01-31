@@ -107,7 +107,7 @@ ConsoleWindow::MessageReceived(BMessage* message)
 				_AppendMessage(msg);
 				// Periodically re-sync list to prevent unbounded growth from collapsed items
 				// or drift from deque popping
-				if (fMessagesListView->CountItems() > 2000)
+				if (fMessagesListView->CountItems() > 600)
 					_UpdateMessageList();
 				else if (fMessagesListView->CountItems() > 0)
 					fMessagesListView->ScrollTo(fMessagesListView->CountItems() - 1);

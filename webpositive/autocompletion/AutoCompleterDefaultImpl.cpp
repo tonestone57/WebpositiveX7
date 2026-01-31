@@ -8,6 +8,7 @@
 
 #include "AutoCompleterDefaultImpl.h"
 
+#include <ControlLook.h>
 #include <ListView.h>
 #include <Screen.h>
 #include <ScrollView.h>
@@ -427,7 +428,7 @@ BDefaultChoiceView::ShowChoices(BAutoCompleter::CompletionStyle* completer)
 		scrollView->ResizeTo(listRect.Width() + 1, listRect.Height() + 2);
 		// Move here to compensate for the above
 		fListView->MoveTo(0, 1);
-		fListView->ResizeTo(listRect.Width() - B_V_SCROLL_BAR_WIDTH, listRect.Height());
+		fListView->ResizeTo(listRect.Width() - be_control_look->GetScrollBarWidth(), listRect.Height());
 	} else {
 		fListView->MoveTo(0, 0);
 		fListView->ResizeTo(listRect.Width(), listRect.Height());

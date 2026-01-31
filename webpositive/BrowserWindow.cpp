@@ -42,6 +42,7 @@
 #include <TranslationUtils.h>
 #include <Application.h>
 #include <Bitmap.h>
+#include <ByteOrder.h>
 #include <Button.h>
 #include <Catalog.h>
 #include <View.h>
@@ -230,8 +231,10 @@ _SaveFaviconThread(void* data)
 	if (file.InitCheck() == B_OK) {
 		int32 width = params->icon->Bounds().IntegerWidth() + 1;
 		int32 height = params->icon->Bounds().IntegerHeight() + 1;
-		file.Write(&width, sizeof(width));
-		file.Write(&height, sizeof(height));
+		int32 widthLE = B_HOST_TO_LENDIAN_INT32(width);
+		int32 heightLE = B_HOST_TO_LENDIAN_INT32(height);
+		file.Write(&widthLE, sizeof(widthLE));
+		file.Write(&heightLE, sizeof(heightLE));
 
 		int32 bytesPerRow = params->icon->BytesPerRow();
 		int32 rowLen = width * 4;
@@ -261,6 +264,9 @@ _LoadFaviconThread(void* data)
 		if (file.Read(&width, sizeof(width)) == sizeof(width) &&
 			file.Read(&height, sizeof(height)) == sizeof(height)) {
 
+			width = B_LENDIAN_TO_HOST_INT32(width);
+			height = B_LENDIAN_TO_HOST_INT32(height);
+
 			if (width > 0 && width < 256 && height > 0 && height < 256) {
 				// Verify file size matches expected packed size
 				off_t size;
@@ -270,7 +276,7 @@ _LoadFaviconThread(void* data)
 				if (size >= expectedSize) {
 					// Use B_BITMAP_NO_SERVER_LINK for background thread safety
 					BBitmap* icon = new(std::nothrow) BBitmap(BRect(0, 0, width - 1, height - 1),
-						B_BITMAP_NO_SERVER_LINK, B_RGBA32);
+						B_BITMAP_NO_SERVER_LINK, B_RGBA32_LITTLE);
 					if (icon != NULL && icon->InitCheck() == B_OK) {
 						// Ensure padding bytes are clear (fragility fix)
 						memset(icon->Bits(), 0, icon->BitsLength());
@@ -4324,7 +4330,7 @@ BrowserWindow::_SaveFavicon(const BString& url, const BBitmap* icon)
 		return;
 
 	// Use clone + ImportBits logic instead of new BBitmap(icon)
-	BBitmap* saveIcon = new BBitmap(icon->Bounds(), B_RGBA32);
+	BBitmap* saveIcon = new BBitmap(icon->Bounds(), B_RGBA32_LITTLE);
 	if (saveIcon->ImportBits(icon->Bits(), icon->BitsLength(), icon->BytesPerRow(), 0, icon->ColorSpace()) != B_OK) {
 		delete saveIcon;
 		return;

@@ -1,7 +1,7 @@
 
 const uint32 kWindowIconWidth = 13;
 const uint32 kWindowIconHeight = 14;
-const color_space kWindowIconFormat = B_RGBA32;
+const color_space kWindowIconFormat = B_RGBA32_LITTLE;
 
 const unsigned char kWindowIconBits[] = {
 	0x78, 0x78, 0x78, 0xff, 0x78, 0x78, 0x78, 0xff, 0x78, 0x78, 0x78, 0xff, 0x78, 0x78, 0x78, 0xff,

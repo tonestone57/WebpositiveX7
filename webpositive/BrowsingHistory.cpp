@@ -27,7 +27,7 @@
 #include "BrowserApp.h"
 
 
-static const uint32 SAVE_HISTORY = 'svhs';
+static const uint32 SAVE_HISTORY = 0x73766873;
 
 
 BrowsingHistoryItem::BrowsingHistoryItem(const BString& url)
