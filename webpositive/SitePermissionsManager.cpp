@@ -41,13 +41,11 @@ SitePermissionsManager::Reload()
 	BAutolock lock(fLock);
 	fPermissionMap.clear();
 
-	BPath path;
-	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
-		path.Append(kApplicationName);
-		path.Append("SitePermissions");
-		SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.Path());
+	BString path(kApplicationName);
+	path << "/SitePermissions";
+	SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.String());
 
-		int32 i = 0;
+	int32 i = 0;
 		BMessage domainMsg;
 		while (settings.FindMessage("domain", i++, &domainMsg) == B_OK) {
 			BString name;
@@ -170,14 +168,12 @@ SitePermissionsManager::GetPermissions()
 void
 SitePermissionsManager::_Save()
 {
-	BPath path;
-	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
-		path.Append(kApplicationName);
-		path.Append("SitePermissions");
-		SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.Path());
-		settings.MakeEmpty();
+	BString path(kApplicationName);
+	path << "/SitePermissions";
+	SettingsMessage settings(B_USER_SETTINGS_DIRECTORY, path.String());
+	settings.MakeEmpty();
 
-		std::map<BString, PermissionEntry>::iterator it;
+	std::map<BString, PermissionEntry>::iterator it;
 		for (it = fPermissionMap.begin(); it != fPermissionMap.end(); ++it) {
 			BMessage domainMsg;
 			// Ensure we pass const char*
