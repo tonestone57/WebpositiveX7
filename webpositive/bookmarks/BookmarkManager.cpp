@@ -19,6 +19,7 @@
 
 #include <vector>
 
+#include "../support/SafeStrerror.h"
 #include "../support/WebConstants.h"
 
 #undef B_TRANSLATION_CONTEXT
@@ -61,7 +62,7 @@ BookmarkManager::CreateBookmark(const BString& fileName, const BString& title,
 		BString message(B_TRANSLATE_COMMENT("There was an error retrieving "
 			"the bookmark folder.\n\nError: %error", "Don't translate the "
 			"variable %error"));
-		message.ReplaceFirst("%error", strerror(status));
+		message.ReplaceFirst("%error", SafeStrerror(status).String());
 		BAlert* alert = new BAlert(B_TRANSLATE("Bookmark error"),
 			message.String(), B_TRANSLATE("OK"), NULL, NULL,
 			B_WIDTH_AS_USUAL, B_STOP_ALERT);
@@ -155,7 +156,7 @@ BookmarkManager::_CreateBookmark(const BPath& path, BString fileName, const BStr
 				ret = nodeInfo.SetIcon(miniIcon, B_MINI_ICON);
 				if (ret != B_OK) {
 					fprintf(stderr, "Failed to store mini icon for bookmark: "
-						"%s\n", strerror(ret));
+						"%s\n", SafeStrerror(ret).String());
 				}
 			}
 			if (largeIcon != NULL && ret == B_OK)
@@ -189,7 +190,7 @@ BookmarkManager::_CreateBookmark(const BPath& path, BString fileName, const BStr
 				ret = B_OK;
 			if (ret != B_OK) {
 				fprintf(stderr, "Failed to store large icon for bookmark: "
-					"%s\n", strerror(ret));
+					"%s\n", SafeStrerror(ret).String());
 			}
 		}
 	}
@@ -198,7 +199,7 @@ BookmarkManager::_CreateBookmark(const BPath& path, BString fileName, const BStr
 		BString message(B_TRANSLATE_COMMENT("There was an error creating the "
 			"bookmark file.\n\nError: %error", "Don't translate variable "
 			"%error"));
-		message.ReplaceFirst("%error", strerror(status));
+		message.ReplaceFirst("%error", SafeStrerror(status).String());
 		BAlert* alert = new BAlert(B_TRANSLATE("Bookmark error"),
 			message.String(), B_TRANSLATE("OK"), NULL, NULL,
 			B_WIDTH_AS_USUAL, B_STOP_ALERT);
@@ -289,7 +290,7 @@ BookmarkManager::ShowBookmarks()
 		BString message(B_TRANSLATE_COMMENT("There was an error trying to "
 			"show the Bookmarks folder.\n\nError: %error",
 			"Don't translate variable %error"));
-		message.ReplaceFirst("%error", strerror(status));
+		message.ReplaceFirst("%error", SafeStrerror(status).String());
 		BAlert* alert = new BAlert(B_TRANSLATE("Bookmark error"),
 			message.String(), B_TRANSLATE("OK"), NULL, NULL,
 			B_WIDTH_AS_USUAL, B_STOP_ALERT);

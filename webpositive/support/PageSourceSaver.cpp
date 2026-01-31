@@ -19,6 +19,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "SafeStrerror.h"
 #include "SourceWindow.h"
 
 #undef B_TRANSLATION_CONTEXT
@@ -149,7 +150,7 @@ PageSourceSaver::_PageSourceThread(void* data)
 	if (ret != B_OK) {
 		char buffer[1024];
 		snprintf(buffer, sizeof(buffer), "Failed to show the "
-			"page source: %s\n", strerror(ret));
+			"page source: %s\n", SafeStrerror(ret).String());
 		BAlert* alert = new BAlert(B_TRANSLATE("Page source error"), buffer,
 			B_TRANSLATE("OK"));
 		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);

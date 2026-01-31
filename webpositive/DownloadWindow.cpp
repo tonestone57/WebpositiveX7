@@ -34,6 +34,7 @@
 #include "BrowserApp.h"
 #include "BrowserWindow.h"
 #include "DownloadProgressView.h"
+#include "SafeStrerror.h"
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
 #include "WebDownload.h"
@@ -323,7 +324,7 @@ DownloadWindow::MessageReceived(BMessage* message)
 				BString errorString(B_TRANSLATE_COMMENT("The downloads folder could "
 					"not be opened.\n\nError: %error", "Don't translate "
 					"variable %error"));
-				errorString.ReplaceFirst("%error", strerror(status));
+				errorString.ReplaceFirst("%error", SafeStrerror(status).String());
 				BAlert* alert = new BAlert(B_TRANSLATE("Error opening downloads "
 					"folder"), errorString.String(), B_TRANSLATE("OK"));
 				alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
