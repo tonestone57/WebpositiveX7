@@ -242,8 +242,9 @@ BookmarkBar::MessageReceived(BMessage* message)
 	switch (message->what) {
 		case kMsgInitialBookmarksLoaded:
 		{
-			std::vector<BookmarkItem*>* list;
-			if (message->FindPointer("list", (void**)&list) == B_OK) {
+			void* listPtr = NULL;
+			if (message->FindPointer("list", &listPtr) == B_OK) {
+				std::vector<BookmarkItem*>* list = static_cast<std::vector<BookmarkItem*>*>(listPtr);
 				bool addedAny = false;
 				for (size_t i = 0; i < list->size(); i++) {
 					BookmarkItem* data = (*list)[i];
@@ -548,7 +549,12 @@ BookmarkBar::MessageReceived(BMessage* message)
 			// User clicked OK, get the new name
 			BString newName = message->FindString("text");
 			BMenuItem* selectedItem = NULL;
-			message->FindPointer("item", (void**)&selectedItem);
+			void* itemPtr = NULL;
+			if (message->FindPointer("item", &itemPtr) == B_OK)
+				selectedItem = static_cast<BMenuItem*>(itemPtr);
+
+			if (selectedItem == NULL)
+				break;
 
 			// Rename the bookmark file
 			entry_ref ref;
