@@ -392,7 +392,7 @@ public:
 		fCurrentToolTip = text;
 		fManager->GetTabContainerView()->HideToolTip();
 		fManager->GetTabContainerView()->SetToolTip(
-			reinterpret_cast<BToolTip*>(NULL));
+			static_cast<BToolTip*>(NULL));
 		fManager->GetTabContainerView()->SetToolTip(fCurrentToolTip.String());
 	}
 

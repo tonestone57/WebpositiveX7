@@ -19,9 +19,7 @@
 
 #include <vector>
 
-#ifndef B_RGBA32_TYPE
-#define B_RGBA32_TYPE 'RGBA'
-#endif
+#include "WebConstants.h"
 
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "WebPositive Window"
