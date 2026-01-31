@@ -854,8 +854,7 @@ SettingsWindow::_CanApplySettings() const
 	canApply = canApply || (strcmp(fProxyUsernameControl->Text(),
 		fSettings->GetValue(kSettingsKeyProxyUsername, "")) != 0);
 
-	canApply = canApply || (strcmp(fProxyPasswordControl->Text(),
-		fSettings->GetValue(kSettingsKeyProxyPassword, "")) != 0);
+	canApply = canApply || (fOriginalProxyPassword != fProxyPasswordControl->Text());
 
 	// Privacy settings
 	canApply = canApply || ((fHttpsOnlyCheckBox->Value() == B_CONTROL_ON)
@@ -1059,8 +1058,7 @@ SettingsWindow::_RevertSettings()
 		""));
 
 	BString proxyPassword = fSettings->GetValue(kSettingsKeyProxyPassword, "");
-	if (proxyPassword.Length() == 0
-		&& fUseProxyAuthCheckBox->Value() == B_CONTROL_ON) {
+	if (proxyPassword.Length() == 0) {
 		BKeyStore keyStore;
 		BPasswordKey key;
 		if (keyStore.GetKey("WebPositive", B_KEY_TYPE_PASSWORD, "ProxySettings",
@@ -1068,6 +1066,7 @@ SettingsWindow::_RevertSettings()
 			proxyPassword = key.Password();
 		}
 	}
+	fOriginalProxyPassword = proxyPassword;
 	fProxyPasswordControl->SetText(proxyPassword.String());
 
 	// Privacy settings
@@ -1179,11 +1178,9 @@ SettingsWindow::_UpdateProxySettings()
 	if (status != B_OK)
 		fprintf(stderr, "Failed to store proxy password: %s\n", strerror(status));
 
-	// Clear sensitive password from UI control
-	// Note: We need to use the password for SetProxyInfo before clearing,
-	// or retrieve it. We'll use a local copy.
+	// Note: We need to use the password for SetProxyInfo
 	BString passwordStr(password);
-	fProxyPasswordControl->SetText("");
+	fOriginalProxyPassword = password;
 
 	// Clear plaintext password from settings file if present
 	if (fSettings->GetValue(kSettingsKeyProxyPassword, "") != "")

@@ -126,6 +126,8 @@ private:
 			BSpinner*			fFixedSizesSpinner;
 
 			std::unique_ptr<BFilePanel> fOpenFilePanel;
+
+			BString				fOriginalProxyPassword;
 };
 
 
