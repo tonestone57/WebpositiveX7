@@ -36,7 +36,7 @@
 #include "WebView.h"
 #include "WebWindow.h"
 
-#include "WebConstants.h"
+#include "support/WebConstants.h"
 
 
 #undef B_TRANSLATION_CONTEXT

@@ -19,7 +19,7 @@
 
 #include <vector>
 
-#include "WebConstants.h"
+#include "../support/WebConstants.h"
 
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "WebPositive Window"
