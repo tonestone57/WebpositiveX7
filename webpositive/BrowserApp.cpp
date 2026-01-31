@@ -84,7 +84,7 @@ static void write_int(int fd, const char* label, long long value)
 	char buffer[32];
 	int i = 0;
 	bool neg = value < 0;
-	unsigned long long v = neg ? -value : value;
+	unsigned long long v = neg ? 0 - (unsigned long long)value : (unsigned long long)value;
 	if (v == 0) buffer[i++] = '0';
 	while (v > 0) {
 		buffer[i++] = (v % 10) + '0';
