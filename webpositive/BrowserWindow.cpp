@@ -276,7 +276,7 @@ _LoadFaviconThread(void* data)
 				if (size >= expectedSize) {
 					// Use B_BITMAP_NO_SERVER_LINK for background thread safety
 					BBitmap* icon = new(std::nothrow) BBitmap(BRect(0, 0, width - 1, height - 1),
-						B_BITMAP_NO_SERVER_LINK, B_RGBA32);
+						B_BITMAP_NO_SERVER_LINK, B_RGBA32_LITTLE);
 					if (icon != NULL && icon->InitCheck() == B_OK) {
 						// Ensure padding bytes are clear (fragility fix)
 						memset(icon->Bits(), 0, icon->BitsLength());
