@@ -77,7 +77,7 @@ class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
 	{
 		int32 count = CountChoices();
 		for (int32 i = 0; i < count; i++) {
-			delete reinterpret_cast<BAutoCompleter::Choice*>(
+			delete static_cast<BAutoCompleter::Choice*>(
 				fChoices.ItemAtFast(i));
 		}
 		fChoices.MakeEmpty();
@@ -125,7 +125,7 @@ class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
 
 	virtual const BAutoCompleter::Choice* ChoiceAt(int32 index) const
 	{
-		return reinterpret_cast<BAutoCompleter::Choice*>(
+		return static_cast<BAutoCompleter::Choice*>(
 			fChoices.ItemAt(index));
 	}
 
