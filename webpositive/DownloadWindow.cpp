@@ -34,7 +34,7 @@
 #include "BrowserApp.h"
 #include "BrowserWindow.h"
 #include "DownloadProgressView.h"
-#include "SafeStrerror.h"
+#include "support/SafeStrerror.h"
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
 #include "WebDownload.h"

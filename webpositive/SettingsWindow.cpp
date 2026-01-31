@@ -35,7 +35,7 @@
 #include "BrowsingHistory.h"
 #include "BrowserWindow.h"
 #include "FontSelectionView.h"
-#include "SafeStrerror.h"
+#include "support/SafeStrerror.h"
 #include "SettingsKeys.h"
 #include "WebSettings.h"
 

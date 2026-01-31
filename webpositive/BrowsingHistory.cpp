@@ -230,7 +230,10 @@ BrowsingHistory::ImportHistory(const BPath& path)
 
 	std::unique_ptr<char[]> bufferPtr(buffer);
 
-	if (file.Read(buffer, size) != size)
+	ssize_t bytesRead = file.Read(buffer, size);
+	if (bytesRead < 0)
+		return (status_t)bytesRead;
+	if (bytesRead != size)
 		return B_IO_ERROR;
 	buffer[size] = '\0';
 

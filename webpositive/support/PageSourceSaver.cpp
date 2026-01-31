@@ -123,7 +123,7 @@ PageSourceSaver::_PageSourceThread(void* data)
 			ssize_t written = pageSourceFile.Write(source.String(),
 				source.Length());
 			if (written != source.Length())
-				ret = (status_t)written;
+				ret = (written < 0) ? (status_t)written : B_IO_ERROR;
 		}
 
 		if (ret == B_OK) {

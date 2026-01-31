@@ -97,7 +97,7 @@
 #include "PageUserData.h"
 #include "PermissionsWindow.h"
 #include "NetworkWindow.h"
-#include "SafeStrerror.h"
+#include "support/SafeStrerror.h"
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
 #include "SitePermissionsManager.h"
