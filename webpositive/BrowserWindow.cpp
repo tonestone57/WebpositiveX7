@@ -97,6 +97,7 @@
 #include "PageUserData.h"
 #include "PermissionsWindow.h"
 #include "NetworkWindow.h"
+#include "support/SafeStrerror.h"
 #include "SettingsKeys.h"
 #include "SettingsMessage.h"
 #include "SitePermissionsManager.h"
@@ -329,7 +330,7 @@ _ExportProfileThread(void* data)
 
 	if (status != B_OK) {
 		BString errorMsg(B_TRANSLATE("Failed to export profile"));
-		errorMsg << ": " << strerror(status);
+		errorMsg << ": " << SafeStrerror(status).String();
 		BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 			errorMsg.String(), B_TRANSLATE("OK"));
 		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
@@ -348,7 +349,7 @@ _ImportProfileThread(void* data)
 
 	if (status != B_OK) {
 		BString errorMsg(B_TRANSLATE("Failed to import profile"));
-		errorMsg << ": " << strerror(status);
+		errorMsg << ": " << SafeStrerror(status).String();
 		BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
 			errorMsg.String(), B_TRANSLATE("OK"));
 		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
@@ -1314,7 +1315,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					status_t status = BookmarkManager::ExportBookmarks(path);
 					if (status != B_OK) {
 						BString errorMsg(B_TRANSLATE("Failed to export bookmarks"));
-						errorMsg << ": " << strerror(status);
+						errorMsg << ": " << SafeStrerror(status).String();
 						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 							errorMsg.String(), B_TRANSLATE("OK"));
 						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
@@ -1325,7 +1326,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					status_t status = BrowsingHistory::ExportHistory(path);
 					if (status != B_OK) {
 						BString errorMsg(B_TRANSLATE("Failed to export history"));
-						errorMsg << ": " << strerror(status);
+						errorMsg << ": " << SafeStrerror(status).String();
 						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 							errorMsg.String(), B_TRANSLATE("OK"));
 						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
@@ -1336,7 +1337,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 					status_t status = Sync::ExportCookies(path, fContext->GetCookieJar());
 					if (status != B_OK) {
 						BString errorMsg(B_TRANSLATE("Failed to export cookies"));
-						errorMsg << ": " << strerror(status);
+						errorMsg << ": " << SafeStrerror(status).String();
 						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
 							errorMsg.String(), B_TRANSLATE("OK"));
 						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
@@ -1470,7 +1471,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 				status_t status = BookmarkManager::ImportBookmarks(path);
 				if (status != B_OK) {
 					BString errorMsg(B_TRANSLATE("Failed to import bookmarks"));
-					errorMsg << ": " << strerror(status);
+					errorMsg << ": " << SafeStrerror(status).String();
 					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
 						errorMsg.String(), B_TRANSLATE("OK"));
 					alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));

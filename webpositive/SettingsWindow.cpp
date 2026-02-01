@@ -35,6 +35,7 @@
 #include "BrowsingHistory.h"
 #include "BrowserWindow.h"
 #include "FontSelectionView.h"
+#include "support/SafeStrerror.h"
 #include "SettingsKeys.h"
 #include "WebSettings.h"
 
@@ -1176,7 +1177,7 @@ SettingsWindow::_UpdateProxySettings()
 	passwordKey.SetPurpose(B_KEY_PURPOSE_WEB);
 	status_t status = keyStore.AddKey("WebPositive", passwordKey);
 	if (status != B_OK)
-		fprintf(stderr, "Failed to store proxy password: %s\n", strerror(status));
+		fprintf(stderr, "Failed to store proxy password: %s\n", SafeStrerror(status).String());
 
 	fOriginalProxyPassword = password;
 
