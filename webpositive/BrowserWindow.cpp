@@ -284,12 +284,38 @@ _LoadFaviconThread(void* data)
 
 						int32 bytesPerRow = icon->BytesPerRow();
 						int32 rowLen = width * 4;
-						uint8* bits = (uint8*)icon->Bits();
 						bool success = true;
-						for (int32 i = 0; i < height; i++) {
-							if (file.Read(bits + (i * bytesPerRow), rowLen) != rowLen) {
+
+						// Optimization: Read entire image at once to reduce syscalls
+						size_t totalDataSize = (size_t)width * height * 4;
+
+						if (bytesPerRow == rowLen) {
+							// Fast path: bitmap memory is packed, read directly
+							if (file.Read(icon->Bits(), totalDataSize) != (ssize_t)totalDataSize)
 								success = false;
-								break;
+						} else {
+							// Slow path: bitmap memory has padding
+							uint8* buffer = new(std::nothrow) uint8[totalDataSize];
+							if (buffer != NULL) {
+								if (file.Read(buffer, totalDataSize) == (ssize_t)totalDataSize) {
+									uint8* bits = static_cast<uint8*>(icon->Bits());
+									for (int32 i = 0; i < height; i++) {
+										memcpy(bits + (i * bytesPerRow),
+											buffer + (i * rowLen), rowLen);
+									}
+								} else {
+									success = false;
+								}
+								delete[] buffer;
+							} else {
+								// Fallback: Line-by-line read if allocation fails
+								uint8* bits = static_cast<uint8*>(icon->Bits());
+								for (int32 i = 0; i < height; i++) {
+									if (file.Read(bits + (i * bytesPerRow), rowLen) != rowLen) {
+										success = false;
+										break;
+									}
+								}
 							}
 						}
 						if (success) {
