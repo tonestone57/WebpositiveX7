@@ -425,10 +425,9 @@ BrowserApp::MessageReceived(BMessage* message)
 			strcmp(property, "Credentials") == 0) {
 
 			BMessage reply(B_REPLY);
-			// CredentialsStorage access is currently limited to internal use.
-			// Future work: Expose public iterator or export method in CredentialsStorage
-			// to fully support this scripting capability.
-			reply.AddInt32("error", B_ERROR);
+			if (CredentialsStorage::PersistentInstance()->Export(&reply) != B_OK)
+				reply.AddInt32("error", B_ERROR);
+
 			message->SendReply(&reply);
 			return;
 		}

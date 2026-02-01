@@ -56,6 +56,7 @@ public:
 									const Credentials& credentials);
 			Credentials			GetCredentials(const HashString& key);
 			void				RemoveCredentials(const HashString& key);
+			status_t			Export(BMessage* archive);
 
 private:
 								CredentialsStorage(bool persistent);
