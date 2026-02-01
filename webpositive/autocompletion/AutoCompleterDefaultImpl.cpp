@@ -205,7 +205,6 @@ BDefaultChoiceView::ListView::ListView(
 	BListView(BRect(0, 0, 100, 100), "ChoiceViewList"),
 	fCompleter(completer)
 {
-	// we need to check if user clicks outside of window-bounds:
 	SetEventMask(B_POINTER_EVENTS);
 }
 
@@ -243,7 +242,7 @@ void
 BDefaultChoiceView::ListView::MouseDown(BPoint point)
 {
 	if (!Window()->Frame().Contains(ConvertToScreen(point))) {
-		// click outside of window, so we close it:
+		// click outside of window (captured via SetEventMask), so we close it:
 		fCompleter->CancelChoice();
 	} else
 		BListView::MouseDown(point);
