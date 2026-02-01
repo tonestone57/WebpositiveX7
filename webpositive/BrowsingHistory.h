@@ -97,8 +97,9 @@ private:
 			void				_Clear();
 			bool				_AddItem(const BrowsingHistoryItem& item,
 									bool invoke);
-			bool				_RemoveUrl(const BString& url);
-			void				_RemoveItemsForDomain(const char* domain);
+			bool				_RemoveUrl(const BString& url, bool internal = false);
+			void				_RemoveItemsForDomain(const char* domain,
+									bool internal = false);
 
 			void				_LoadSettings();
 			void				_SaveSettings(bool forceSync = false);
@@ -112,6 +113,8 @@ private:
 			HistoryList			fHistoryList;
 
 			std::map<BString, BrowsingHistoryItem*> fHistoryMap;
+			std::vector<BMessage> fPendingOperations;
+			int32				fPendingOpCount;
 			int32				fMaxHistoryItemAge;
 
 	static	BrowsingHistory		sDefaultInstance;

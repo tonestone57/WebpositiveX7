@@ -81,36 +81,156 @@ public:
     }
 
     status_t FindMessage(const char* name, BMessage* message) const {
-        if (messages.count(name)) {
-            *message = messages.at(name);
+        if (messages.count(name) && !messages.at(name).empty()) {
+            *message = messages.at(name)[0];
             return B_OK;
         }
         return B_ERROR;
     }
     status_t FindMessage(const char* name, int32 index, BMessage* message) const {
-        // Index not supported in simple map mock, but BrowsingHistory uses index loop
-        // for "history item" 0..N.
-        // I need to support lists or multiple items with same name?
-        // BrowsingHistory.cpp: settingsArchive.FindMessage("history item", i, &historyItemArchive)
-        // I need to support lists.
-        // But for "date time", it is single.
-        // Let's assume single for now for "date time".
-        // But "history item" needs list.
-        // Wait, BrowsingHistoryItemTest doesn't test loading full history list, only single item.
-        // So single map entry is enough for "date time".
-        if (index == 0 && messages.count(name)) {
-            *message = messages.at(name);
+        if (messages.count(name) && index >= 0 && index < (int32)messages.at(name).size()) {
+            *message = messages.at(name)[index];
             return B_OK;
         }
         return B_ERROR;
     }
     status_t AddMessage(const char* name, const BMessage* message) {
-        messages[name] = *message;
+        messages[name].push_back(*message);
         return B_OK;
     }
 
-    status_t Flatten(BFile* file) { return B_OK; }
-    status_t Unflatten(BFile* file) { return B_OK; }
+    status_t Flatten(BFile* file) const {
+        file->Write(&what, sizeof(uint32));
+
+        uint32 count = strings.size();
+        file->Write(&count, sizeof(uint32));
+        for (std::map<std::string, std::string>::const_iterator it = strings.begin(); it != strings.end(); ++it) {
+            uint32 len = it->first.length();
+            file->Write(&len, sizeof(uint32));
+            file->Write(it->first.c_str(), len);
+            len = it->second.length();
+            file->Write(&len, sizeof(uint32));
+            file->Write(it->second.c_str(), len);
+        }
+
+        count = int64s.size();
+        file->Write(&count, sizeof(uint32));
+        for (std::map<std::string, int64>::const_iterator it = int64s.begin(); it != int64s.end(); ++it) {
+            uint32 len = it->first.length();
+            file->Write(&len, sizeof(uint32));
+            file->Write(it->first.c_str(), len);
+            file->Write(&it->second, sizeof(int64));
+        }
+
+        count = int32s.size();
+        file->Write(&count, sizeof(uint32));
+        for (std::map<std::string, int32>::const_iterator it = int32s.begin(); it != int32s.end(); ++it) {
+            uint32 len = it->first.length();
+            file->Write(&len, sizeof(uint32));
+            file->Write(it->first.c_str(), len);
+            file->Write(&it->second, sizeof(int32));
+        }
+
+        count = uint32s.size();
+        file->Write(&count, sizeof(uint32));
+        for (std::map<std::string, uint32>::const_iterator it = uint32s.begin(); it != uint32s.end(); ++it) {
+            uint32 len = it->first.length();
+            file->Write(&len, sizeof(uint32));
+            file->Write(it->first.c_str(), len);
+            file->Write(&it->second, sizeof(uint32));
+        }
+
+        count = messages.size();
+        file->Write(&count, sizeof(uint32));
+        for (std::map<std::string, std::vector<BMessage> >::const_iterator it = messages.begin(); it != messages.end(); ++it) {
+            uint32 len = it->first.length();
+            file->Write(&len, sizeof(uint32));
+            file->Write(it->first.c_str(), len);
+
+            uint32 vecSize = it->second.size();
+            file->Write(&vecSize, sizeof(uint32));
+            for (size_t i = 0; i < vecSize; i++) {
+                it->second[i].Flatten(file);
+            }
+        }
+        return B_OK;
+    }
+
+    status_t Unflatten(BFile* file) {
+        if (file->Read(&what, sizeof(uint32)) != sizeof(uint32)) return B_ERROR;
+
+        uint32 count;
+        if (file->Read(&count, sizeof(uint32)) != sizeof(uint32)) return B_ERROR;
+        if (count > 10000) return B_ERROR; // Sanity check for mock
+        for (uint32 i=0; i<count; i++) {
+            uint32 len;
+            file->Read(&len, sizeof(uint32));
+            std::string key(len, '\0');
+            file->Read(&key[0], len);
+
+            file->Read(&len, sizeof(uint32));
+            std::string val(len, '\0');
+            file->Read(&val[0], len);
+
+            strings[key] = val;
+        }
+
+        if (file->Read(&count, sizeof(uint32)) != sizeof(uint32)) return B_ERROR;
+        for (uint32 i=0; i<count; i++) {
+            uint32 len;
+            file->Read(&len, sizeof(uint32));
+            std::string key(len, '\0');
+            file->Read(&key[0], len);
+
+            int32 val;
+            file->Read(&val, sizeof(int32));
+
+            int32s[key] = val;
+        }
+
+        if (file->Read(&count, sizeof(uint32)) != sizeof(uint32)) return B_ERROR;
+        for (uint32 i=0; i<count; i++) {
+            uint32 len;
+            file->Read(&len, sizeof(uint32));
+            std::string key(len, '\0');
+            file->Read(&key[0], len);
+
+            uint32 val;
+            file->Read(&val, sizeof(uint32));
+
+            uint32s[key] = val;
+        }
+
+        if (file->Read(&count, sizeof(uint32)) != sizeof(uint32)) return B_ERROR;
+        for (uint32 i=0; i<count; i++) {
+            uint32 len;
+            file->Read(&len, sizeof(uint32));
+            std::string key(len, '\0');
+            file->Read(&key[0], len);
+
+            int64 val;
+            file->Read(&val, sizeof(int64));
+
+            int64s[key] = val;
+        }
+
+        if (file->Read(&count, sizeof(uint32)) != sizeof(uint32)) return B_ERROR;
+        for (uint32 i=0; i<count; i++) {
+            uint32 len;
+            file->Read(&len, sizeof(uint32));
+            std::string key(len, '\0');
+            file->Read(&key[0], len);
+
+            uint32 vecSize;
+            file->Read(&vecSize, sizeof(uint32));
+            for (uint32 j = 0; j < vecSize; j++) {
+                BMessage msg;
+                msg.Unflatten(file);
+                messages[key].push_back(msg);
+            }
+        }
+        return B_OK;
+    }
 
     void MakeEmpty() {
         int64s.clear();
@@ -121,8 +241,7 @@ public:
     }
 
     status_t GetInfo(const char* name, type_code* type, int32* count) const {
-        // Mock implementation for iteration
-        if (messages.count(name)) *count = 1;
+        if (messages.count(name)) *count = (int32)messages.at(name).size();
         else *count = 0;
         return B_OK;
     }
@@ -132,6 +251,6 @@ public:
     std::map<std::string, int32> int32s;
     std::map<std::string, uint32> uint32s;
     std::map<std::string, std::string> strings;
-    std::map<std::string, BMessage> messages;
+    std::map<std::string, std::vector<BMessage> > messages;
 };
 #endif
