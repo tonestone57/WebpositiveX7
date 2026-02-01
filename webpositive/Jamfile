@@ -35,6 +35,7 @@ local sources =
 
 	AuthenticationPanel.cpp
 	BrowserApp.cpp
+	BrowserWebView.cpp
 	BrowserWindow.cpp
 	BrowsingHistory.cpp
 	ConsoleWindow.cpp
