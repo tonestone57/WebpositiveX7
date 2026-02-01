@@ -240,8 +240,13 @@ _SaveFaviconThread(void* data)
 		int32 bytesPerRow = params->icon->BytesPerRow();
 		int32 rowLen = width * 4;
 		uint8* bits = (uint8*)params->icon->Bits();
-		for (int32 i = 0; i < height; i++)
-			file.Write(bits + (i * bytesPerRow), rowLen);
+
+		if (bytesPerRow == rowLen) {
+			file.Write(bits, height * rowLen);
+		} else {
+			for (int32 i = 0; i < height; i++)
+				file.Write(bits + (i * bytesPerRow), rowLen);
+		}
 
 		file.Unset();
 		BEntry entry(tempPath.Path());
