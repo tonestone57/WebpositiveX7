@@ -90,6 +90,7 @@
 #include "BitmapButton.h"
 #include "BookmarkBar.h"
 #include "BrowserApp.h"
+#include "BrowserWebView.h"
 #include "BrowsingHistory.h"
 #include "CredentialsStorage.h"
 #include "IconButton.h"
@@ -1152,19 +1153,20 @@ BrowserWindow::DispatchMessage(BMessage* message, BHandler* target)
 		// Only do this when the mouse is over the web view
 		if (webView->Bounds().Contains(where)) {
 			// Zoom and unzoom text on Command + mouse wheel.
-			// This could of course (and maybe should be) implemented in the
-			// WebView, but there would need to be a way for the WebView to
-			// know the setting of the fZoomTextOnly member here. Plus other
-			// clients of the API may not want this feature.
-			if ((modifiers() & B_COMMAND_KEY) != 0) {
-				float deltaY;
-				if (message->FindFloat("be:wheel_delta_y", &deltaY) == B_OK) {
-					if (deltaY < 0)
-						webView->IncreaseZoomFactor(fZoomTextOnly);
-					else
-						webView->DecreaseZoomFactor(fZoomTextOnly);
+			// This is implemented in BrowserWebView for new tabs, but we
+			// keep the logic here for fallback in case we have a plain
+			// BWebView (e.g. from popup windows created by WebKit).
+			if (dynamic_cast<BrowserWebView*>(webView) == NULL) {
+				if ((modifiers() & B_COMMAND_KEY) != 0) {
+					float deltaY;
+					if (message->FindFloat("be:wheel_delta_y", &deltaY) == B_OK) {
+						if (deltaY < 0)
+							webView->IncreaseZoomFactor(fZoomTextOnly);
+						else
+							webView->DecreaseZoomFactor(fZoomTextOnly);
 
-					return;
+						return;
+					}
 				}
 			}
 		} else {
@@ -1645,6 +1647,13 @@ BrowserWindow::MessageReceived(BMessage* message)
 		{
 			fZoomTextOnly = !fZoomTextOnly;
 			fZoomTextOnlyMenuItem->SetMarked(fZoomTextOnly);
+			for (int32 i = 0; i < fTabManager->CountTabs(); i++) {
+				BView* view = fTabManager->ViewForTab(i);
+				BrowserWebView* browserWebView = dynamic_cast<BrowserWebView*>(view);
+				if (browserWebView != NULL)
+					browserWebView->SetZoomTextOnly(fZoomTextOnly);
+			}
+
 			BWebView* webView = CurrentWebView();
 			if (webView != NULL && webView->WebPage()) {
 				float zoomFactor = webView->WebPage()->ZoomFactor();
@@ -2657,6 +2666,10 @@ BrowserWindow::SetCurrentWebView(BWebView* webView)
 	BWebWindow::SetCurrentWebView(webView);
 
 	if (webView != NULL) {
+		BrowserWebView* browserWebView = dynamic_cast<BrowserWebView*>(webView);
+		if (browserWebView != NULL)
+			browserWebView->SetZoomTextOnly(fZoomTextOnly);
+
 		webView->SetAutoHidePointer(fAutoHidePointer);
 
 		_UpdateTitle(webView->MainFrameTitle());
@@ -2740,8 +2753,11 @@ BrowserWindow::CreateNewTab(const BString& _url, bool select,
 {
 	bool applyNewPagePolicy = webView == NULL;
 	// Executed in app thread (new BWebPage needs to be created in app thread).
-	if (webView == NULL)
-		webView = new BWebView("web view", fContext);
+	if (webView == NULL) {
+		BrowserWebView* browserWebView = new BrowserWebView("web view", fContext);
+		browserWebView->SetZoomTextOnly(fZoomTextOnly);
+		webView = browserWebView;
+	}
 
 	bool isNewWindow = fTabManager->CountTabs() == 0;
 
