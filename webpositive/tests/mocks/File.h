@@ -15,9 +15,9 @@ enum {
 
 class BFile : public BNode {
 public:
-    BFile() {}
-    BFile(const char* path, uint32 mode) {}
-    BFile(const BEntry* entry, uint32 mode) {}
+    BFile() : BNode() {}
+    BFile(const char* path, uint32 mode) : BNode() {}
+    BFile(const BEntry* entry, uint32 mode) : BNode(entry) {}
     status_t InitCheck() { return B_OK; }
     ssize_t Write(const void* buffer, size_t size) {
         content.append((const char*)buffer, size);
@@ -33,8 +33,13 @@ public:
     status_t SetTo(const BEntry* entry, uint32 mode) { return B_OK; }
     void Unset() {}
 
-    ssize_t ReadAttrString(const char* name, BString* result) { return B_OK; }
-    ssize_t WriteAttrString(const char* name, const BString* data) { return B_OK; }
+    // Using BNode::ReadAttrString
+    using BNode::ReadAttrString;
+
+    ssize_t WriteAttrString(const char* name, const BString* data) {
+         if (data) fAttributes[name] = data->String();
+         return B_OK;
+    }
 
     static std::string content;
 };
