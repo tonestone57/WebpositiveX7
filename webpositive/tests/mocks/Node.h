@@ -3,6 +3,7 @@
 #include "Entry.h"
 #include "SupportDefs.h"
 #include "String.h"
+#include "MockFileSystem.h"
 
 class BNode {
 public:
@@ -16,6 +17,7 @@ public:
     status_t GetNextAttrName(char* buffer) { return B_ENTRY_NOT_FOUND; }
 
     status_t ReadAttrString(const char* name, BString* result) {
+        MockFileSystem::sReadAttrCount++;
         if (fAttributes.count(name)) {
              if (result) *result = fAttributes[name].c_str();
              return B_OK;

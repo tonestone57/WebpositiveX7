@@ -13,7 +13,9 @@
 #include <Invoker.h>
 #include <Message.h>
 #include <NodeInfo.h>
+#include <Query.h>
 #include <Roster.h>
+#include <Volume.h>
 #include <stdio.h>
 #include <strings.h>
 
@@ -328,7 +330,48 @@ BookmarkManager::ReadURLAttr(BFile& bookmarkFile, BString& url)
 BookmarkManager::AddBookmarkURLsRecursively(BDirectory& directory,
 	BMessage* message, uint32& addedCount)
 {
+	BVolume volume;
+	if (directory.GetVolume(&volume) == B_OK && volume.KnowsQuery()) {
+		BQuery query;
+		query.SetVolume(&volume);
+		query.PushAttr("META:url");
+		query.PushString("*");
+		query.PushOp(B_EQ);
+
+		if (query.Fetch() == B_OK) {
+			BEntry dirEntry;
+			BPath dirPath;
+			if (directory.GetEntry(&dirEntry) == B_OK && dirEntry.GetPath(&dirPath) == B_OK) {
+				const char* dirStr = dirPath.Path();
+				size_t dirLen = strlen(dirStr);
+
+				entry_ref ref;
+				BPath path;
+				while (query.GetNextRef(&ref) == B_OK) {
+					if (path.SetTo(&ref) == B_OK) {
+						const char* pathStr = path.Path();
+						// Check if pathStr starts with dirStr
+						if (strncmp(pathStr, dirStr, dirLen) == 0) {
+							// Ensure it is a file under this directory (descendant)
+							// pathStr must have a separator after dirStr or be strictly inside
+							if (pathStr[dirLen] == '/' || pathStr[dirLen] == '\0') {
+								BFile file(&ref, B_READ_ONLY);
+								BString storedURL;
+								if (ReadURLAttr(file, storedURL)) {
+									message->AddString("url", storedURL.String());
+									addedCount++;
+								}
+							}
+						}
+					}
+				}
+				return;
+			}
+		}
+	}
+
 	BEntry entry;
+	directory.Rewind();
 	while (directory.GetNextEntry(&entry) == B_OK) {
 		if (entry.IsDirectory()) {
 			BDirectory subBirectory(&entry);

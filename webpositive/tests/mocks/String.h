@@ -15,6 +15,7 @@ public:
     BString(const BString& other) : s(other.s) {}
 
     const char* String() const { return s.c_str(); }
+    operator const char*() const { return s.c_str(); }
     int32 Length() const { return (int32)s.length(); }
     void Truncate(int32 len) { if (len < (int32)s.length()) s.resize(len); }
     void ReplaceAll(const char* a, const char* b) {

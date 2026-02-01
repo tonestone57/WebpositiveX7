@@ -4,6 +4,7 @@
 #include "Entry.h"
 #include "String.h"
 #include "Node.h"
+#include "MockFileSystem.h"
 #include <string>
 
 enum {
@@ -16,8 +17,27 @@ enum {
 class BFile : public BNode {
 public:
     BFile() : BNode() {}
-    BFile(const char* path, uint32 mode) : BNode() {}
-    BFile(const BEntry* entry, uint32 mode) : BNode(entry) {}
+    BFile(const char* path, uint32 mode) : BNode() {
+        MockFileSystem::sOpenCount++;
+        // Load attrs if exists
+        MockEntryData data;
+        if (MockFileSystem::GetEntry(path, &data)) {
+            fAttributes = data.attributes;
+        }
+    }
+    BFile(const BEntry* entry, uint32 mode) : BNode(entry) {
+        MockFileSystem::sOpenCount++;
+    }
+    BFile(const entry_ref* ref, uint32 mode) : BNode() {
+        MockFileSystem::sOpenCount++;
+        if (ref) {
+             MockEntryData data;
+             if (MockFileSystem::GetEntry(ref->path, &data)) {
+                 fAttributes = data.attributes;
+             }
+        }
+    }
+
     status_t InitCheck() { return B_OK; }
     ssize_t Write(const void* buffer, size_t size) {
         content.append((const char*)buffer, size);
