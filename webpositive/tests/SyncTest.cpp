@@ -21,6 +21,12 @@ std::string BFile::content = "";
 status_t create_directory(const char* path, mode_t mode) { return B_OK; }
 
 // Include the source file under test.
+// Prevent system headers from being included by Sync.cpp, as we want to use the mocks.
+#define _FILE_H
+#define _DIRECTORY_H
+#define _PATH_H
+#define _FIND_DIRECTORY_H
+#define _B_STRING_H
 #include "../Sync.cpp"
 
 int main() {

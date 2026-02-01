@@ -61,6 +61,13 @@ int32_t atomic_get(int32_t* value) {
 void snooze(bigtime_t microseconds) {}
 
 // Include the source file under test
+#define _AUTOLOCK_H
+#define _ENTRY_H
+#define _FILE_H
+#define _FIND_DIRECTORY_H
+#define _MESSAGE_H
+#define _MESSAGE_RUNNER_H
+#define _PATH_H
 #include "../BrowsingHistory.cpp"
 
 int main()

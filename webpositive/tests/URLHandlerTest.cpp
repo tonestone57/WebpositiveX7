@@ -12,6 +12,7 @@
 BRoster* be_roster = new BRoster();
 
 #include "../support/URLHandler.h"
+#define _ROSTER_H
 #include "../support/URLHandler.cpp"
 
 // Mock for kSearchEngines matching SettingsKeys.cpp format
