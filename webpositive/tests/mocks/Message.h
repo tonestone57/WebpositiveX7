@@ -182,6 +182,19 @@ public:
             std::string key(len, '\0');
             file->Read(&key[0], len);
 
+            int64 val;
+            file->Read(&val, sizeof(int64));
+
+            int64s[key] = val;
+        }
+
+        if (file->Read(&count, sizeof(uint32)) != sizeof(uint32)) return B_ERROR;
+        for (uint32 i=0; i<count; i++) {
+            uint32 len;
+            file->Read(&len, sizeof(uint32));
+            std::string key(len, '\0');
+            file->Read(&key[0], len);
+
             int32 val;
             file->Read(&val, sizeof(int32));
 
@@ -199,19 +212,6 @@ public:
             file->Read(&val, sizeof(uint32));
 
             uint32s[key] = val;
-        }
-
-        if (file->Read(&count, sizeof(uint32)) != sizeof(uint32)) return B_ERROR;
-        for (uint32 i=0; i<count; i++) {
-            uint32 len;
-            file->Read(&len, sizeof(uint32));
-            std::string key(len, '\0');
-            file->Read(&key[0], len);
-
-            int64 val;
-            file->Read(&val, sizeof(int64));
-
-            int64s[key] = val;
         }
 
         if (file->Read(&count, sizeof(uint32)) != sizeof(uint32)) return B_ERROR;

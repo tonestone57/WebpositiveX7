@@ -463,7 +463,11 @@ BrowsingHistory::BrowsingHistory()
 BrowsingHistory::~BrowsingHistory()
 {
 	delete fSaveRunner;
-	_SaveSettings(true);
+
+	{
+		BAutolock _(this);
+		_SaveSettings(true);
+	}
 
 	while (atomic_get(&sActiveSaveThreads) > 0)
 		snooze(10000);
@@ -960,10 +964,12 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 		if (resume_thread(thread) != B_OK) {
 			kill_thread(thread);
 			atomic_add(&sActiveSaveThreads, -1);
+			context->async = false;
 			_SaveHistoryThread(context);
 		}
 	} else {
 		atomic_add(&sActiveSaveThreads, -1);
+		context->async = false;
 		_SaveHistoryThread(context);
 	}
 }
@@ -991,6 +997,7 @@ BrowsingHistory::_SaveHistoryThread(void* cookie)
 		BAutolock _(&sSaveLock);
 		_SaveToDisk(&settingsArchive);
 	} else {
+		BAutolock _(&sSaveLock);
 		// Append to file
 		BPath path;
 		if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK

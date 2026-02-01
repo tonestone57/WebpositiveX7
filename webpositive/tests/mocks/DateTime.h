@@ -30,7 +30,12 @@ public:
         }
     }
 
-    static BDateTime CurrentDateTime(int) { return BDateTime(); }
+    static time_t sCurrentTime;
+    static BDateTime CurrentDateTime(int) {
+        BDateTime dt;
+        dt.t = ++sCurrentTime;
+        return dt;
+    }
     time_t Time_t() const { return t; }
     void SetTime_t(time_t time) { t = time; }
     void SetTime(const BTime&) {}
@@ -50,5 +55,6 @@ public:
 private:
     time_t t;
 };
+time_t BDateTime::sCurrentTime = 1000;
 enum { B_LOCAL_TIME };
 #endif

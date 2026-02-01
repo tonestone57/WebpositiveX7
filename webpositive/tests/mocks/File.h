@@ -42,8 +42,16 @@ public:
         return fPosition;
     }
     status_t GetSize(off_t* size) { *size = content.length(); return B_OK; }
-    status_t SetTo(const char* path, uint32 mode) { fPosition = 0; return B_OK; }
-    status_t SetTo(const BEntry* entry, uint32 mode) { fPosition = 0; return B_OK; }
+    status_t SetTo(const char* path, uint32 mode) {
+        fPosition = 0;
+        if (mode & B_ERASE_FILE) content = "";
+        return B_OK;
+    }
+    status_t SetTo(const BEntry* entry, uint32 mode) {
+        fPosition = 0;
+        if (mode & B_ERASE_FILE) content = "";
+        return B_OK;
+    }
     void Unset() {}
 
     // Using BNode::ReadAttrString
