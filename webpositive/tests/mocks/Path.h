@@ -1,39 +1,42 @@
 #ifndef _MOCK_PATH_H
 #define _MOCK_PATH_H
-#include <string>
 #include "SupportDefs.h"
-#include "String.h"
-
-struct entry_ref;
+#include "EntryRef.h"
+#include <string>
 
 class BPath {
 public:
+    std::string path;
+
     BPath() {}
-    BPath(const char* p) : path(p ? p : "") {}
-    BPath(const entry_ref* ref) {}
-    BPath(const BPath& other) : path(other.path) {}
+    BPath(const char* p) { if (p) path = p; }
+    BPath(const entry_ref* ref) { if (ref) path = ref->path; }
+
     status_t SetTo(const char* p) { path = p ? p : ""; return B_OK; }
+    status_t SetTo(const entry_ref* ref) {
+        if (ref) path = ref->path;
+        else path = "";
+        return B_OK;
+    }
+    status_t Append(const char* component) {
+        if (!path.empty() && path.back() != '/') path += "/";
+        path += component;
+        return B_OK;
+    }
     const char* Path() const { return path.c_str(); }
     const char* Leaf() const {
-        size_t pos = path.find_last_of('/');
+        size_t pos = path.rfind('/');
         if (pos != std::string::npos) return path.c_str() + pos + 1;
         return path.c_str();
     }
-    status_t Append(const char* p) {
-        if (!path.empty() && path.back() != '/') path += "/";
-        path += p;
-        return B_OK;
-    }
-    status_t Append(const BString& p) {
-        return Append(p.String());
-    }
     status_t GetParent(BPath* parent) const {
-        size_t pos = path.find_last_of('/');
-        if (pos != std::string::npos) parent->path = path.substr(0, pos);
-        else parent->path = ".";
+        size_t pos = path.rfind('/');
+        if (pos != std::string::npos) {
+             parent->SetTo(path.substr(0, pos).c_str());
+        } else {
+             parent->SetTo(".");
+        }
         return B_OK;
     }
-private:
-    std::string path;
 };
 #endif
