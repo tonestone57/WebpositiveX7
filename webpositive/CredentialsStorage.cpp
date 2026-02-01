@@ -218,6 +218,29 @@ CredentialsStorage::RemoveCredentials(const HashString& key)
 }
 
 
+status_t
+CredentialsStorage::Export(BMessage* archive)
+{
+	BAutolock _(this);
+
+	if (archive == NULL)
+		return B_BAD_VALUE;
+
+	CredentialMap::Iterator iterator = fCredentialMap.GetIterator();
+	while (iterator.HasNext()) {
+		CredentialMap::Entry entry = iterator.Next();
+		BMessage credentialMsg;
+		if (entry.value.Archive(&credentialMsg) == B_OK) {
+			credentialMsg.AddString("key", entry.key.GetString());
+			status_t status = archive->AddMessage("credentials", &credentialMsg);
+			if (status != B_OK)
+				return status;
+		}
+	}
+	return B_OK;
+}
+
+
 // #pragma mark - private
 
 
