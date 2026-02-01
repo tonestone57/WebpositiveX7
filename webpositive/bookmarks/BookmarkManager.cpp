@@ -11,6 +11,7 @@
 #include <File.h>
 #include <FindDirectory.h>
 #include <Invoker.h>
+#include <Locale.h>
 #include <Message.h>
 #include <NodeInfo.h>
 #include <Roster.h>
@@ -25,12 +26,6 @@
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "WebPositive Window"
 
-// This string is needed for the translation context.
-// In the original code it was "WebPositive Window".
-// We might need to ensure the catalog is loaded correctly or use B_TRANSLATE_CONTEXT.
-
-static const char* kApplicationName = "WebPositive";
-
 /*static*/ status_t
 BookmarkManager::GetBookmarkPath(BPath& path)
 {
@@ -38,7 +33,7 @@ BookmarkManager::GetBookmarkPath(BPath& path)
 	if (ret != B_OK)
 		return ret;
 
-	ret = path.Append(kApplicationName);
+	ret = path.Append(B_TRANSLATE_SYSTEM_NAME("WebPositive"));
 	if (ret != B_OK)
 		return ret;
 
