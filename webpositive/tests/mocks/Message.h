@@ -5,6 +5,7 @@
 #include "Entry.h"
 #include <map>
 #include <string>
+#include <vector>
 
 class BFile;
 
@@ -13,61 +14,77 @@ public:
     BMessage(uint32 what = 0) : what(what) {}
 
     status_t FindInt64(const char* name, int64* value) const {
-        if (int64s.count(name)) {
-            *value = int64s.at(name);
-            return B_OK;
-        }
-        return B_ERROR;
+        return FindInt64(name, 0, value);
     }
-    status_t FindString(const char* name, const char** value) const {
-        if (strings.count(name)) {
-            *value = strings.at(name).c_str();
+    status_t FindInt64(const char* name, int32 index, int64* value) const {
+        if (int64s.count(name) && index >= 0 && index < (int32)int64s.at(name).size()) {
+            *value = int64s.at(name)[index];
             return B_OK;
         }
         return B_ERROR;
     }
     status_t AddInt64(const char* name, int64 value) {
-        int64s[name] = value;
+        int64s[name].push_back(value);
         return B_OK;
     }
 
-    status_t FindInt32(const char* name, int32* value) const {
-        if (int32s.count(name)) {
-            *value = int32s.at(name);
+    status_t FindString(const char* name, const char** value) const {
+        return FindString(name, 0, value);
+    }
+    status_t FindString(const char* name, int32 index, const char** value) const {
+        if (strings.count(name) && index >= 0 && index < (int32)strings.at(name).size()) {
+            *value = strings.at(name)[index].c_str();
             return B_OK;
         }
         return B_ERROR;
-    }
-    status_t AddInt32(const char* name, int32 value) {
-        int32s[name] = value;
-        return B_OK;
-    }
-
-    status_t FindUInt32(const char* name, uint32* value) const {
-        if (uint32s.count(name)) {
-            *value = uint32s.at(name);
-            return B_OK;
-        }
-        return B_ERROR;
-    }
-    status_t AddUInt32(const char* name, uint32 value) {
-        uint32s[name] = value;
-        return B_OK;
     }
 
     status_t FindString(const char* name, BString* value) const {
-        if (strings.count(name)) {
-            *value = strings.at(name).c_str();
+        return FindString(name, 0, value);
+    }
+    status_t FindString(const char* name, int32 index, BString* value) const {
+        if (strings.count(name) && index >= 0 && index < (int32)strings.at(name).size()) {
+            *value = strings.at(name)[index].c_str();
             return B_OK;
         }
         return B_ERROR;
     }
     status_t AddString(const char* name, const char* value) {
-        strings[name] = value;
+        strings[name].push_back(value);
         return B_OK;
     }
     status_t AddString(const char* name, const BString& value) {
         return AddString(name, value.String());
+    }
+
+    status_t FindInt32(const char* name, int32* value) const {
+        return FindInt32(name, 0, value);
+    }
+    status_t FindInt32(const char* name, int32 index, int32* value) const {
+        if (int32s.count(name) && index >= 0 && index < (int32)int32s.at(name).size()) {
+            *value = int32s.at(name)[index];
+            return B_OK;
+        }
+        return B_ERROR;
+    }
+    status_t AddInt32(const char* name, int32 value) {
+        int32s[name].push_back(value);
+        return B_OK;
+    }
+
+    status_t FindUInt32(const char* name, uint32* value) const {
+        return FindUInt32(name, 0, value);
+    }
+    status_t FindUInt32(const char* name, int32 index, uint32* value) const {
+        if (uint32s.count(name) && index >= 0 && index < (int32)uint32s.at(name).size()) {
+            *value = uint32s.at(name)[index];
+            return B_OK;
+        }
+        return B_ERROR;
+    }
+    status_t AddUInt32(const char* name, uint32 value) {
+        uint32s[name].push_back(value);
+        return B_OK;
     }
 
     status_t FindData(const char* name, type_code type, const void** data, ssize_t* numBytes) const {
@@ -81,31 +98,17 @@ public:
     }
 
     status_t FindMessage(const char* name, BMessage* message) const {
-        if (messages.count(name)) {
-            *message = messages.at(name);
-            return B_OK;
-        }
-        return B_ERROR;
+        return FindMessage(name, 0, message);
     }
     status_t FindMessage(const char* name, int32 index, BMessage* message) const {
-        // Index not supported in simple map mock, but BrowsingHistory uses index loop
-        // for "history item" 0..N.
-        // I need to support lists or multiple items with same name?
-        // BrowsingHistory.cpp: settingsArchive.FindMessage("history item", i, &historyItemArchive)
-        // I need to support lists.
-        // But for "date time", it is single.
-        // Let's assume single for now for "date time".
-        // But "history item" needs list.
-        // Wait, BrowsingHistoryItemTest doesn't test loading full history list, only single item.
-        // So single map entry is enough for "date time".
-        if (index == 0 && messages.count(name)) {
-            *message = messages.at(name);
+        if (messages.count(name) && index >= 0 && index < (int32)messages.at(name).size()) {
+            *message = messages.at(name)[index];
             return B_OK;
         }
         return B_ERROR;
     }
     status_t AddMessage(const char* name, const BMessage* message) {
-        messages[name] = *message;
+        messages[name].push_back(*message);
         return B_OK;
     }
 
@@ -121,17 +124,35 @@ public:
     }
 
     status_t GetInfo(const char* name, type_code* type, int32* count) const {
-        // Mock implementation for iteration
-        if (messages.count(name)) *count = 1;
-        else *count = 0;
-        return B_OK;
+        if (messages.count(name)) {
+            *count = messages.at(name).size();
+            return B_OK;
+        }
+        if (strings.count(name)) {
+            *count = strings.at(name).size();
+            return B_OK;
+        }
+        if (int64s.count(name)) {
+            *count = int64s.at(name).size();
+            return B_OK;
+        }
+        if (int32s.count(name)) {
+            *count = int32s.at(name).size();
+            return B_OK;
+        }
+        if (uint32s.count(name)) {
+            *count = uint32s.at(name).size();
+            return B_OK;
+        }
+        *count = 0;
+        return B_ENTRY_NOT_FOUND;
     }
 
     uint32 what;
-    std::map<std::string, int64> int64s;
-    std::map<std::string, int32> int32s;
-    std::map<std::string, uint32> uint32s;
-    std::map<std::string, std::string> strings;
-    std::map<std::string, BMessage> messages;
+    std::map<std::string, std::vector<int64> > int64s;
+    std::map<std::string, std::vector<int32> > int32s;
+    std::map<std::string, std::vector<uint32> > uint32s;
+    std::map<std::string, std::vector<std::string> > strings;
+    std::map<std::string, std::vector<BMessage> > messages;
 };
 #endif
