@@ -219,6 +219,93 @@ struct FaviconLoadParams {
 };
 
 
+struct PathActionParams {
+	BPath path;
+};
+
+
+struct CookieActionParams {
+	BPath path;
+	BReference<BPrivate::Network::BNetworkCookieJar> cookieJar;
+};
+
+
+static status_t
+_ExportHistoryThread(void* data)
+{
+	PathActionParams* params = static_cast<PathActionParams*>(data);
+	status_t status = BrowsingHistory::ExportHistory(params->path);
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to export history"));
+		errorMsg << ": " << SafeStrerror(status).String();
+		BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
+	}
+
+	delete params;
+	return B_OK;
+}
+
+
+static status_t
+_ExportBookmarksThread(void* data)
+{
+	PathActionParams* params = static_cast<PathActionParams*>(data);
+	status_t status = BookmarkManager::ExportBookmarks(params->path);
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to export bookmarks"));
+		errorMsg << ": " << SafeStrerror(status).String();
+		BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
+	}
+
+	delete params;
+	return B_OK;
+}
+
+
+static status_t
+_ImportBookmarksThread(void* data)
+{
+	PathActionParams* params = static_cast<PathActionParams*>(data);
+	status_t status = BookmarkManager::ImportBookmarks(params->path);
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to import bookmarks"));
+		errorMsg << ": " << SafeStrerror(status).String();
+		BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
+	}
+
+	delete params;
+	return B_OK;
+}
+
+
+static status_t
+_ExportCookiesThread(void* data)
+{
+	CookieActionParams* params = static_cast<CookieActionParams*>(data);
+	status_t status = Sync::ExportCookies(params->path, params->cookieJar);
+
+	if (status != B_OK) {
+		BString errorMsg(B_TRANSLATE("Failed to export cookies"));
+		errorMsg << ": " << SafeStrerror(status).String();
+		BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
+			errorMsg.String(), B_TRANSLATE("OK"));
+		alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
+	}
+
+	delete params;
+	return B_OK;
+}
+
+
 static status_t
 _SaveFaviconThread(void* data)
 {
@@ -1299,9 +1386,29 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case IMPORT_BOOKMARKS:
 		{
-			BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
-				NULL, B_FILE_NODE, false, new BMessage(IMPORT_BOOKMARKS));
-			panel->Show();
+			// Handle Import from FilePanel selection
+			entry_ref ref;
+			if (message->FindRef("refs", &ref) == B_OK) {
+				BPath path(&ref);
+				PathActionParams* params = new(std::nothrow) PathActionParams;
+				if (params != NULL) {
+					params->path = path;
+					thread_id thread = spawn_thread(_ImportBookmarksThread,
+						"Import Bookmarks", B_NORMAL_PRIORITY, params);
+					if (thread >= 0) {
+						if (resume_thread(thread) != B_OK) {
+							kill_thread(thread);
+							delete params;
+						}
+					} else {
+						delete params;
+					}
+				}
+			} else {
+				BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(this),
+					NULL, B_FILE_NODE, false, new BMessage(IMPORT_BOOKMARKS));
+				panel->Show();
+			}
 			break;
 		}
 
@@ -1356,35 +1463,54 @@ BrowserWindow::MessageReceived(BMessage* message)
 				if (type == EXPORT_BOOKMARKS) {
 					BPath path(&ref);
 					path.Append(name);
-					status_t status = BookmarkManager::ExportBookmarks(path);
-					if (status != B_OK) {
-						BString errorMsg(B_TRANSLATE("Failed to export bookmarks"));
-						errorMsg << ": " << SafeStrerror(status).String();
-						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
-							errorMsg.String(), B_TRANSLATE("OK"));
-						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
+					PathActionParams* params = new(std::nothrow) PathActionParams;
+					if (params != NULL) {
+						params->path = path;
+						thread_id thread = spawn_thread(_ExportBookmarksThread,
+							"Export Bookmarks", B_NORMAL_PRIORITY, params);
+						if (thread >= 0) {
+							if (resume_thread(thread) != B_OK) {
+								kill_thread(thread);
+								delete params;
+							}
+						} else {
+							delete params;
+						}
 					}
 				} else if (type == EXPORT_HISTORY) {
 					BPath path(&ref);
 					path.Append(name);
-					status_t status = BrowsingHistory::ExportHistory(path);
-					if (status != B_OK) {
-						BString errorMsg(B_TRANSLATE("Failed to export history"));
-						errorMsg << ": " << SafeStrerror(status).String();
-						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
-							errorMsg.String(), B_TRANSLATE("OK"));
-						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
+					PathActionParams* params = new(std::nothrow) PathActionParams;
+					if (params != NULL) {
+						params->path = path;
+						thread_id thread = spawn_thread(_ExportHistoryThread,
+							"Export History", B_NORMAL_PRIORITY, params);
+						if (thread >= 0) {
+							if (resume_thread(thread) != B_OK) {
+								kill_thread(thread);
+								delete params;
+							}
+						} else {
+							delete params;
+						}
 					}
 				} else if (type == EXPORT_COOKIES) {
 					BPath path(&ref);
 					path.Append(name);
-					status_t status = Sync::ExportCookies(path, fContext->GetCookieJar());
-					if (status != B_OK) {
-						BString errorMsg(B_TRANSLATE("Failed to export cookies"));
-						errorMsg << ": " << SafeStrerror(status).String();
-						BAlert* alert = new BAlert(B_TRANSLATE("Export error"),
-							errorMsg.String(), B_TRANSLATE("OK"));
-						alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
+					CookieActionParams* params = new(std::nothrow) CookieActionParams;
+					if (params != NULL) {
+						params->path = path;
+						params->cookieJar = fContext->GetCookieJar();
+						thread_id thread = spawn_thread(_ExportCookiesThread,
+							"Export Cookies", B_NORMAL_PRIORITY, params);
+						if (thread >= 0) {
+							if (resume_thread(thread) != B_OK) {
+								kill_thread(thread);
+								delete params;
+							}
+						} else {
+							delete params;
+						}
 					}
 				} else if (type == SAVE_PAGE) {
 					BFile output(&dir, name,
@@ -1505,24 +1631,6 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case SHOW_BOOKMARKS:
 			BookmarkManager::ShowBookmarks();
 			break;
-
-		case IMPORT_BOOKMARKS:
-		{
-			// Handle Import from FilePanel selection
-			entry_ref ref;
-			if (message->FindRef("refs", &ref) == B_OK) {
-				BPath path(&ref);
-				status_t status = BookmarkManager::ImportBookmarks(path);
-				if (status != B_OK) {
-					BString errorMsg(B_TRANSLATE("Failed to import bookmarks"));
-					errorMsg << ": " << SafeStrerror(status).String();
-					BAlert* alert = new BAlert(B_TRANSLATE("Import error"),
-						errorMsg.String(), B_TRANSLATE("OK"));
-					alert->Go(new BInvoker(new BMessage(B_NO_REPLY), NULL));
-				}
-			}
-			break;
-		}
 
 		case B_REFS_RECEIVED:
 		{
@@ -2365,15 +2473,23 @@ BrowserWindow::MessageReceived(BMessage* message)
 				if (fExpectingDomInspection) {
 					if (text.StartsWith("INSPECT_DOM_START:")) {
 						fInspectDomBuffer = "";
-						fInspectDomExpectedChunks = atoi(text.String() + strlen("INSPECT_DOM_START:"));
+						char* endPtr;
+						const char* numberStart = text.String() + strlen("INSPECT_DOM_START:");
+						fInspectDomExpectedChunks = strtol(numberStart, &endPtr, 10);
+						if (endPtr == numberStart)
+							fInspectDomExpectedChunks = 0;
 						fInspectDomReceivedChunks = 0;
 
 						// Preallocate buffer to avoid frequent reallocations.
 						// JS side uses 2048 chars per chunk.
 						// Cap at 20MB to match the hard limit enforced below.
-						int32 estimatedSize = fInspectDomExpectedChunks * 2048;
-						if (estimatedSize > 20 * 1024 * 1024)
-							estimatedSize = 20 * 1024 * 1024;
+						int32 estimatedSize = 0;
+						if (fInspectDomExpectedChunks > 0) {
+							if (fInspectDomExpectedChunks > (20 * 1024 * 1024) / 2048)
+								estimatedSize = 20 * 1024 * 1024;
+							else
+								estimatedSize = fInspectDomExpectedChunks * 2048;
+						}
 
 						if (estimatedSize > 0) {
 							fInspectDomBuffer.LockBuffer(estimatedSize);
