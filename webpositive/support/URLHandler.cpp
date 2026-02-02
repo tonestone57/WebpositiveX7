@@ -72,6 +72,7 @@ URLHandler::_EncodeURIComponent(const BString& search)
 	BString result;
 
 	// Worst case expansion: every character is escaped (3 bytes)
+	// Optimization: Single pass with pessimistic allocation
 	char* buffer = result.LockBuffer(length * 3);
 	if (buffer == NULL)
 		return result;
