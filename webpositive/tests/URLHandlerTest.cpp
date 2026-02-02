@@ -103,6 +103,16 @@ int main()
 	assert(action == URLHandler::LAUNCH_APP);
 	printf("Test 9 Passed: FTP URL (Delegated)\n");
 
+	// Test 10: Localhost with port
+	input = "localhost:8080";
+	action = URLHandler::CheckURL(input, outURL, searchPageURL);
+	assert(action == URLHandler::LOAD_URL);
+	if (outURL != "http://localhost:8080") {
+		printf("Test 10 Failed: Expected 'http://localhost:8080', Got '%s'\n", outURL.String());
+	}
+	assert(outURL == "http://localhost:8080");
+	printf("Test 10 Passed: Localhost with port\n");
+
 
 	printf("All tests passed!\n");
 	return 0;
