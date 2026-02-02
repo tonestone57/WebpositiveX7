@@ -97,6 +97,16 @@ int main()
 	assert(outURL == "https://duckduckgo.com/?q=good");
 	printf("Test 8 Passed: False Positive Avoidance\n");
 
+	// Test 9: FTP URL
+	input = "ftp://ftp.haiku-os.org";
+	action = URLHandler::CheckURL(input, outURL, searchPageURL);
+	assert(action == URLHandler::LOAD_URL);
+	if (outURL != "ftp://ftp.haiku-os.org") {
+		printf("Test 9 Failed: Expected 'ftp://ftp.haiku-os.org', Got '%s'\n", outURL.String());
+	}
+	assert(outURL == "ftp://ftp.haiku-os.org");
+	printf("Test 9 Passed: FTP URL\n");
+
 
 	printf("All tests passed!\n");
 	return 0;
