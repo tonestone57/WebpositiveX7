@@ -107,15 +107,7 @@ class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
 				priority = INT_MAX;
 
 			// Optimized inline baseURL() to avoid memory allocation
-			int32 protoPos = choiceText.FindFirst("://");
-			if (protoPos < 0) {
-				lastBaseURL = choiceText;
-			} else {
-				int32 baseURLStart = protoPos + 3;
-				int32 baseURLEnd = choiceText.FindFirst("/", baseURLStart + 1);
-				lastBaseURL.SetTo(choiceText.String() + baseURLStart,
-					baseURLEnd - baseURLStart);
-			}
+			baseURL(choiceText, lastBaseURL);
 
 			fChoices.AddItem(new URLChoice(choiceText,
 				choiceText, matchPos, pattern.Length(), priority));

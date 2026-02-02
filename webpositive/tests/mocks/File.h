@@ -11,12 +11,14 @@ enum {
     B_READ_ONLY = 1,
     B_WRITE_ONLY = 2,
     B_CREATE_FILE = 4,
-    B_ERASE_FILE = 8
+    B_ERASE_FILE = 8,
+    B_OPEN_AT_END = 16
 };
 
 class BFile : public BNode {
 public:
     BFile() : BNode() {}
+    off_t Seek(off_t offset, uint32 seekMode) { return 0; }
     BFile(const char* path, uint32 mode) : BNode() {
         MockFileSystem::sOpenCount++;
         // Load attrs if exists

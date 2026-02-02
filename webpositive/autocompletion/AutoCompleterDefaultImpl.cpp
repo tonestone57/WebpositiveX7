@@ -205,13 +205,13 @@ BDefaultChoiceView::ListView::ListView(
 	BListView(BRect(0, 0, 100, 100), "ChoiceViewList"),
 	fCompleter(completer)
 {
-	SetEventMask(B_POINTER_EVENTS);
 }
 
 
 void
 BDefaultChoiceView::ListView::AttachedToWindow()
 {
+	SetEventMask(B_POINTER_EVENTS);
 	SetTarget(this);
 	SetInvocationMessage(new BMessage(MSG_INVOKED));
 	BListView::AttachedToWindow();
