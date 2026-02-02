@@ -28,6 +28,7 @@
 
 
 static const uint32 SAVE_HISTORY = 0x73766873;
+static const int32 kSaveBufferSize = 4096;
 
 
 BrowsingHistoryItem::BrowsingHistoryItem(const BString& url)
@@ -427,7 +428,7 @@ _SaveToDisk(const std::vector<BrowsingHistoryItem>& items, int32 maxAge)
 					buffer << "hadd " << item.URL() << " " << (int64)item.DateTime().Time_t()
 						<< " " << item.InvocationCount() << "\n";
 
-					if (buffer.Length() > 4096) {
+					if (buffer.Length() > kSaveBufferSize) {
 						if (settingsFile.Write(buffer.String(), buffer.Length()) != buffer.Length()) {
 							success = false;
 							break;
