@@ -207,6 +207,74 @@ BrowsingHistory::ExportHistory(const BPath& path)
 }
 
 
+static void
+ParseHistoryLine(char* lineStart, std::vector<BrowsingHistoryItem>& items)
+{
+	char* token = lineStart;
+	BString url;
+
+	// URL
+	if (*token == '"') {
+		token++; // Skip opening quote
+		// Manual unescaping
+		while (*token) {
+			if (*token == '"') {
+				if (*(token + 1) == '"') {
+					url += '"';
+					token += 2;
+				} else {
+					// End quote
+					token++;
+					if (*token == ',') token++;
+					break;
+				}
+			} else {
+				// Optimization: append chunk until next quote
+				char* nextQuote = strchr(token, '"');
+				if (nextQuote) {
+					url.Append(token, nextQuote - token);
+					token = nextQuote;
+				} else {
+					// Should not happen if well-formed
+					url += token;
+					break;
+				}
+			}
+		}
+	} else {
+		char* comma = strchr(token, ',');
+		if (comma) {
+			url.Append(token, comma - token);
+			token = comma + 1;
+		} else {
+			url = token;
+			token += strlen(token);
+		}
+	}
+
+	// Date
+	char* comma = strchr(token, ',');
+	if (comma) {
+		*comma = '\0';
+		struct tm timeinfo;
+		memset(&timeinfo, 0, sizeof(struct tm));
+		strptime(token, "%Y-%m-%d %H:%M:%S", &timeinfo);
+		time_t t = mktime(&timeinfo);
+		BDateTime dateTime;
+		dateTime.SetTime_t(t);
+
+		// Count
+		token = comma + 1;
+		uint32 count = (uint32)atoi(token);
+
+		BrowsingHistoryItem item(url);
+		item.SetDateTime(dateTime);
+		item.SetInvocationCount(count);
+		items.push_back(item);
+	}
+}
+
+
 /*static*/ status_t
 BrowsingHistory::ImportHistory(const BPath& path)
 {
@@ -224,122 +292,58 @@ BrowsingHistory::ImportHistory(const BPath& path)
 	if (size < 0 || size > 0x10000000)
 		return B_ERROR;
 
-	// Optimize: raw buffer for manual parsing
-	char* buffer = new(std::nothrow) char[size + 1];
-	if (buffer == NULL)
-		return B_NO_MEMORY;
-
-	std::unique_ptr<char[]> bufferPtr(buffer);
-
-	ssize_t bytesRead = file.Read(buffer, size);
-	if (bytesRead < 0)
-		return (status_t)bytesRead;
-	if (bytesRead != size)
-		return B_IO_ERROR;
-	buffer[size] = '\0';
-
 	std::vector<BrowsingHistoryItem> items;
 	// Pre-allocate to reduce reallocations
 	items.reserve(size / 50);
 
-	char* cursor = buffer;
-	char* end = buffer + size;
+	const size_t kBufferSize = 65536;
+	char buffer[kBufferSize];
 
-	// Skip header
-	while (cursor < end && *cursor != '\n') cursor++;
-	if (cursor < end) cursor++;
+	BString currentLine;
+	bool inQuotes = false;
+	bool headerSkipped = false;
 
-	while (cursor < end && *cursor) {
-		char* lineStart = cursor;
-		// Find end of line, respecting quotes
-		bool inQuotes = false;
+	while (true) {
+		ssize_t bytesRead = file.Read(buffer, kBufferSize);
+		if (bytesRead < 0)
+			return (status_t)bytesRead;
+		if (bytesRead == 0)
+			break;
+
+		char* cursor = buffer;
+		char* end = buffer + bytesRead;
+		char* segmentStart = cursor;
+
 		while (cursor < end) {
-			if (*cursor == '"') inQuotes = !inQuotes;
-			else if (*cursor == '\n' && !inQuotes) break;
+			char c = *cursor;
+			if (c == '"') {
+				inQuotes = !inQuotes;
+			} else if (c == '\n' && !inQuotes) {
+				// End of line
+				if (!headerSkipped) {
+					headerSkipped = true;
+				} else {
+					currentLine.Append(segmentStart, cursor - segmentStart);
+					char* lineBuf = currentLine.LockBuffer(currentLine.Length());
+					ParseHistoryLine(lineBuf, items);
+					currentLine.UnlockBuffer(currentLine.Length());
+				}
+
+				currentLine.Truncate(0);
+				segmentStart = cursor + 1;
+			}
 			cursor++;
 		}
 
-		size_t lineLen = cursor - lineStart;
-		if (lineLen == 0) {
-			if (cursor < end) cursor++;
-			continue;
-		}
-
-		// Temporarily null-terminate the line
-		char originalChar = *cursor;
-		*cursor = '\0';
-
-		// Parse Line
-		char* token = lineStart;
-		BString url;
-
-		// URL
-		if (*token == '"') {
-			token++; // Skip opening quote
-			// Manual unescaping
-			while (*token) {
-				if (*token == '"') {
-					if (*(token + 1) == '"') {
-						url += '"';
-						token += 2;
-					} else {
-						// End quote
-						token++;
-						if (*token == ',') token++;
-						break;
-					}
-				} else {
-					// Optimization: append chunk until next quote
-					char* nextQuote = strchr(token, '"');
-					if (nextQuote) {
-						url.Append(token, nextQuote - token);
-						token = nextQuote;
-					} else {
-						// Should not happen if well-formed
-						url += token;
-						break;
-					}
-				}
-			}
-		} else {
-			char* comma = strchr(token, ',');
-			if (comma) {
-				url.Append(token, comma - token);
-				token = comma + 1;
-			} else {
-				url = token;
-				token += strlen(token);
-			}
-		}
-
-		// Date
-		char* comma = strchr(token, ',');
-		if (comma) {
-			*comma = '\0';
-			struct tm timeinfo;
-			memset(&timeinfo, 0, sizeof(struct tm));
-			strptime(token, "%Y-%m-%d %H:%M:%S", &timeinfo);
-			time_t t = mktime(&timeinfo);
-			BDateTime dateTime;
-			dateTime.SetTime_t(t);
-
-			// Count
-			token = comma + 1;
-			uint32 count = (uint32)atoi(token);
-
-			BrowsingHistoryItem item(url);
-			item.SetDateTime(dateTime);
-			item.SetInvocationCount(count);
-			items.push_back(item);
-		}
-
-		// Restore and advance
-		*cursor = originalChar;
-		if (cursor < end) cursor++;
+		if (segmentStart < end)
+			currentLine.Append(segmentStart, end - segmentStart);
 	}
 
-	// bufferPtr will delete buffer
-	bufferPtr.reset();
+	if (currentLine.Length() > 0) {
+		char* lineBuf = currentLine.LockBuffer(currentLine.Length());
+		ParseHistoryLine(lineBuf, items);
+		currentLine.UnlockBuffer(currentLine.Length());
+	}
 
 	if (items.empty())
 		return B_OK;
