@@ -35,18 +35,26 @@ BrowsingHistoryItem::BrowsingHistoryItem(const BString& url)
 	:
 	fURL(url),
 	fDateTime(BDateTime::CurrentDateTime(B_LOCAL_TIME)),
-	fInvocationCount(0)
+	fInvocationCount(0),
+	fHostStart(-1),
+	fHostLength(0)
 {
 }
 
 
 BrowsingHistoryItem::BrowsingHistoryItem(const BrowsingHistoryItem& other)
+	:
+	fHostStart(other.fHostStart),
+	fHostLength(other.fHostLength)
 {
 	*this = other;
 }
 
 
 BrowsingHistoryItem::BrowsingHistoryItem(const BMessage* archive)
+	:
+	fHostStart(-1),
+	fHostLength(0)
 {
 	if (!archive)
 		return;
@@ -95,6 +103,8 @@ BrowsingHistoryItem::operator=(const BrowsingHistoryItem& other)
 	fURL = other.fURL;
 	fDateTime = other.fDateTime;
 	fInvocationCount = other.fInvocationCount;
+	fHostStart = other.fHostStart;
+	fHostLength = other.fHostLength;
 
 	return *this;
 }
@@ -162,6 +172,74 @@ BrowsingHistoryItem::Invoked()
 	if (count > fInvocationCount)
 		fInvocationCount = count;
 	fDateTime = BDateTime::CurrentDateTime(B_LOCAL_TIME);
+}
+
+
+bool
+BrowsingHistoryItem::IsDomainMatch(const char* domain) const
+{
+	if (fHostStart < 0) {
+		const char* url = fURL.String();
+		// 1. Skip scheme
+		const char* start = strstr(url, "://");
+		if (start)
+			start += 3;
+		else
+			start = url;
+
+		// 2. Scan for authority end, userinfo, and port in one loop.
+		const char* p = start;
+		const char* hostStart = start;
+		const char* hostEnd = NULL;
+		bool inBrackets = false;
+
+		while (*p) {
+			char c = *p;
+			if (c == '/' || c == '?' || c == '#') {
+				break; // End of authority
+			}
+
+			if (c == '@') {
+				hostStart = p + 1;
+				hostEnd = NULL; // Reset port/hostEnd logic
+				inBrackets = false;
+			} else if (c == '[') {
+				inBrackets = true;
+			} else if (c == ']') {
+				inBrackets = false;
+			} else if (c == ':' && !inBrackets) {
+				// First colon after host start (and not inside brackets) marks start of port
+				if (hostEnd == NULL)
+					hostEnd = p;
+			}
+			p++;
+		}
+
+		// p is now at end of authority
+		if (hostEnd == NULL)
+			hostEnd = p;
+
+		fHostStart = hostStart - url;
+		fHostLength = hostEnd - hostStart;
+	}
+
+	size_t targetLen = strlen(domain);
+
+	if ((size_t)fHostLength < targetLen)
+		return false;
+
+	const char* hostStart = fURL.String() + fHostStart;
+
+	// Compare
+	if (strncasecmp(hostStart + fHostLength - targetLen, domain, targetLen) == 0) {
+		if ((size_t)fHostLength == targetLen)
+			return true;
+		// Check for dot before domain
+		if (hostStart[fHostLength - targetLen - 1] == '.')
+			return true;
+	}
+
+	return false;
 }
 
 
@@ -713,65 +791,6 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 }
 
 
-static bool
-IsDomainMatch(const char* url, const char* targetDomain)
-{
-	// 1. Skip scheme
-	const char* start = strstr(url, "://");
-	if (start)
-		start += 3;
-	else
-		start = url;
-
-	// 2. Find end of authority
-	const char* end = start;
-	while (*end && *end != '/' && *end != '?' && *end != '#') {
-		end++;
-	}
-
-	// 3. Find host start (after userinfo)
-	const char* hostStart = start;
-	const char* at = start;
-	while (at < end) {
-		if (*at == '@')
-			hostStart = at + 1;
-		at++;
-	}
-
-	// 4. Find host end (before port)
-	const char* hostEnd = end;
-	// Check for IPv6 brackets
-	bool inBrackets = false;
-	const char* p = hostStart;
-	while (p < end) {
-		if (*p == '[') inBrackets = true;
-		else if (*p == ']') inBrackets = false;
-		else if (*p == ':' && !inBrackets) {
-			hostEnd = p;
-			break;
-		}
-		p++;
-	}
-
-	size_t hostLen = hostEnd - hostStart;
-	size_t targetLen = strlen(targetDomain);
-
-	if (hostLen < targetLen)
-		return false;
-
-	// 5. Compare
-	if (strncasecmp(hostStart + hostLen - targetLen, targetDomain, targetLen) == 0) {
-		if (hostLen == targetLen)
-			return true;
-		// Check for dot before domain
-		if (hostStart[hostLen - targetLen - 1] == '.')
-			return true;
-	}
-
-	return false;
-}
-
-
 void
 BrowsingHistory::_RemoveItemsForDomain(const char* domain)
 {
@@ -783,11 +802,8 @@ BrowsingHistory::_RemoveItemsForDomain(const char* domain)
 		BrowsingHistoryItem* item = fHistoryList[i];
 		bool remove = false;
 
-		// Fast pre-filter
-		if (item->URL().IFindFirst(domain) >= 0) {
-			if (IsDomainMatch(item->URL().String(), domain)) {
-				remove = true;
-			}
+		if (item->IsDomainMatch(domain)) {
+			remove = true;
 		}
 
 		if (remove) {
@@ -957,7 +973,7 @@ BrowsingHistory::_LoadSettings()
 				} else if (strncmp(line, "hrmd ", 5) == 0) {
 					const char* domain = line + 5;
 					for (auto it = fHistoryMap.begin(); it != fHistoryMap.end();) {
-						if (IsDomainMatch(it->first.String(), domain)) {
+						if (it->second->IsDomainMatch(domain)) {
 							delete it->second;
 							fHistoryMap.erase(it++);
 						} else {
