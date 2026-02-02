@@ -2937,30 +2937,20 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 			BString host = checkUrl.Host();
 			host.ToLower();
 
-			// Binary search for exact match
-			if (std::binary_search(kBlockedDomains.begin(), kBlockedDomains.end(), host)) {
-				if (view)
-					view->LoadURL("about:blank");
-				return;
-			}
-
-			// Check for subdomain match (e.g. ad.doubleclick.net)
-			// This is still O(N) in worst case unless we optimize domain tree, but N is small (6).
-			// With larger list, a trie or reversed domain sort would be better.
-			// Given the constraint "sorted vector and binary search", exact match is fast.
-			// For suffix match, we can lower_bound to find potential candidates.
-
-			// Simple suffix check for now as per previous logic, but using vector
-			for (const auto& domain : kBlockedDomains) {
-				if (host.EndsWith(domain)) {
-					int32 hostLen = host.Length();
-					int32 domainLen = domain.Length();
-					if (hostLen > domainLen && host.ByteAt(hostLen - domainLen - 1) == '.') {
-						if (view)
-							view->LoadURL("about:blank");
-						return;
-					}
+			// Iterate up the domain hierarchy
+			// Checks: "mail.google.com", then "google.com", then "com"
+			while (!host.IsEmpty()) {
+				if (std::binary_search(kBlockedDomains.begin(), kBlockedDomains.end(), host)) {
+					if (view)
+						view->LoadURL("about:blank");
+					return;
 				}
+
+				// Find the next dot to strip the subdomain
+				int32 firstDot = host.FindFirst('.');
+				if (firstDot == B_ERROR) break; // No more parents to check
+
+				host.Remove(0, firstDot + 1);
 			}
 		}
 	}

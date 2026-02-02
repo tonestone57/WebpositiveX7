@@ -33,6 +33,10 @@ public:
         std::replace(s.begin(), s.end(), a, b);
     }
 
+    void ToLower() {
+        std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+    }
+
     int32 FindFirst(char c) const {
         size_t pos = s.find(c);
         return pos == std::string::npos ? B_ERROR : (int32)pos;
