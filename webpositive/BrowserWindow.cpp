@@ -246,8 +246,18 @@ _SaveFaviconThread(void* data)
 		if (bytesPerRow == rowLen) {
 			file.Write(bits, height * rowLen);
 		} else {
-			for (int32 i = 0; i < height; i++)
-				file.Write(bits + (i * bytesPerRow), rowLen);
+			size_t totalDataSize = (size_t)height * rowLen;
+			uint8* buffer = new(std::nothrow) uint8[totalDataSize];
+			if (buffer) {
+				for (int32 i = 0; i < height; i++)
+					memcpy(buffer + (i * rowLen), bits + (i * bytesPerRow), rowLen);
+
+				file.Write(buffer, totalDataSize);
+				delete[] buffer;
+			} else {
+				for (int32 i = 0; i < height; i++)
+					file.Write(bits + (i * bytesPerRow), rowLen);
+			}
 		}
 
 		file.Unset();
