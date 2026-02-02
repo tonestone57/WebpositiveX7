@@ -15,10 +15,7 @@
 // Mock for be_roster
 BRoster* be_roster = new BRoster();
 
-// Hack to access private members
-#define private public
 #include "../support/URLHandler.h"
-#undef private
 #define _ROSTER_H
 #include "../support/URLHandler.cpp"
 
@@ -38,13 +35,13 @@ int main()
         search += search;
     }
 
-	printf("Benchmarking _EncodeURIComponent with string length: %d\n", search.Length());
+	printf("Benchmarking EncodeURIComponent with string length: %d\n", search.Length());
 
 	clock_t start = clock();
 	int iterations = 100000;
 
 	for (int i = 0; i < iterations; i++) {
-		BString result = URLHandler::_EncodeURIComponent(search);
+		BString result = URLHandler::EncodeURIComponent(search);
         // preventative check to ensure compiler doesn't optimize away
         if (result.Length() == 0) printf("Error\n");
 	}

@@ -17,9 +17,9 @@ public:
 
 	static Action CheckURL(const BString& input, BString& outURL, const BString& searchPageURL);
 	static bool IsValidDomainChar(char ch);
+	static BString EncodeURIComponent(const BString& search);
 
 private:
-	static BString _EncodeURIComponent(const BString& search);
 	static void _VisitSearchEngine(const BString& search, BString& outURL, const BString& searchPageURL);
 };
 
