@@ -259,8 +259,9 @@ DownloadProgressView::DownloadProgressView(const BMessage* archive)
 		fURL = string;
 
 	fFinishTime = 0;
-	if (archive->FindInt64("finish_time", (int64*)&fFinishTime) != B_OK)
-		fFinishTime = 0;
+	int64 finishTime;
+	if (archive->FindInt64("finish_time", &finishTime) == B_OK)
+		fFinishTime = (time_t)finishTime;
 }
 
 
@@ -280,8 +281,7 @@ DownloadProgressView::Init(BMessage* archive)
 	if (!archive)
 		fFinishTime = 0;
 
-	fProcessStartTime = fLastSpeedReferenceTime
-		= fEstimatedFinishReferenceTime	= system_time();
+	fLastSpeedReferenceTime = fEstimatedFinishReferenceTime = system_time();
 
 	SetViewUIColor(B_LIST_BACKGROUND_COLOR);
 	SetFlags(Flags() | B_FULL_UPDATE_ON_RESIZE | B_WILL_DRAW);
