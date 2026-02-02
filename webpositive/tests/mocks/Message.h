@@ -9,6 +9,8 @@
 
 class BFile;
 
+const uint32 B_REFS_RECEIVED = 'RRCV';
+
 class BMessage {
 public:
     BMessage(uint32 what = 0) : what(what) {}
@@ -88,12 +90,36 @@ public:
     }
 
     status_t FindData(const char* name, type_code type, const void** data, ssize_t* numBytes) const {
+        return FindData(name, type, 0, data, numBytes);
+    }
+    status_t FindData(const char* name, type_code type, int32 index, const void** data, ssize_t* numBytes) const {
+        if (dataItems.count(name) && index >= 0 && index < (int32)dataItems.at(name).size()) {
+             *data = dataItems.at(name)[index].data();
+             *numBytes = dataItems.at(name)[index].size();
+             return B_OK;
+        }
+        // Fallback to strings if needed (simulating BMessage behavior where strings are data too)
+        if (strings.count(name) && index >= 0 && index < (int32)strings.at(name).size()) {
+            *data = strings.at(name)[index].c_str();
+            *numBytes = strings.at(name)[index].length() + 1; // Include null terminator
+            return B_OK;
+        }
         return B_ERROR;
     }
+    status_t AddData(const char* name, type_code type, const void* data, ssize_t numBytes) {
+        std::vector<uint8_t> vec;
+        vec.assign((const uint8_t*)data, (const uint8_t*)data + numBytes);
+        dataItems[name].push_back(vec);
+        return B_OK;
+    }
+
     status_t FindRef(const char* name, entry_ref* ref) const {
         return B_OK;
     }
     status_t FindRef(const char* name, int32 index, entry_ref* ref) const {
+        return B_OK;
+    }
+    status_t AddRef(const char* name, const entry_ref* ref) {
         return B_OK;
     }
 
@@ -144,6 +170,10 @@ public:
             *count = uint32s.at(name).size();
             return B_OK;
         }
+        if (dataItems.count(name)) {
+            *count = dataItems.at(name).size();
+            return B_OK;
+        }
         *count = 0;
         return B_ENTRY_NOT_FOUND;
     }
@@ -154,5 +184,6 @@ public:
     std::map<std::string, std::vector<uint32> > uint32s;
     std::map<std::string, std::vector<std::string> > strings;
     std::map<std::string, std::vector<BMessage> > messages;
+    std::map<std::string, std::vector<std::vector<uint8_t> > > dataItems;
 };
 #endif

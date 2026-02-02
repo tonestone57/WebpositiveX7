@@ -24,8 +24,12 @@ const status_t B_IO_ERROR = -3;
 const status_t B_BAD_VALUE = -4; // Added B_BAD_VALUE
 const status_t B_ENTRY_NOT_FOUND = -5;
 const status_t B_ALREADY_RUNNING = -6;
+const status_t B_NAME_NOT_FOUND = -7;
 const uint32 B_NO_REPLY = 0;
 const type_code B_COLOR_8_BIT_TYPE = 1;
+const type_code B_STRING_TYPE = 'CSTR';
+const type_code B_RAW_TYPE = 'RAWT';
+const type_code B_ANY_TYPE = 'ANYT';
 #ifndef B_RGBA32_TYPE // Defined in WebConstants.h usually, but here for mocks
 #define B_RGBA32_TYPE 0x52474241
 #endif

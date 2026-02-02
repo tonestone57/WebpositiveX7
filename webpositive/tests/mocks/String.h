@@ -78,6 +78,14 @@ public:
         return pos == std::string::npos ? B_ERROR : (int32)pos;
     }
 
+    int ICompare(const char* str) const {
+        std::string s1 = s;
+        std::string s2 = str ? str : "";
+        std::transform(s1.begin(), s1.end(), s1.begin(), ::toupper);
+        std::transform(s2.begin(), s2.end(), s2.begin(), ::toupper);
+        return s1.compare(s2);
+    }
+
     char ByteAt(int32 index) const { return s[index]; }
     bool IsEmpty() const { return s.empty(); }
     void SetTo(char c, int32 count) { s.assign(count, c); }

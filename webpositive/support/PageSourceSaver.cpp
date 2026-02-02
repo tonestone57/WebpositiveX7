@@ -65,11 +65,16 @@ PageSourceSaver::_PageSourceThread(void* data)
 		pathToPageSource.SetTo(url.String());
 	} else {
 		// Something else, store it.
-		BString source;
-		ret = message->FindString("source", &source);
+		const void* data;
+		ssize_t size;
+		ret = message->FindData("source", B_ANY_TYPE, &data, &size);
 
-		if (ret == B_OK)
+		if (ret == B_OK) {
+			if (size > 0 && ((const char*)data)[size - 1] == '\0')
+				size--;
+
 			ret = find_directory(B_SYSTEM_TEMP_DIRECTORY, &pathToPageSource);
+		}
 
 		BString extension = ".html";
 		const char* mimeType = "text/html";
@@ -120,9 +125,8 @@ PageSourceSaver::_PageSourceThread(void* data)
 			ret = pageSourceFile.InitCheck();
 
 		if (ret == B_OK) {
-			ssize_t written = pageSourceFile.Write(source.String(),
-				source.Length());
-			if (written != source.Length())
+			ssize_t written = pageSourceFile.Write(data, size);
+			if (written != size)
 				ret = (written < 0) ? (status_t)written : B_IO_ERROR;
 		}
 

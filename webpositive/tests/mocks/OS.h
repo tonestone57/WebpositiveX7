@@ -11,4 +11,5 @@ thread_id spawn_thread(status_t (*func)(void*), const char* name, int32 priority
 int32_t atomic_add(int32_t* value, int32_t addvalue);
 int32_t atomic_get(int32_t* value);
 void snooze(bigtime_t microseconds);
+bigtime_t system_time();
 #endif
