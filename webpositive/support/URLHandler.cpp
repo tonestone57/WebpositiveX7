@@ -16,7 +16,6 @@
 static const char* kHandledProtocols[] = {
 	"http",
 	"https",
-	"ftp",
 	"file",
 	"about",
 	"data",

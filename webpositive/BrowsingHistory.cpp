@@ -343,7 +343,7 @@ ParseHistoryLine(char* lineStart, std::vector<BrowsingHistoryItem>& items)
 
 		// Count
 		token = comma + 1;
-		uint32 count = (uint32)atoi(token);
+		uint32 count = (uint32)strtoul(token, NULL, 10);
 
 		BrowsingHistoryItem item(url);
 		item.SetDateTime(dateTime);
@@ -959,7 +959,7 @@ BrowsingHistory::_LoadSettings()
 
 			if (*line) {
 				if (strncmp(line, "max_age ", 8) == 0) {
-					fMaxHistoryItemAge = atoi(line + 8);
+					fMaxHistoryItemAge = strtoul(line + 8, NULL, 10);
 					oldestAllowedDateTime = BDateTime::CurrentDateTime(B_LOCAL_TIME);
 					oldestAllowedDateTime.Date().AddDays(-fMaxHistoryItemAge);
 				} else if (strncmp(line, "hclr", 4) == 0) {
@@ -987,12 +987,12 @@ BrowsingHistory::_LoadSettings()
 				} else if (strncmp(line, "hadd ", 5) == 0) {
 					char* countStr = strrchr(line, ' ');
 					if (countStr) {
-						uint32 count = atoi(countStr + 1);
+						uint32 count = strtoul(countStr + 1, NULL, 10);
 						*countStr = '\0';
 
 						char* timeStr = strrchr(line, ' ');
 						if (timeStr) {
-							int64 timeVal = atoll(timeStr + 1);
+							int64 timeVal = strtoll(timeStr + 1, NULL, 10);
 							*timeStr = '\0';
 
 							BString url(line + 5);

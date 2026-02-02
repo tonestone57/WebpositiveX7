@@ -2365,15 +2365,23 @@ BrowserWindow::MessageReceived(BMessage* message)
 				if (fExpectingDomInspection) {
 					if (text.StartsWith("INSPECT_DOM_START:")) {
 						fInspectDomBuffer = "";
-						fInspectDomExpectedChunks = atoi(text.String() + strlen("INSPECT_DOM_START:"));
+						char* endPtr;
+						const char* numberStart = text.String() + strlen("INSPECT_DOM_START:");
+						fInspectDomExpectedChunks = strtol(numberStart, &endPtr, 10);
+						if (endPtr == numberStart)
+							fInspectDomExpectedChunks = 0;
 						fInspectDomReceivedChunks = 0;
 
 						// Preallocate buffer to avoid frequent reallocations.
 						// JS side uses 2048 chars per chunk.
 						// Cap at 20MB to match the hard limit enforced below.
-						int32 estimatedSize = fInspectDomExpectedChunks * 2048;
-						if (estimatedSize > 20 * 1024 * 1024)
-							estimatedSize = 20 * 1024 * 1024;
+						int32 estimatedSize = 0;
+						if (fInspectDomExpectedChunks > 0) {
+							if (fInspectDomExpectedChunks > (20 * 1024 * 1024) / 2048)
+								estimatedSize = 20 * 1024 * 1024;
+							else
+								estimatedSize = fInspectDomExpectedChunks * 2048;
+						}
 
 						if (estimatedSize > 0) {
 							fInspectDomBuffer.LockBuffer(estimatedSize);
