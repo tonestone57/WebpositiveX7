@@ -2365,7 +2365,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 				if (fExpectingDomInspection) {
 					if (text.StartsWith("INSPECT_DOM_START:")) {
 						fInspectDomBuffer = "";
-						fInspectDomExpectedChunks = strtol(text.String() + strlen("INSPECT_DOM_START:"), NULL, 10);
+						char* endPtr;
+						const char* numberStart = text.String() + strlen("INSPECT_DOM_START:");
+						fInspectDomExpectedChunks = strtol(numberStart, &endPtr, 10);
+						if (endPtr == numberStart)
+							fInspectDomExpectedChunks = 0;
 						fInspectDomReceivedChunks = 0;
 
 						// Preallocate buffer to avoid frequent reallocations.
