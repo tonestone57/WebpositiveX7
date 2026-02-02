@@ -88,8 +88,6 @@ private:
 			off_t				fEstimatedFinishReferenceSize;
 			bigtime_t			fLastUpdateTime;
 			bigtime_t			fLastSpeedReferenceTime;
-			bigtime_t			fProcessStartTime;
-			bigtime_t			fLastSpeedUpdateTime;
 			bigtime_t			fEstimatedFinishReferenceTime;
 	static	const size_t		kBytesPerSecondSlots = 10;
 			size_t				fCurrentBytesPerSecondSlot;
