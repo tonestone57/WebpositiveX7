@@ -24,6 +24,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
+#include <algorithm>
 
 #include "BaseURL.h"
 #include "BrowserWindow.h"
@@ -73,14 +75,15 @@ private:
 
 
 class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
+public:
+	virtual ~BrowsingHistoryChoiceModel()
+	{
+		_ClearChoices();
+	}
+
 	virtual void FetchChoicesFor(const BString& pattern)
 	{
-		int32 count = CountChoices();
-		for (int32 i = 0; i < count; i++) {
-			delete static_cast<BAutoCompleter::Choice*>(
-				fChoices.ItemAtFast(i));
-		}
-		fChoices.MakeEmpty();
+		_ClearChoices();
 
 		// Search through BrowsingHistory for any matches.
 		BrowsingHistory* history = BrowsingHistory::DefaultInstance();
@@ -91,7 +94,7 @@ class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
 		int32 priority = INT_MAX;
 
 		const int32 kMaxChoices = 50;
-		count = history->CountItems();
+		int32 count = history->CountItems();
 		for (int32 i = count - 1; i >= 0; i--) {
 			const BrowsingHistoryItem* item = history->HistoryItemAt(i);
 			if (item == NULL)
@@ -109,44 +112,43 @@ class BrowsingHistoryChoiceModel : public BAutoCompleter::ChoiceModel {
 			// Optimized inline baseURL() to avoid memory allocation
 			baseURL(choiceText, lastBaseURL);
 
-			fChoices.AddItem(new URLChoice(choiceText,
+			fChoices.push_back(new URLChoice(choiceText,
 				choiceText, matchPos, pattern.Length(), priority));
 
-			if (fChoices.CountItems() >= kMaxChoices)
+			if ((int32)fChoices.size() >= kMaxChoices)
 				break;
 		}
 
 		history->Unlock();
 
-		fChoices.SortItems(_CompareChoices);
+		std::sort(fChoices.begin(), fChoices.end(), _CompareChoices);
 	}
 
 	virtual int32 CountChoices() const
 	{
-		return fChoices.CountItems();
+		return (int32)fChoices.size();
 	}
 
 	virtual const BAutoCompleter::Choice* ChoiceAt(int32 index) const
 	{
-		return static_cast<BAutoCompleter::Choice*>(
-			fChoices.ItemAt(index));
+		return fChoices[index];
 	}
 
-	static int _CompareChoices(const void* a, const void* b)
+	static bool _CompareChoices(const URLChoice* a, const URLChoice* b)
 	{
-		const URLChoice* aChoice
-			= *static_cast<const URLChoice* const *>(a);
-		const URLChoice* bChoice
-			= *static_cast<const URLChoice* const *>(b);
-		if (*aChoice < *bChoice)
-			return -1;
-		else if (*aChoice == *bChoice)
-			return 0;
-		return 1;
+		return *a < *b;
 	}
 
 private:
-	BList fChoices;
+	void _ClearChoices()
+	{
+		for (size_t i = 0; i < fChoices.size(); i++)
+			delete fChoices[i];
+		fChoices.clear();
+	}
+
+private:
+	std::vector<URLChoice*> fChoices;
 };
 
 
