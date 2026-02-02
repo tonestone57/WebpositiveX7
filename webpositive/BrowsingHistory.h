@@ -118,6 +118,7 @@ private:
 			bool				fSettingsLoaded;
 			BMessageRunner*		fSaveRunner;
 			uint32				fGeneration;
+			int32				fPendingOperations;
 };
 
 

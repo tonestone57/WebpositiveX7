@@ -45,6 +45,7 @@ public:
     }
 
     bool operator<(const BDateTime& other) const { return t < other.t; }
+    bool operator>(const BDateTime& other) const { return t > other.t; }
     bool operator==(const BDateTime& other) const { return t == other.t; }
 
 private:

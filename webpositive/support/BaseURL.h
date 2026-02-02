@@ -9,6 +9,7 @@
 
 
 BString baseURL(const BString& string);
+void baseURL(const BString& string, BString& result);
 
 
 #endif // BASE_URL_H

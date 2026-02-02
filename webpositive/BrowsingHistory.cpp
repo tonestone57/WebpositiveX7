@@ -399,7 +399,7 @@ struct SaveContext {
 
 
 static void
-_SaveToDisk(BMessage* settingsArchive)
+_SaveToDisk(const std::vector<BrowsingHistoryItem>& items, int32 maxAge)
 {
 	// Implement logic similar to _OpenSettingsFile but standalone to avoid
 	// dependency on the singleton instance which might be destroyed.
@@ -416,7 +416,24 @@ _SaveToDisk(BMessage* settingsArchive)
 
 		BFile settingsFile;
 		if (settingsFile.SetTo(tempPath.Path(), B_CREATE_FILE | B_ERASE_FILE | B_WRITE_ONLY) == B_OK) {
-			if (settingsArchive->Flatten(&settingsFile) == B_OK) {
+			BString header;
+			header << "max_age " << maxAge << "\n";
+			bool success = settingsFile.Write(header.String(), header.Length()) == header.Length();
+
+			if (success) {
+				for (size_t i = 0; i < items.size(); i++) {
+					const BrowsingHistoryItem& item = items[i];
+					BString line;
+					line << "hadd " << item.URL() << " " << (int64)item.DateTime().Time_t()
+						<< " " << item.InvocationCount() << "\n";
+					if (settingsFile.Write(line.String(), line.Length()) != line.Length()) {
+						success = false;
+						break;
+					}
+				}
+			}
+
+			if (success) {
 				settingsFile.Unset();
 				BEntry entry(tempPath.Path());
 				entry.Rename(path.Leaf(), true);
@@ -431,6 +448,35 @@ _SaveToDisk(BMessage* settingsArchive)
 }
 
 
+static void
+_AppendToHistory(const char* command, const char* url = NULL, bigtime_t time = 0, uint32 count = 0)
+{
+	BPath path;
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK
+		|| path.Append(kApplicationName) != B_OK
+		|| path.Append("BrowsingHistory") != B_OK) {
+		return;
+	}
+
+	BFile file(path.Path(), B_WRITE_ONLY | B_OPEN_AT_END | B_CREATE_FILE);
+	if (file.InitCheck() != B_OK)
+		return;
+
+	BString line;
+	line << command;
+	if (url)
+		line << " " << url;
+	if (time > 0 || strcmp(command, "hadd") == 0 || strcmp(command, "max_age") == 0)
+		line << " " << (int64)time;
+	if (count > 0 || strcmp(command, "hadd") == 0)
+		line << " " << count;
+	line << "\n";
+
+	BAutolock _(&sSaveLock);
+	file.Write(line.String(), line.Length());
+}
+
+
 BrowsingHistory::BrowsingHistory()
 	:
 	BHandler("browsing history"),
@@ -438,7 +484,8 @@ BrowsingHistory::BrowsingHistory()
 	fMaxHistoryItemAge(7),
 	fSettingsLoaded(false),
 	fSaveRunner(NULL),
-	fGeneration(0)
+	fGeneration(0),
+	fPendingOperations(0)
 {
 }
 
@@ -513,8 +560,11 @@ BrowsingHistory::Clear()
 {
 	BAutolock _(this);
 	_Clear();
-	_ScheduleSave();
-}	
+	_AppendToHistory("hclr");
+	fPendingOperations++;
+	if (fPendingOperations > 500)
+		_SaveSettings(true);
+}
 
 
 void
@@ -541,7 +591,7 @@ BrowsingHistory::SetMaxHistoryItemAge(int32 days)
 	BAutolock _(this);
 	if (fMaxHistoryItemAge != days) {
 		fMaxHistoryItemAge = days;
-		_ScheduleSave();
+		_AppendToHistory("max_age", NULL, days);
 	}
 }	
 
@@ -635,7 +685,11 @@ BrowsingHistory::_AddItem(const BrowsingHistoryItem& item, bool internal)
 
 	if (!internal) {
 		newItem->Invoked();
-		_ScheduleSave();
+		_AppendToHistory("hadd", newItem->URL().String(),
+			newItem->DateTime().Time_t(), newItem->InvocationCount());
+		fPendingOperations++;
+		if (fPendingOperations > 500)
+			_SaveSettings(true);
 	}
 
 	fGeneration++;
@@ -735,7 +789,11 @@ BrowsingHistory::_RemoveItemsForDomain(const char* domain)
 	if (changed) {
 		fHistoryList.resize(writeIndex);
 		fGeneration++;
-		_ScheduleSave();
+
+		_AppendToHistory("hrmd", domain);
+		fPendingOperations++;
+		if (fPendingOperations > 500)
+			_SaveSettings(true);
 	}
 }
 
@@ -743,8 +801,9 @@ BrowsingHistory::_RemoveItemsForDomain(const char* domain)
 bool
 BrowsingHistory::_RemoveUrl(const BString& url)
 {
+	BString urlCopy(url);
 	std::map<BString, BrowsingHistoryItem*>::iterator it
-		= fHistoryMap.find(url);
+		= fHistoryMap.find(urlCopy);
 	if (it == fHistoryMap.end())
 		return false;
 
@@ -762,10 +821,14 @@ BrowsingHistory::_RemoveUrl(const BString& url)
 		fHistoryList.erase(listIt);
 	}
 
+	_AppendToHistory("hrem", urlCopy.String());
+	fPendingOperations++;
+	if (fPendingOperations > 500)
+		_SaveSettings(true);
+
 	fHistoryMap.erase(it);
 	delete item;
 
-	_ScheduleSave();
 	fGeneration++;
 
 	return true;
@@ -783,52 +846,153 @@ BrowsingHistory::_LoadSettings()
 	BFile settingsFile;
 	if (_OpenSettingsFile(settingsFile, B_READ_ONLY)) {
 		BMessage settingsArchive;
-		settingsArchive.Unflatten(&settingsFile);
-		if (settingsArchive.FindInt32("max history item age",
-				&fMaxHistoryItemAge) != B_OK) {
-			fMaxHistoryItemAge = 7;
+		if (settingsArchive.Unflatten(&settingsFile) == B_OK) {
+			if (settingsArchive.FindInt32("max history item age",
+					&fMaxHistoryItemAge) != B_OK) {
+				fMaxHistoryItemAge = 7;
+			}
+			BDateTime oldestAllowedDateTime
+				= BDateTime::CurrentDateTime(B_LOCAL_TIME);
+			oldestAllowedDateTime.Date().AddDays(-fMaxHistoryItemAge);
+
+			BMessage historyItemArchive;
+			int32 count = 0;
+			// Count items first to reserve vector
+			type_code type;
+			if (settingsArchive.GetInfo("history item", &type, &count) != B_OK)
+				count = 0;
+
+			if (count > 0)
+				fHistoryList.reserve(count);
+
+			for (int32 i = 0; settingsArchive.FindMessage("history item", i,
+					&historyItemArchive) == B_OK; i++) {
+				BrowsingHistoryItem item(&historyItemArchive);
+				if (oldestAllowedDateTime < item.DateTime()) {
+					// Bulk load: create item and push back, sort later
+					if (fHistoryMap.find(item.URL()) == fHistoryMap.end()) {
+						std::unique_ptr<BrowsingHistoryItem> newItem(new(std::nothrow) BrowsingHistoryItem(item));
+						if (!newItem) continue;
+
+						try {
+							fHistoryList.push_back(newItem.get());
+							try {
+								fHistoryMap[newItem->URL()] = newItem.get();
+								newItem.release();
+							} catch (...) {
+								fHistoryList.pop_back();
+								throw;
+							}
+						} catch (...) {
+							// newItem destroyed by unique_ptr
+						}
+					}
+				}
+				historyItemArchive.MakeEmpty();
+			}
+
+			// Sort the list once after bulk insertion
+			std::sort(fHistoryList.begin(), fHistoryList.end(), BrowsingHistoryItemPointerCompare());
+			return;
 		}
-		BDateTime oldestAllowedDateTime
-			= BDateTime::CurrentDateTime(B_LOCAL_TIME);
+
+		// Fallback to text format
+		settingsFile.Seek(0, SEEK_SET);
+		off_t size;
+		settingsFile.GetSize(&size);
+		if (size <= 0)
+			return;
+
+		char* buffer = new(std::nothrow) char[size + 1];
+		if (buffer == NULL)
+			return;
+
+		if (settingsFile.Read(buffer, size) != size) {
+			delete[] buffer;
+			return;
+		}
+		buffer[size] = '\0';
+
+		BDateTime oldestAllowedDateTime = BDateTime::CurrentDateTime(B_LOCAL_TIME);
 		oldestAllowedDateTime.Date().AddDays(-fMaxHistoryItemAge);
 
-		BMessage historyItemArchive;
-		int32 count = 0;
-		// Count items first to reserve vector
-		type_code type;
-		if (settingsArchive.GetInfo("history item", &type, &count) != B_OK)
-			count = 0;
+		char* line = buffer;
+		while (line < buffer + size) {
+			char* nextLine = strchr(line, '\n');
+			if (nextLine)
+				*nextLine = '\0';
 
-		if (count > 0)
-			fHistoryList.reserve(count);
-
-		for (int32 i = 0; settingsArchive.FindMessage("history item", i,
-				&historyItemArchive) == B_OK; i++) {
-			BrowsingHistoryItem item(&historyItemArchive);
-			if (oldestAllowedDateTime < item.DateTime()) {
-				// Bulk load: create item and push back, sort later
-				if (fHistoryMap.find(item.URL()) == fHistoryMap.end()) {
-					std::unique_ptr<BrowsingHistoryItem> newItem(new(std::nothrow) BrowsingHistoryItem(item));
-					if (!newItem) continue;
-
-					try {
-						fHistoryList.push_back(newItem.get());
-						try {
-							fHistoryMap[newItem->URL()] = newItem.get();
-							newItem.release();
-						} catch (...) {
-							fHistoryList.pop_back();
-							throw;
+			if (*line) {
+				if (strncmp(line, "max_age ", 8) == 0) {
+					fMaxHistoryItemAge = atoi(line + 8);
+					oldestAllowedDateTime = BDateTime::CurrentDateTime(B_LOCAL_TIME);
+					oldestAllowedDateTime.Date().AddDays(-fMaxHistoryItemAge);
+				} else if (strncmp(line, "hclr", 4) == 0) {
+					// Clear map
+					for (auto it = fHistoryMap.begin(); it != fHistoryMap.end(); ++it)
+						delete it->second;
+					fHistoryMap.clear();
+				} else if (strncmp(line, "hrem ", 5) == 0) {
+					BString url(line + 5);
+					auto it = fHistoryMap.find(url);
+					if (it != fHistoryMap.end()) {
+						delete it->second;
+						fHistoryMap.erase(it);
+					}
+				} else if (strncmp(line, "hrmd ", 5) == 0) {
+					const char* domain = line + 5;
+					for (auto it = fHistoryMap.begin(); it != fHistoryMap.end();) {
+						if (IsDomainMatch(it->first.String(), domain)) {
+							delete it->second;
+							fHistoryMap.erase(it++);
+						} else {
+							++it;
 						}
-					} catch (...) {
-						// newItem destroyed by unique_ptr
+					}
+				} else if (strncmp(line, "hadd ", 5) == 0) {
+					char* countStr = strrchr(line, ' ');
+					if (countStr) {
+						uint32 count = atoi(countStr + 1);
+						*countStr = '\0';
+
+						char* timeStr = strrchr(line, ' ');
+						if (timeStr) {
+							int64 timeVal = atoll(timeStr + 1);
+							*timeStr = '\0';
+
+							BString url(line + 5);
+							BDateTime dateTime;
+							dateTime.SetTime_t((time_t)timeVal);
+
+							if (dateTime > oldestAllowedDateTime) {
+								auto it = fHistoryMap.find(url);
+								if (it != fHistoryMap.end()) {
+									it->second->SetDateTime(dateTime);
+									it->second->SetInvocationCount(count);
+								} else {
+									BrowsingHistoryItem* newItem = new BrowsingHistoryItem(url);
+									newItem->SetDateTime(dateTime);
+									newItem->SetInvocationCount(count);
+									fHistoryMap[url] = newItem;
+								}
+							}
+						}
 					}
 				}
 			}
-			historyItemArchive.MakeEmpty();
+
+			if (!nextLine)
+				break;
+			line = nextLine + 1;
 		}
 
-		// Sort the list once after bulk insertion
+		delete[] buffer;
+
+		// Rebuild list from map
+		fHistoryList.reserve(fHistoryMap.size());
+		for (auto it = fHistoryMap.begin(); it != fHistoryMap.end(); ++it) {
+			fHistoryList.push_back(it->second);
+		}
 		std::sort(fHistoryList.begin(), fHistoryList.end(), BrowsingHistoryItemPointerCompare());
 	}
 }
@@ -838,24 +1002,23 @@ void
 BrowsingHistory::_SaveSettings(bool forceSync)
 {
 	if (forceSync) {
-		BMessage settingsArchive;
-		settingsArchive.AddInt32("max history item age", fMaxHistoryItemAge);
-		BMessage historyItemArchive;
-		for (HistoryList::const_iterator it = fHistoryList.begin();
-			it != fHistoryList.end(); ++it) {
-			const BrowsingHistoryItem* item = *it;
-			if (!item || item->Archive(&historyItemArchive) != B_OK)
-				break;
-			if (settingsArchive.AddMessage("history item",
-					&historyItemArchive) != B_OK) {
-				break;
+		fPendingOperations = 0;
+		std::vector<BrowsingHistoryItem> items;
+		try {
+			items.reserve(fHistoryList.size());
+			for (HistoryList::const_iterator it = fHistoryList.begin();
+				it != fHistoryList.end(); ++it) {
+				const BrowsingHistoryItem* item = *it;
+				if (item)
+					items.push_back(*item);
 			}
-			historyItemArchive.MakeEmpty();
+		} catch (...) {
+			// In case of allocation failure, we just don't save or save partial
 		}
 
 		BAutolock _(&sSaveLock);
 		sIsShuttingDown = true;
-		_SaveToDisk(&settingsArchive);
+		_SaveToDisk(items, fMaxHistoryItemAge);
 		return;
 	}
 
@@ -894,19 +1057,6 @@ BrowsingHistory::_SaveHistoryThread(void* cookie)
 {
 	SaveContext* context = (SaveContext*)cookie;
 
-	BMessage settingsArchive;
-	settingsArchive.AddInt32("max history item age", context->maxAge);
-	BMessage historyItemArchive;
-	for (size_t i = 0; i < context->items.size(); i++) {
-		if (context->items[i].Archive(&historyItemArchive) != B_OK)
-			break;
-		if (settingsArchive.AddMessage("history item",
-				&historyItemArchive) != B_OK) {
-			break;
-		}
-		historyItemArchive.MakeEmpty();
-	}
-
 	BAutolock _(&sSaveLock);
 
 	if (sIsShuttingDown) {
@@ -915,7 +1065,7 @@ BrowsingHistory::_SaveHistoryThread(void* cookie)
 		return B_OK;
 	}
 
-	_SaveToDisk(&settingsArchive);
+	_SaveToDisk(context->items, context->maxAge);
 	delete context;
 	atomic_add(&sActiveSaveThreads, -1);
 	return B_OK;
