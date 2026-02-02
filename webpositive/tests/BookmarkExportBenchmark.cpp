@@ -1,3 +1,8 @@
+/*
+ * Copyright 2024 Haiku, Inc. All rights reserved.
+ * Distributed under the terms of the MIT License.
+ */
+
 #include <stdio.h>
 #include <iostream>
 #include <vector>
@@ -41,6 +46,7 @@ BRoster* be_roster = new BRoster();
 // Mock create_directory
 status_t create_directory(const char* path, mode_t mode) { return B_OK; }
 
+#undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "Benchmark"
 #include "../bookmarks/BookmarkManager.cpp"
 

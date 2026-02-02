@@ -42,6 +42,7 @@ status_t create_directory(const char* path, mode_t mode) { return B_OK; }
 
 // Include source
 // We need to define B_TRANSLATION_CONTEXT to avoid errors if it's redefined
+#undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "Benchmark"
 #include "../bookmarks/BookmarkManager.cpp"
 
