@@ -13,7 +13,18 @@ public:
     BNode(const BEntry* entry) {
         if (entry) fAttributes = entry->fAttributes;
     }
+    BNode(const entry_ref* ref) {
+        if (ref) {
+             MockEntryData data;
+             if (MockFileSystem::GetEntry(ref->path, &data)) {
+                 fAttributes = data.attributes;
+             }
+        }
+    }
     virtual ~BNode() {}
+
+    status_t InitCheck() { return B_OK; }
+
     status_t GetNextAttrName(char* buffer) { return B_ENTRY_NOT_FOUND; }
 
     status_t ReadAttrString(const char* name, BString* result) {

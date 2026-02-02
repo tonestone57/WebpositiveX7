@@ -26,7 +26,7 @@ public:
 	static bool CheckBookmarkExists(BDirectory& directory,
 		const BString& fileName, const BString& url);
 
-	static bool ReadURLAttr(BFile& bookmarkFile, BString& url);
+	static bool ReadURLAttr(BNode& bookmarkNode, BString& url);
 
 	static void AddBookmarkURLsRecursively(BDirectory& directory,
 		BMessage* message, uint32& addedCount);

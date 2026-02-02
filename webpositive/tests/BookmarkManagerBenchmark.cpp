@@ -23,6 +23,10 @@
 
 // Define static members for mocks
 std::string BFile::content = "";
+std::map<std::string, MockEntryData> MockFileSystem::sEntries;
+long MockFileSystem::sGetNextEntryCount = 0;
+long MockFileSystem::sOpenCount = 0;
+long MockFileSystem::sReadAttrCount = 0;
 
 // Implement find_directory
 status_t find_directory(directory_which which, BPath* path) {
@@ -38,6 +42,7 @@ status_t create_directory(const char* path, mode_t mode) { return B_OK; }
 
 // Include source
 // We need to define B_TRANSLATION_CONTEXT to avoid errors if it's redefined
+#undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "Benchmark"
 #include "../bookmarks/BookmarkManager.cpp"
 

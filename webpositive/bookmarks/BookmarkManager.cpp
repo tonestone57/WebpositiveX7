@@ -304,8 +304,8 @@ BookmarkManager::CheckBookmarkExists(BDirectory& directory,
 	BEntry entry;
 	if (directory.FindEntry(bookmarkName.String(), &entry) == B_OK) {
 		BString storedURL;
-		BFile file(&entry, B_READ_ONLY);
-		if (ReadURLAttr(file, storedURL)) {
+		BNode node(&entry);
+		if (ReadURLAttr(node, storedURL)) {
 			// Just bail if the bookmark already exists
 			if (storedURL == url)
 				return true;
@@ -315,10 +315,10 @@ BookmarkManager::CheckBookmarkExists(BDirectory& directory,
 }
 
 /*static*/ bool
-BookmarkManager::ReadURLAttr(BFile& bookmarkFile, BString& url)
+BookmarkManager::ReadURLAttr(BNode& bookmarkNode, BString& url)
 {
-	return bookmarkFile.InitCheck() == B_OK
-		&& bookmarkFile.ReadAttrString("META:url", &url) == B_OK;
+	return bookmarkNode.InitCheck() == B_OK
+		&& bookmarkNode.ReadAttrString("META:url", &url) == B_OK;
 }
 
 /*static*/ void
@@ -350,9 +350,9 @@ BookmarkManager::AddBookmarkURLsRecursively(BDirectory& directory,
 							// Ensure it is a file under this directory (descendant)
 							// pathStr must have a separator after dirStr or be strictly inside
 							if (pathStr[dirLen] == '/' || pathStr[dirLen] == '\0') {
-								BFile file(&ref, B_READ_ONLY);
+								BNode node(&ref);
 								BString storedURL;
-								if (ReadURLAttr(file, storedURL)) {
+								if (ReadURLAttr(node, storedURL)) {
 									message->AddString("url", storedURL.String());
 									addedCount++;
 								}
@@ -377,8 +377,8 @@ BookmarkManager::AddBookmarkURLsRecursively(BDirectory& directory,
 			AddBookmarkURLsRecursively(subBirectory, message, addedCount);
 		} else {
 			BString storedURL;
-			BFile file(&entry, B_READ_ONLY);
-			if (ReadURLAttr(file, storedURL)) {
+			BNode node(&entry);
+			if (ReadURLAttr(node, storedURL)) {
 				message->AddString("url", storedURL.String());
 				addedCount++;
 			}
@@ -449,11 +449,11 @@ BookmarkManager::_ExportBookmarksRecursively(BDirectory& directory, BFile& file,
 			line << indent << "</DL><p>\n";
 			file.Write(line.String(), line.Length());
 		} else {
-			BFile bookmarkFile(&entry, B_READ_ONLY);
+			BNode bookmarkNode(&entry);
 			BString url;
-			if (ReadURLAttr(bookmarkFile, url)) {
+			if (ReadURLAttr(bookmarkNode, url)) {
 				BString title;
-				if (bookmarkFile.ReadAttrString("META:title", &title) != B_OK)
+				if (bookmarkNode.ReadAttrString("META:title", &title) != B_OK)
 					title = name;
 
 				title.ReplaceAll("&", "&amp;");
