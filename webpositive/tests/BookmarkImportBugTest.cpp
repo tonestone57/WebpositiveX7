@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <map>
 #include <string>
@@ -47,13 +48,6 @@ status_t create_directory(const char* path, mode_t mode) {
 #include "Roster.h"
 BRoster* be_roster = NULL;
 
-// Include source
-#define _ALERT_H
-#define _DIRECTORY_H
-#define _FILE_H
-#define _FIND_DIRECTORY_H
-#define _PATH_H
-#define _ROSTER_H
 #define _NODE_INFO_H
 #include "../bookmarks/BookmarkManager.cpp"
 
@@ -76,14 +70,18 @@ int main() {
     // /boot/home/config/settings/WebPositive/Bookmarks
 
     // Setup Test Data
-    // <DT><H3>EmptyFolder</H3> (No DL, immediately followed by another folder)
+    // <DT><H3>EmptyFolder</H3> (followed by DT)
     // <DT><H3>NextFolder</H3>
+    // <DT><H3>LastEmptyFolder</H3> (followed by /DL)
     std::string testHtml =
         "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n"
+        "<DL><p>\n"
         "<DT><H3>EmptyFolder</H3>\n"
         "<DT><H3>NextFolder</H3>\n"
         "<DL><p>\n"
         "<DT><A HREF=\"http://example.com\">Example</A>\n"
+        "</DL><p>\n"
+        "<DT><H3>LastEmptyFolder</H3>\n"
         "</DL><p>\n";
 
     // Set mock content for BFile to read
@@ -94,12 +92,12 @@ int main() {
 
     // Check results
     bool foundEmpty = false;
-    bool foundNext = false;
+    bool foundLast = false;
 
     for (const auto& dir : sCreatedDirectories) {
         printf("Created: %s\n", dir.c_str());
         if (dir.find("EmptyFolder") != std::string::npos) foundEmpty = true;
-        if (dir.find("NextFolder") != std::string::npos) foundNext = true;
+        if (dir.find("LastEmptyFolder") != std::string::npos) foundLast = true;
     }
 
     if (!foundEmpty) {
@@ -108,11 +106,13 @@ int main() {
         printf("SUCCESS: EmptyFolder created.\n");
     }
 
-    if (!foundNext) {
-        printf("FAILURE: NextFolder was not created.\n");
+    if (!foundLast) {
+        printf("FAILURE: LastEmptyFolder was not created.\n");
+    } else {
+        printf("SUCCESS: LastEmptyFolder created.\n");
     }
 
-    if (!foundEmpty || !foundNext) return 1;
+    if (!foundEmpty || !foundLast) return 1;
 
     return 0;
 }

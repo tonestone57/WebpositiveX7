@@ -629,6 +629,13 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 				pendingFolderName = "";
 			}
 		} else if (tagLen >= 3 && strncasecmp(tagData, "/DL", 3) == 0) {
+			if (!pendingFolderName.IsEmpty()) {
+				BPath currentPath = dirStack.back();
+				currentPath.Append(pendingFolderName);
+				create_directory(currentPath.Path(), 0777);
+				pendingFolderName = "";
+			}
+
 			if (dirStack.size() > 1)
 				dirStack.pop_back();
 		}
