@@ -176,10 +176,12 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 		outURL = "http://localhost/";
 		return LOAD_URL;
 	} else {
-		// Also handle URLs starting with "localhost" followed by a path.
-		const char* localhostPrefix = "localhost/";
+		// Also handle URLs starting with "localhost" followed by a path or port.
+		static const char* kLocalhostPrefix = "localhost";
+		static const int32 kLocalhostLen = strlen(kLocalhostPrefix);
 
-		if (input.Compare(localhostPrefix, strlen(localhostPrefix)) == 0) {
+		if (input.Compare(kLocalhostPrefix, kLocalhostLen) == 0
+			&& (input[kLocalhostLen] == '/' || input[kLocalhostLen] == ':')) {
 			if (input.FindFirst("://") == B_ERROR)
 				outURL = BString("http://") << input;
 			else

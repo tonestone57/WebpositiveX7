@@ -4478,6 +4478,7 @@ BrowserWindow::_GetFaviconPath(const BString& url, BPath& path)
 
 	BString filename(parsedUrl.Host());
 	// Sanitize filename
+	filename.ToLower();
 	filename.ReplaceAll('/', '_');
 	filename.ReplaceAll(':', '_');
 
