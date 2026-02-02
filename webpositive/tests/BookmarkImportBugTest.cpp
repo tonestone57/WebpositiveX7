@@ -3,12 +3,10 @@
 #include <map>
 #include <string>
 #include <vector>
-
-#include "MockFileSystem.h"
-
 #include <assert.h>
 #include <iostream>
 
+#include "MockFileSystem.h"
 #include "String.h"
 #include "File.h"
 #include "Path.h"
