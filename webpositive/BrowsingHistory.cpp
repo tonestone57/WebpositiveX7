@@ -421,14 +421,23 @@ _SaveToDisk(const std::vector<BrowsingHistoryItem>& items, int32 maxAge)
 			bool success = settingsFile.Write(header.String(), header.Length()) == header.Length();
 
 			if (success) {
+				BString buffer;
 				for (size_t i = 0; i < items.size(); i++) {
 					const BrowsingHistoryItem& item = items[i];
-					BString line;
-					line << "hadd " << item.URL() << " " << (int64)item.DateTime().Time_t()
+					buffer << "hadd " << item.URL() << " " << (int64)item.DateTime().Time_t()
 						<< " " << item.InvocationCount() << "\n";
-					if (settingsFile.Write(line.String(), line.Length()) != line.Length()) {
+
+					if (buffer.Length() > 4096) {
+						if (settingsFile.Write(buffer.String(), buffer.Length()) != buffer.Length()) {
+							success = false;
+							break;
+						}
+						buffer.Truncate(0);
+					}
+				}
+				if (success && buffer.Length() > 0) {
+					if (settingsFile.Write(buffer.String(), buffer.Length()) != buffer.Length()) {
 						success = false;
-						break;
 					}
 				}
 			}
