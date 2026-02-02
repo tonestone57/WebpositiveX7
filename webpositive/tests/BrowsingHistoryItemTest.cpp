@@ -24,9 +24,16 @@
 #include "Messenger.h"
 #include "BrowserApp.h"
 #include "OS.h"
+#include "MockFileSystem.h"
 
 // Define static content for BFile mock
 std::string BFile::content = "";
+
+// Define MockFileSystem statics
+std::map<std::string, MockEntryData> MockFileSystem::sEntries;
+long MockFileSystem::sGetNextEntryCount = 0;
+long MockFileSystem::sOpenCount = 0;
+long MockFileSystem::sReadAttrCount = 0;
 
 // Stub for find_directory
 status_t find_directory(directory_which which, BPath* path) {

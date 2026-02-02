@@ -492,6 +492,11 @@ BrowsingHistory::BrowsingHistory()
 
 BrowsingHistory::~BrowsingHistory()
 {
+	{
+		BAutolock _(&sSaveLock);
+		sIsShuttingDown = true;
+	}
+
 	delete fSaveRunner;
 	_SaveSettings(true);
 
@@ -1017,7 +1022,6 @@ BrowsingHistory::_SaveSettings(bool forceSync)
 		}
 
 		BAutolock _(&sSaveLock);
-		sIsShuttingDown = true;
 		_SaveToDisk(items, fMaxHistoryItemAge);
 		return;
 	}
