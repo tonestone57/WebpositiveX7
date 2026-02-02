@@ -32,6 +32,7 @@
 #include "BrowserWindow.h"
 
 #include <memory>
+#include <new>
 #include <stdlib.h>
 #include <string.h>
 
