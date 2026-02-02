@@ -23,6 +23,10 @@
 
 // Define static members for mocks
 std::string BFile::content = "";
+std::map<std::string, MockEntryData> MockFileSystem::sEntries;
+long MockFileSystem::sGetNextEntryCount = 0;
+long MockFileSystem::sOpenCount = 0;
+long MockFileSystem::sReadAttrCount = 0;
 
 // Implement find_directory
 status_t find_directory(directory_which which, BPath* path) {
