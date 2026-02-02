@@ -63,6 +63,10 @@ public:
          return B_OK;
     }
 
+    ssize_t WriteAttr(const char* name, type_code type, off_t offset, const void* buffer, size_t size) {
+        return size;
+    }
+
     static std::string content;
 };
 #endif
