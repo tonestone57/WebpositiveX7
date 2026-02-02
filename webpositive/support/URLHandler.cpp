@@ -67,7 +67,7 @@ ShouldEscape(char c)
 
 
 /*static*/ BString
-URLHandler::_EncodeURIComponent(const BString& search)
+URLHandler::EncodeURIComponent(const BString& search)
 {
 	int32 length = search.Length();
 	BString result;
@@ -120,7 +120,7 @@ URLHandler::_VisitSearchEngine(const BString& search, BString& outURL, const BSt
 		}
 	}
 
-	engine.ReplaceAll("%s", _EncodeURIComponent(searchQuery));
+	engine.ReplaceAll("%s", EncodeURIComponent(searchQuery));
 	outURL = engine;
 }
 
