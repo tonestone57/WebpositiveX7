@@ -559,6 +559,13 @@ BookmarkManager::ImportBookmarks(const BPath& path)
 		int32 tagLen = tagEnd - tagStart - 1;
 
 		if (tagLen >= 2 && strncasecmp(tagData, "DT", 2) == 0) {
+			if (!pendingFolderName.IsEmpty()) {
+				BPath currentPath = dirStack.back();
+				currentPath.Append(pendingFolderName);
+				create_directory(currentPath.Path(), 0777);
+				pendingFolderName = "";
+			}
+
 			// Found DT, look for H3 or A in next tag
 			int32 nextTagStart = content.FindFirst("<", tagEnd);
 			if (nextTagStart > 0) {

@@ -124,7 +124,9 @@ FormSafetyHelper::ConsoleMessage(const BString& message)
 			if (strncmp(message.String() + 22, "true", 4) == 0)
 				fDirtyTabs++;
 
-			fTabsToCheck--;
+			if (fTabsToCheck > 0)
+				fTabsToCheck--;
+
 			if (fTabsToCheck <= 0) {
 				_CheckFormDirtyFinished();
 			}
