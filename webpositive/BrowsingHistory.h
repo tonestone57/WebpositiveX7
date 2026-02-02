@@ -54,10 +54,15 @@ public:
 
 			void				Invoked();
 
+			bool				IsDomainMatch(const char* domain) const;
+
 private:
 			BString				fURL;
 			BDateTime			fDateTime;
 			uint32				fInvocationCount;
+
+	mutable	int32				fHostStart;
+	mutable	int32				fHostLength;
 };
 
 struct BrowsingHistoryItemPointerCompare {
