@@ -45,6 +45,24 @@ URLHandler::IsValidDomainChar(char ch)
 
 
 static bool
+IsValidScheme(const BString& scheme)
+{
+	if (scheme.Length() == 0)
+		return false;
+
+	if (!isalpha(scheme[0]))
+		return false;
+
+	for (int32 i = 1; i < scheme.Length(); i++) {
+		char c = scheme[i];
+		if (!isalnum(c) && c != '+' && c != '-' && c != '.')
+			return false;
+	}
+	return true;
+}
+
+
+static bool
 ShouldEscape(char c)
 {
 	// We have to take care of some of the escaping before we hand over the
@@ -137,33 +155,35 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 		BString proto;
 		input.CopyInto(proto, 0, at);
 
-		bool handled = false;
+		if (IsValidScheme(proto)) {
+			bool handled = false;
 
-		// First try the built-in supported ones
-		for (int32 i = 0; i < (int32)(sizeof(kHandledProtocols) / sizeof(char*));
-				i++) {
-			handled = (proto == kHandledProtocols[i]);
-			if (handled)
-				break;
-		}
+			// First try the built-in supported ones
+			for (int32 i = 0; i < (int32)(sizeof(kHandledProtocols) / sizeof(char*));
+					i++) {
+				handled = (proto == kHandledProtocols[i]);
+				if (handled)
+					break;
+			}
 
-		if (handled) {
-			// This is the easy case, a complete and well-formed URL, we can
-			// navigate to it without further efforts.
-			outURL = input;
-			return LOAD_URL;
-		} else {
-			// There is what looks like a protocol, but one we don't know.
-			// Ask the BRoster if there is a matching filetype and app which
-			// can handle it.
-			BString temp;
-			temp = "application/x-vnd.Be.URL.";
-			temp += proto;
+			if (handled) {
+				// This is the easy case, a complete and well-formed URL, we can
+				// navigate to it without further efforts.
+				outURL = input;
+				return LOAD_URL;
+			} else {
+				// There is what looks like a protocol, but one we don't know.
+				// Ask the BRoster if there is a matching filetype and app which
+				// can handle it.
+				BString temp;
+				temp = "application/x-vnd.Be.URL.";
+				temp += proto;
 
-			const char* argv[] = { input.String(), NULL };
+				const char* argv[] = { input.String(), NULL };
 
-			if (be_roster->Launch(temp.String(), 1, argv) == B_OK)
-				return LAUNCH_APP;
+				if (be_roster->Launch(temp.String(), 1, argv) == B_OK)
+					return LAUNCH_APP;
+			}
 		}
 	}
 
@@ -192,6 +212,7 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 			// must be at least one dot and no spaces until the first / in the
 			// URL.
 			bool isURL = false;
+			bool validChars = true;
 
 			for (int32 i = 0; i < input.Length(); i++) {
 				if (input[i] == '.')
@@ -200,9 +221,13 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 					break;
 				else if (!IsValidDomainChar(input[i])) {
 					isURL = false;
+					validChars = false;
 					break;
 				}
 			}
+
+			if (!isURL && validChars && input[0] == '[' && input.FindFirst(']') != B_ERROR)
+				isURL = true;
 
 			if (isURL) {
 				// This is apparently an URL missing the protocol part. In that
