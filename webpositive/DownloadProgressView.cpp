@@ -900,7 +900,7 @@ DownloadProgressView::DownloadStarted(BMessage* message)
 	// starts.
 	sShowSpeed = true;
 	sLastEstimatedFinishSpeedToggleTime
-		= fProcessStartTime = fLastSpeedReferenceTime
+		= fLastSpeedReferenceTime
 		= fEstimatedFinishReferenceTime = system_time();
 }
 
