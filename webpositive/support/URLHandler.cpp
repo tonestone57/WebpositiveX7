@@ -36,7 +36,7 @@ URLHandler::IsValidDomainChar(char ch)
 	if ((unsigned char)ch > 0x7f)
 		return true;
 
-	if (isalnum(ch))
+	if (isalnum((unsigned char)ch))
 		return true;
 
 	return ch == '-' || ch == '.' || ch == ':'
