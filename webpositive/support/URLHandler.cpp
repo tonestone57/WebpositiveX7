@@ -5,10 +5,10 @@
 
 #include "URLHandler.h"
 
-#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <Roster.h>
+#include <ctype.h>
 #include <Url.h>
 
 #include "SettingsKeys.h"
@@ -36,11 +36,29 @@ URLHandler::IsValidDomainChar(char ch)
 	if ((unsigned char)ch > 0x7f)
 		return true;
 
-	if (isalnum(ch))
+	if (isalnum((unsigned char)ch))
 		return true;
 
 	return ch == '-' || ch == '.' || ch == ':'
 		|| ch == '[' || ch == ']' || ch == '@';
+}
+
+
+static bool
+IsValidScheme(const BString& scheme)
+{
+	if (scheme.Length() == 0)
+		return false;
+
+	if (!isalpha((unsigned char)scheme[0]))
+		return false;
+
+	for (int32 i = 1; i < scheme.Length(); i++) {
+		unsigned char c = (unsigned char)scheme[i];
+		if (!isalnum(c) && c != '+' && c != '-' && c != '.')
+			return false;
+	}
+	return true;
 }
 
 
@@ -137,33 +155,35 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 		BString proto;
 		input.CopyInto(proto, 0, at);
 
-		bool handled = false;
+		if (IsValidScheme(proto)) {
+			bool handled = false;
 
-		// First try the built-in supported ones
-		for (int32 i = 0; i < (int32)(sizeof(kHandledProtocols) / sizeof(char*));
-				i++) {
-			handled = (proto == kHandledProtocols[i]);
-			if (handled)
-				break;
-		}
+			// First try the built-in supported ones
+			for (int32 i = 0; i < (int32)(sizeof(kHandledProtocols) / sizeof(char*));
+					i++) {
+				handled = (proto == kHandledProtocols[i]);
+				if (handled)
+					break;
+			}
 
-		if (handled) {
-			// This is the easy case, a complete and well-formed URL, we can
-			// navigate to it without further efforts.
-			outURL = input;
-			return LOAD_URL;
-		} else {
-			// There is what looks like a protocol, but one we don't know.
-			// Ask the BRoster if there is a matching filetype and app which
-			// can handle it.
-			BString temp;
-			temp = "application/x-vnd.Be.URL.";
-			temp += proto;
+			if (handled) {
+				// This is the easy case, a complete and well-formed URL, we can
+				// navigate to it without further efforts.
+				outURL = input;
+				return LOAD_URL;
+			} else {
+				// There is what looks like a protocol, but one we don't know.
+				// Ask the BRoster if there is a matching filetype and app which
+				// can handle it.
+				BString temp;
+				temp = "application/x-vnd.Be.URL.";
+				temp += proto;
 
-			const char* argv[] = { input.String(), NULL };
+				const char* argv[] = { input.String(), NULL };
 
-			if (be_roster->Launch(temp.String(), 1, argv) == B_OK)
-				return LAUNCH_APP;
+				if (be_roster->Launch(temp.String(), 1, argv) == B_OK)
+					return LAUNCH_APP;
+			}
 		}
 	}
 
@@ -193,15 +213,40 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 			// URL.
 			bool isURL = false;
 
-			for (int32 i = 0; i < input.Length(); i++) {
-				if (input[i] == '.')
-					isURL = true;
-				else if (input[i] == '/' || input[i] == '?' || input[i] == '#')
-					break;
-				else if (!IsValidDomainChar(input[i])) {
-					isURL = false;
-					break;
+			// Heuristic 1: Check if it looks like an IPv6 literal (e.g. [::1])
+			if (input.Length() > 0 && input[0] == '['
+				&& input.FindFirst(']') != B_ERROR) {
+				bool validIPv6 = true;
+				for (int32 i = 0; i < input.Length(); i++) {
+					// We use IsValidDomainChar because it allows hex, colon,
+					// dot (IPv4-mapped), and brackets, but disallows spaces.
+					if (!IsValidDomainChar(input[i])) {
+						validIPv6 = false;
+						break;
+					}
 				}
+				if (validIPv6)
+					isURL = true;
+			}
+
+			// Heuristic 2: Check if it looks like a domain name
+			if (!isURL) {
+				bool validChars = true;
+				bool hasDot = false;
+
+				for (int32 i = 0; i < input.Length(); i++) {
+					if (input[i] == '.')
+						hasDot = true;
+					else if (input[i] == '/' || input[i] == '?' || input[i] == '#')
+						break;
+					else if (!IsValidDomainChar(input[i])) {
+						validChars = false;
+						break;
+					}
+				}
+
+				if (validChars && hasDot)
+					isURL = true;
 			}
 
 			if (isURL) {
