@@ -28,6 +28,7 @@ int main()
 	BString searchPageURL = "https://duckduckgo.com/?q=%s";
 	BString input;
 	URLHandler::Action action;
+	int result = 0;
 
 	// Test IPv6 Loopback
 	input = "[::1]";
@@ -37,6 +38,7 @@ int main()
 		printf("Test IPv6 Loopback Passed\n");
 	} else {
 		printf("Test IPv6 Loopback Failed: Got action %d, URL '%s'\n", action, outURL.String());
+		result = 1;
 	}
 
     // Test IPv6 with port
@@ -47,6 +49,7 @@ int main()
 		printf("Test IPv6 Loopback with port Passed\n");
 	} else {
 		printf("Test IPv6 Loopback with port Failed: Got action %d, URL '%s'\n", action, outURL.String());
+		result = 1;
 	}
 
 	// Test Invalid IPv6 (brackets with space) -> Search
@@ -57,7 +60,8 @@ int main()
 		printf("Test Invalid IPv6 (space) Passed\n");
 	} else {
 		printf("Test Invalid IPv6 (space) Failed: Got action %d, URL '%s'\n", action, outURL.String());
+		result = 1;
 	}
 
-	return 0;
+	return result;
 }

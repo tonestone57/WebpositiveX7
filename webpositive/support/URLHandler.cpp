@@ -5,10 +5,10 @@
 
 #include "URLHandler.h"
 
-#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <Roster.h>
+#include <ctype.h>
 #include <Url.h>
 
 #include "SettingsKeys.h"
@@ -50,11 +50,11 @@ IsValidScheme(const BString& scheme)
 	if (scheme.Length() == 0)
 		return false;
 
-	if (!isalpha(scheme[0]))
+	if (!isalpha((unsigned char)scheme[0]))
 		return false;
 
 	for (int32 i = 1; i < scheme.Length(); i++) {
-		char c = scheme[i];
+		unsigned char c = (unsigned char)scheme[i];
 		if (!isalnum(c) && c != '+' && c != '-' && c != '.')
 			return false;
 	}
@@ -212,22 +212,42 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 			// must be at least one dot and no spaces until the first / in the
 			// URL.
 			bool isURL = false;
-			bool validChars = true;
 
-			for (int32 i = 0; i < input.Length(); i++) {
-				if (input[i] == '.')
-					isURL = true;
-				else if (input[i] == '/' || input[i] == '?' || input[i] == '#')
-					break;
-				else if (!IsValidDomainChar(input[i])) {
-					isURL = false;
-					validChars = false;
-					break;
+			// Heuristic 1: Check if it looks like an IPv6 literal (e.g. [::1])
+			if (input.Length() > 0 && input[0] == '['
+				&& input.FindFirst(']') != B_ERROR) {
+				bool validIPv6 = true;
+				for (int32 i = 0; i < input.Length(); i++) {
+					// We use IsValidDomainChar because it allows hex, colon,
+					// dot (IPv4-mapped), and brackets, but disallows spaces.
+					if (!IsValidDomainChar(input[i])) {
+						validIPv6 = false;
+						break;
+					}
 				}
+				if (validIPv6)
+					isURL = true;
 			}
 
-			if (!isURL && validChars && input[0] == '[' && input.FindFirst(']') != B_ERROR)
-				isURL = true;
+			// Heuristic 2: Check if it looks like a domain name
+			if (!isURL) {
+				bool validChars = true;
+				bool hasDot = false;
+
+				for (int32 i = 0; i < input.Length(); i++) {
+					if (input[i] == '.')
+						hasDot = true;
+					else if (input[i] == '/' || input[i] == '?' || input[i] == '#')
+						break;
+					else if (!IsValidDomainChar(input[i])) {
+						validChars = false;
+						break;
+					}
+				}
+
+				if (validChars && hasDot)
+					isURL = true;
+			}
 
 			if (isURL) {
 				// This is apparently an URL missing the protocol part. In that
