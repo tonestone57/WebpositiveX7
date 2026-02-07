@@ -582,7 +582,7 @@ public:
 				// The title may differ from the validated filename
 			if (fPageIconSet == true) {
 				// Don't bother sending the placeholder web icon, if that is all we have.
-				data.AddData("miniIcon", B_COLOR_8_BIT_TYPE, &miniIcon, sizeof(miniIcon));
+				data.AddData("miniIcon", B_COLOR_8_BIT_TYPE, miniIcon.Bits(), miniIcon.BitsLength());
 				if (largeIcon != NULL) {
 					data.AddData("largeIcon", B_RGBA32_TYPE, largeIcon->Bits(),
 						largeIcon->BitsLength());
