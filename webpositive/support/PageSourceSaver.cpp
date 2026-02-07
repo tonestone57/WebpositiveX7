@@ -131,7 +131,7 @@ PageSourceSaver::_PageSourceThread(void* data)
 		}
 
 		if (ret == B_OK) {
-			size_t size = strlen(mimeType);
+			size_t size = strlen(mimeType) + 1;
 			pageSourceFile.WriteAttr("BEOS:TYPE", B_STRING_TYPE, 0, mimeType, size);
 				// If it fails we don't care.
 		}
