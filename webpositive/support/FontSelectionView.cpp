@@ -122,7 +122,9 @@ FontSelectionView::FontSelectionView(const char* name, const char* label,
 FontSelectionView::~FontSelectionView()
 {
 	// Some controls may not have been attached...
-	if (!fPreviewTextView->Window())
+	if (fPreviewBox && !fPreviewBox->Window())
+		delete fPreviewBox;
+	else if (!fPreviewTextView->Window())
 		delete fPreviewTextView;
 	if (!fSizesMenuField->Window())
 		delete fSizesMenuField;
