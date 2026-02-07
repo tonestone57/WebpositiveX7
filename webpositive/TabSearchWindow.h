@@ -6,6 +6,7 @@
 #define TAB_SEARCH_WINDOW_H
 
 #include <Window.h>
+#include <Messenger.h>
 #include <String.h>
 
 class BListView;
@@ -20,12 +21,15 @@ public:
 	virtual	void				MessageReceived(BMessage* message);
 	virtual	bool				QuitRequested();
 
+			void				SetTabManager(TabManager* manager);
+
 private:
 			void				_UpdateList();
 			void				_FilterList();
 
 private:
 			TabManager*			fTabManager;
+			BMessenger			fTarget;
 			BTextControl*		fSearchControl;
 			BListView*			fTabList;
 };
