@@ -938,12 +938,11 @@ BrowsingHistory::_LoadSettings()
 		if (size <= 0)
 			return;
 
-		char* buffer = new(std::nothrow) char[size + 1];
+		std::unique_ptr<char[]> buffer(new(std::nothrow) char[size + 1]);
 		if (buffer == NULL)
 			return;
 
-		if (settingsFile.Read(buffer, size) != size) {
-			delete[] buffer;
+		if (settingsFile.Read(buffer.get(), size) != size) {
 			return;
 		}
 		buffer[size] = '\0';
@@ -951,8 +950,8 @@ BrowsingHistory::_LoadSettings()
 		BDateTime oldestAllowedDateTime = BDateTime::CurrentDateTime(B_LOCAL_TIME);
 		oldestAllowedDateTime.Date().AddDays(-fMaxHistoryItemAge);
 
-		char* line = buffer;
-		while (line < buffer + size) {
+		char* line = buffer.get();
+		while (line < buffer.get() + size) {
 			char* nextLine = strchr(line, '\n');
 			if (nextLine)
 				*nextLine = '\0';
@@ -1020,8 +1019,6 @@ BrowsingHistory::_LoadSettings()
 				break;
 			line = nextLine + 1;
 		}
-
-		delete[] buffer;
 
 		// Rebuild list from map
 		fHistoryList.reserve(fHistoryMap.size());
