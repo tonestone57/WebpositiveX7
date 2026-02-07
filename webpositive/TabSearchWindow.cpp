@@ -39,7 +39,8 @@ TabSearchWindow::TabSearchWindow(TabManager* manager)
 	:
 	BWindow(BRect(0, 0, 300, 400), "Search Tabs", B_TITLED_WINDOW,
 		B_NOT_ZOOMABLE | B_NOT_RESIZABLE | B_AUTO_UPDATE_SIZE_LIMITS | B_CLOSE_ON_ESCAPE),
-	fTabManager(manager)
+	fTabManager(manager),
+	fTarget(manager->Target())
 {
 	CenterOnScreen();
 
@@ -64,9 +65,9 @@ TabSearchWindow::TabSearchWindow(TabManager* manager)
 
 TabSearchWindow::~TabSearchWindow()
 {
-	if (fTabManager) {
+	if (fTarget.IsValid()) {
 		BMessage msg(TAB_SEARCH_WINDOW_QUIT);
-		fTabManager->Target().SendMessage(&msg);
+		fTarget.SendMessage(&msg);
 	}
 
 	for (int32 i = fTabList->CountItems() - 1; i >= 0; i--)
@@ -89,20 +90,11 @@ TabSearchWindow::MessageReceived(BMessage* message)
 				TabListItem* item = dynamic_cast<TabListItem*>(fTabList->ItemAt(selection));
 				if (item) {
 					BView* view = item->View();
-					if (fTabManager) {
-						BMessenger target = fTabManager->Target();
-						if (target.IsValid()) {
-							// If the target (fTarget) is the Window, this works.
-							// Assuming fTarget is indeed the BrowserWindow as initialized in TabManager::TabManager.
-							// TabManager::TabManager(..., BMessenger& target, ...)
-							// BrowserWindow passes BMessenger(this).
-							// So fTabManager->Target() is the BrowserWindow.
-
-							BMessage selectMsg(SELECT_TAB_BY_VIEW);
-							selectMsg.AddPointer("view", view);
-							target.SendMessage(&selectMsg);
-							PostMessage(B_QUIT_REQUESTED);
-						}
+					if (fTarget.IsValid()) {
+						BMessage selectMsg(SELECT_TAB_BY_VIEW);
+						selectMsg.AddPointer("view", view);
+						fTarget.SendMessage(&selectMsg);
+						PostMessage(B_QUIT_REQUESTED);
 					}
 				}
 			}
@@ -124,6 +116,13 @@ TabSearchWindow::QuitRequested()
 
 
 void
+TabSearchWindow::SetTabManager(TabManager* manager)
+{
+	fTabManager = manager;
+}
+
+
+void
 TabSearchWindow::_UpdateList()
 {
 	for (int32 i = fTabList->CountItems() - 1; i >= 0; i--)
@@ -131,7 +130,7 @@ TabSearchWindow::_UpdateList()
 
 	if (!fTabManager) return;
 
-	BMessenger target = fTabManager->Target();
+	BMessenger target = fTarget;
 	BLooper* looper;
 	target.Target(&looper);
 	// If we can't lock, we assume the window is busy or dead, so we skip updating
@@ -151,7 +150,7 @@ TabSearchWindow::_FilterList()
 {
 	if (!fTabManager) return;
 
-	BMessenger target = fTabManager->Target();
+	BMessenger target = fTarget;
 	BLooper* looper;
 	target.Target(&looper);
 	if (looper && looper->LockWithTimeout(100000) == B_OK) {

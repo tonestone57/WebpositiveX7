@@ -592,6 +592,7 @@ public:
 
 			BBitmap* iconClone = new BBitmap(fIcon);
 			DragMessage(&drag, iconClone, B_OP_ALPHA, offset);
+			delete iconClone;
 		}
 		return;
 	}
