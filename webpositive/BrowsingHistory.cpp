@@ -255,19 +255,17 @@ BrowsingHistory::ExportHistory(const BPath& path)
 	if (status != B_OK)
 		return status;
 
-	BString header = "URL,Date,Count\n";
-	file.Write(header.String(), header.Length());
+	BString buffer = "URL,Date,Count\n";
 
 	for (int32 i = 0; i < DefaultInstance()->CountItems(); i++) {
 		const BrowsingHistoryItem* item = DefaultInstance()->HistoryItemAt(i);
 		if (item) {
-			BString line;
 			BString url = item->URL();
 			if (url.FindFirst(',') >= 0 || url.FindFirst('"') >= 0) {
 				url.ReplaceAll("\"", "\"\"");
-				line << "\"" << url << "\",";
+				buffer << "\"" << url << "\",";
 			} else {
-				line << url << ",";
+				buffer << url << ",";
 			}
 
 			// Format date
@@ -275,12 +273,22 @@ BrowsingHistory::ExportHistory(const BPath& path)
 			time_t t = item->DateTime().Time_t();
 			strftime(dateStr, sizeof(dateStr), "%Y-%m-%d %H:%M:%S", localtime(&t));
 
-			line << dateStr << ",";
-			line << item->InvocationCount() << "\n";
+			buffer << dateStr << ",";
+			buffer << item->InvocationCount() << "\n";
 
-			file.Write(line.String(), line.Length());
+			if (buffer.Length() > kSaveBufferSize) {
+				if (file.Write(buffer.String(), buffer.Length()) != buffer.Length())
+					return B_ERROR;
+				buffer.Truncate(0);
+			}
 		}
 	}
+
+	if (buffer.Length() > 0) {
+		if (file.Write(buffer.String(), buffer.Length()) != buffer.Length())
+			return B_ERROR;
+	}
+
 	return B_OK;
 }
 
