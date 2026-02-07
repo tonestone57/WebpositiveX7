@@ -14,6 +14,8 @@
 #include <ScrollView.h>
 #include <Window.h>
 
+#include <memory>
+
 
 // #pragma mark - BDefaultPatternSelector
 
@@ -391,17 +393,18 @@ BDefaultChoiceView::ShowChoices(BAutoCompleter::CompletionStyle* completer)
 		}
 	}
 
-	fListView = new ListView(completer);
+	std::unique_ptr<ListView> listView(new ListView(completer));
 	int32 count = choiceModel->CountChoices();
 	for(int32 i = 0; i<count; ++i) {
-		fListView->AddItem(
+		listView->AddItem(
 			new ListItem(choiceModel->ChoiceAt(i))
 		);
 	}
 
 	BScrollView *scrollView = NULL;
 	if (count > fMaxVisibleChoices) {
-		scrollView = new BScrollView("", fListView, B_FOLLOW_NONE, 0, false, true, B_NO_BORDER);
+		// BScrollView takes ownership of the target
+		scrollView = new BScrollView("", listView.release(), B_FOLLOW_NONE, 0, false, true, B_NO_BORDER);
 	}
 
 	if (fWindow == NULL) {
@@ -410,10 +413,13 @@ BDefaultChoiceView::ShowChoices(BAutoCompleter::CompletionStyle* completer)
 				| B_AVOID_FOCUS | B_ASYNCHRONOUS_CONTROLS);
 	}
 
-	if (scrollView != NULL)
+	if (scrollView != NULL) {
 		fWindow->AddChild(scrollView);
-	else
+		fListView = (ListView*)scrollView->Target();
+	} else {
+		fListView = listView.release();
 		fWindow->AddChild(fListView);
+	}
 
 	int32 visibleCount = min_c(count, fMaxVisibleChoices);
 	float listHeight = fListView->ItemFrame(visibleCount - 1).bottom + 1;

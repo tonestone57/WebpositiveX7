@@ -157,13 +157,9 @@ SettingsWindow::SettingsWindow(BRect frame, SettingsMessage* settings)
 SettingsWindow::~SettingsWindow()
 {
 	RemoveHandler(fStandardFontView);
-	delete fStandardFontView;
 	RemoveHandler(fSerifFontView);
-	delete fSerifFontView;
 	RemoveHandler(fSansSerifFontView);
-	delete fSansSerifFontView;
 	RemoveHandler(fFixedFontView);
-	delete fFixedFontView;
 }
 
 
@@ -1182,7 +1178,7 @@ SettingsWindow::_UpdateProxySettings()
 	fOriginalProxyPassword = password;
 
 	// Clear plaintext password from settings file if present
-	if (fSettings->GetValue(kSettingsKeyProxyPassword, "") != "")
+	if (BString(fSettings->GetValue(kSettingsKeyProxyPassword, "")) != "")
 		fSettings->SetValue(kSettingsKeyProxyPassword, "");
 
 	if (fUseProxyCheckBox->Value() == B_CONTROL_ON) {

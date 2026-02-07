@@ -312,6 +312,8 @@ ConsoleWindow::_AppendMessage(const ConsoleMessage& message)
 	} else {
 		fPreviousText = finalText;
 		fRepeatCounter = 0;
-		fMessagesListView->AddItem(new BStringItem(finalText.String()));
+		BStringItem* item = new(std::nothrow) BStringItem(finalText.String());
+		if (item == NULL || !fMessagesListView->AddItem(item))
+			delete item;
 	}
 }

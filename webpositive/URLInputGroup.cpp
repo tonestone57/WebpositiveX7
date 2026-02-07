@@ -58,8 +58,8 @@ public:
 
 	bool operator<(const URLChoice& other) const
 	{
-		if (fPriority > other.fPriority)
-			return true;
+		if (fPriority != other.fPriority)
+			return fPriority > other.fPriority;
 		return DisplayText() < other.DisplayText();
 	}
 

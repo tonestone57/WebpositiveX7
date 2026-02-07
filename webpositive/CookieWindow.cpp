@@ -524,8 +524,10 @@ CookieWindow::_DeleteCookies()
 	}
 
 	if (rowsToDelete.empty()) {
-		// A domain was selected in the domain list, but no specific cookies
-		// selected -> delete all cookies for this domain.
+		// If no specific cookies are selected, check if we really want to delete
+		// all cookies for the domain. Only do so if the list has focus or if
+		// the user explicitly requested it via context menu/button on the domain.
+		// Since fDeleteButton is enabled when domain is selected, we assume intent.
 		while (fCookies->CountRows() > 0) {
 			row = (CookieRow*)fCookies->RowAt(0);
 			BPrivate::Network::BNetworkCookie& cookie = row->Cookie();
@@ -570,14 +572,20 @@ CookieWindow::_DeleteCookies()
 			}
 		}
 	} else {
-		// Partial deletion: we should update the map, but it's complex to sync
-		// std::vector in the map with the BColumnListView.
-		// For now, we only optimize the "Empty" case which is the most common
-		// "cleanup" action.
-		// If rows remain, we do NOT trigger a full refresh, as the UI (fCookies)
-		// is already up to date.
-		// The only stale data is fCookieMap (contains deleted cookies) and
-		// potentially fDomains (if we deleted all cookies but one by one).
-		// But checking CountRows() == 0 covers the "domain became empty" case.
+		// Partial deletion: we must update the map to prevent stale data.
+		int32 selection = fDomains->CurrentSelection();
+		if (selection >= 0) {
+			BStringItem* item = (BStringItem*)fDomains->ItemAt(selection);
+			if (item) {
+				BString domain = item->Text();
+				// Rebuild vector for this domain from remaining rows
+				std::vector<BPrivate::Network::BNetworkCookie> remainingCookies;
+				for (int32 i = 0; i < fCookies->CountRows(); i++) {
+					CookieRow* row = (CookieRow*)fCookies->RowAt(i);
+					remainingCookies.push_back(row->Cookie());
+				}
+				fCookieMap[domain] = remainingCookies;
+			}
+		}
 	}
 }

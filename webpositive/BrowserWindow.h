@@ -368,7 +368,6 @@ private:
 
 			PermissionsWindow*	fPermissionsWindow;
 			NetworkWindow*		fNetworkWindow;
-			bool				fIsBypassingCache;
 			bool				fIsPrivate;
 
 			std::unique_ptr<BMessageRunner>		fMemoryPressureRunner;

@@ -153,9 +153,13 @@ PermissionsWindow::MessageReceived(BMessage* message)
 
 				if (!exists) {
 					// Use default settings
-					fDomainList->AddItem(new PermissionItem(domain, true, true, false, 1.0, false, ""));
-					fAddDomainControl->SetText("");
-					_SavePermissions();
+					PermissionItem* item = new PermissionItem(domain, true, true, false, 1.0, false, "");
+					if (fDomainList->AddItem(item)) {
+						fAddDomainControl->SetText("");
+						_SavePermissions();
+					} else {
+						delete item;
+					}
 				}
 			}
 			break;

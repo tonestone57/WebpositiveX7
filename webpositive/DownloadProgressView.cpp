@@ -996,9 +996,14 @@ DownloadProgressView::_UpdateStatus(off_t currentSize, off_t expectedSize)
 			// update current speed every kSpeedReferenceInterval
 			fCurrentBytesPerSecondSlot
 				= (fCurrentBytesPerSecondSlot + 1) % kBytesPerSecondSlots;
-			fBytesPerSecondSlot[fCurrentBytesPerSecondSlot]
-				= (double)(currentSize - fLastSpeedReferenceSize)
-					* 1000000LL / (currentTime - fLastSpeedReferenceTime);
+			bigtime_t timeDiff = currentTime - fLastSpeedReferenceTime;
+			if (timeDiff > 0) {
+				fBytesPerSecondSlot[fCurrentBytesPerSecondSlot]
+					= (double)(currentSize - fLastSpeedReferenceSize)
+						* 1000000LL / timeDiff;
+			} else {
+				fBytesPerSecondSlot[fCurrentBytesPerSecondSlot] = 0.0;
+			}
 			fLastSpeedReferenceSize = currentSize;
 			fLastSpeedReferenceTime = currentTime;
 			fBytesPerSecond = 0.0;
@@ -1069,10 +1074,11 @@ DownloadProgressView::_UpdateStatusText()
 		}
 	} else if (!sShowSpeed && fCurrentSize < fExpectedSize) {
 		double totalBytesPerSecond = 0.0;
-		if (system_time() > fEstimatedFinishReferenceTime) {
+		bigtime_t timeDiff = system_time() - fEstimatedFinishReferenceTime;
+		if (timeDiff > 0) {
 			totalBytesPerSecond = (double)(fCurrentSize
 					- fEstimatedFinishReferenceSize)
-				* 1000000LL / (system_time() - fEstimatedFinishReferenceTime);
+				* 1000000LL / timeDiff;
 		}
 		double secondsRemaining = 0;
 		if (totalBytesPerSecond > 0) {

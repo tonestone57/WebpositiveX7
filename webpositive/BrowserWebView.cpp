@@ -28,7 +28,7 @@ BrowserWebView::MessageReceived(BMessage* message)
 	if (message->what == B_MOUSE_WHEEL_CHANGED) {
 		// Only zoom on Command + mouse wheel
 		if ((modifiers() & B_COMMAND_KEY) != 0) {
-			BPoint where;
+			BPoint where(-1000, -1000);
 			uint32 buttons;
 			GetMouse(&where, &buttons, false);
 

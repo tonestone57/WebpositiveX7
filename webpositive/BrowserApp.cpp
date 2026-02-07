@@ -483,12 +483,24 @@ BrowserApp::MessageReceived(BMessage* message)
 		void* windowPtr = NULL;
 		if (message->FindPointer("window", &windowPtr) != B_OK)
 			break;
-		BrowserWindow* window = static_cast<BrowserWindow*>(windowPtr);
-		BString url;
-		message->FindString("url", &url);
-		bool select = false;
-		message->FindBool("select", &select);
-		_CreateNewTab(window, url, select);
+
+		// Validate that the window pointer is still valid
+		bool isValid = false;
+		for (int32 i = 0; BWindow* win = WindowAt(i); i++) {
+			if (win == windowPtr) {
+				isValid = true;
+				break;
+			}
+		}
+
+		if (isValid) {
+			BrowserWindow* window = static_cast<BrowserWindow*>(windowPtr);
+			BString url;
+			message->FindString("url", &url);
+			bool select = false;
+			message->FindBool("select", &select);
+			_CreateNewTab(window, url, select);
+		}
 		break;
 	}
 	case WINDOW_OPENED:
@@ -574,7 +586,7 @@ BrowserApp::RefsReceived(BMessage* message)
 bool
 BrowserApp::QuitRequested()
 {
-	if (!fForceQuit && fDownloadWindow->DownloadsInProgress()) {
+	if (fDownloadWindow && !fForceQuit && fDownloadWindow->DownloadsInProgress()) {
 		BAlert* alert = new BAlert(B_TRANSLATE("Downloads in progress"),
 			B_TRANSLATE("There are still downloads in progress, do you really "
 			"want to quit WebPositive now?"), B_TRANSLATE("Quit"),

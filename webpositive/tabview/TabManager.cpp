@@ -1093,6 +1093,9 @@ TabManager::MoveTab(int32 fromIndex, int32 toIndex)
 			// We must remove the corresponding card to keep sync.
 			BLayoutItem* item = fCardLayout->RemoveItem(fromIndex);
 			if (item) {
+				BWebView* webView = dynamic_cast<BWebView*>(item->View());
+				if (webView)
+					webView->Shutdown();
 				delete item->View();
 				delete item;
 			}
@@ -1112,6 +1115,9 @@ TabManager::MoveTab(int32 fromIndex, int32 toIndex)
 			// Try to restore to original index
 			if (!fCardLayout->AddItem(fromIndex, item)) {
 				// Fatal error: lost item. Clean up to avoid leak.
+				BWebView* webView = dynamic_cast<BWebView*>(item->View());
+				if (webView)
+					webView->Shutdown();
 				delete item->View();
 				delete item;
 
