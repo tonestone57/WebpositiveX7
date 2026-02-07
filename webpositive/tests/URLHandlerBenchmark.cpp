@@ -52,5 +52,6 @@ int main()
 	printf("Time taken for %d iterations: %f seconds\n", iterations, time_spent);
     printf("Average time per iteration: %f microseconds\n", (time_spent * 1000000) / iterations);
 
+	delete be_roster;
 	return 0;
 }

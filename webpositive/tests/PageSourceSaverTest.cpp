@@ -90,5 +90,6 @@ int main() {
          printf("FAILURE: String content mismatch.\n");
     }
 
+    delete be_roster;
     return 0;
 }
