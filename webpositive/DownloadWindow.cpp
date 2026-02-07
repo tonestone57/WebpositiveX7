@@ -458,13 +458,20 @@ DownloadWindow::_DownloadStarted(BWebDownload* download)
 	}
 	fRemoveFinishedButton->SetEnabled(cleanupCount > 0);
 	fRemoveMissingButton->SetEnabled(missingCount > 0);
-	DownloadProgressView* view = new DownloadProgressView(download);
-	if (!view->Init()) {
-		download->Cancel();
-		delete view;
-		return;
-	}
-	if (fDownloadViewsLayout->AddView(index, view) == NULL) {
+	DownloadProgressView* view = NULL;
+	try {
+		view = new DownloadProgressView(download);
+		if (!view->Init()) {
+			download->Cancel();
+			delete view;
+			return;
+		}
+		if (fDownloadViewsLayout->AddView(index, view) == NULL) {
+			download->Cancel();
+			delete view;
+			return;
+		}
+	} catch (...) {
 		download->Cancel();
 		delete view;
 		return;
@@ -695,14 +702,18 @@ DownloadWindow::_LoadSettings()
 	for (int32 i = 0;
 			message.FindMessage("download", i, &downloadArchive) == B_OK;
 			i++) {
-		DownloadProgressView* view = new DownloadProgressView(
-			&downloadArchive);
-		if (!view->Init(&downloadArchive)) {
+		DownloadProgressView* view = NULL;
+		try {
+			view = new DownloadProgressView(&downloadArchive);
+			if (!view->Init(&downloadArchive)) {
+				delete view;
+				continue;
+			}
+			if (fDownloadViewsLayout->AddView(0, view) == NULL)
+				delete view;
+		} catch (...) {
 			delete view;
-			continue;
 		}
-		if (fDownloadViewsLayout->AddView(0, view) == NULL)
-			delete view;
 	}
 }
 

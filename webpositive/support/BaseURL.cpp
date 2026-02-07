@@ -26,5 +26,8 @@ baseURL(const BString& string, BString& result)
 
 	int32 baseURLStart = protoPos + 3;
 	int32 baseURLEnd = string.FindFirst("/", baseURLStart + 1);
-	result.SetTo(string.String() + baseURLStart, baseURLEnd - baseURLStart);
+	if (baseURLEnd < 0)
+		result.SetTo(string.String() + baseURLStart);
+	else
+		result.SetTo(string.String() + baseURLStart, baseURLEnd - baseURLStart);
 }

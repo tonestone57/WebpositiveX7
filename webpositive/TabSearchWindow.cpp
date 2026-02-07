@@ -40,7 +40,8 @@ TabSearchWindow::TabSearchWindow(TabManager* manager)
 	BWindow(BRect(0, 0, 300, 400), "Search Tabs", B_TITLED_WINDOW,
 		B_NOT_ZOOMABLE | B_NOT_RESIZABLE | B_AUTO_UPDATE_SIZE_LIMITS | B_CLOSE_ON_ESCAPE),
 	fTabManager(manager),
-	fTarget(manager->Target())
+	fTarget(manager->Target()),
+	fForceQuit(false)
 {
 	CenterOnScreen();
 
@@ -106,12 +107,22 @@ TabSearchWindow::MessageReceived(BMessage* message)
 bool
 TabSearchWindow::QuitRequested()
 {
+	if (fForceQuit)
+		return true;
+
 	if (fTarget.IsValid()) {
 		BMessage msg(TAB_SEARCH_WINDOW_QUIT);
 		fTarget.SendMessage(&msg);
 	}
 	Hide();
 	return false;
+}
+
+
+void
+TabSearchWindow::PrepareToQuit()
+{
+	fForceQuit = true;
 }
 
 

@@ -1939,6 +1939,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 		case TAB_SEARCH_WINDOW_QUIT:
 			if (fTabSearchWindow) {
 				fTabSearchWindow->Lock();
+				fTabSearchWindow->PrepareToQuit();
 				fTabSearchWindow->Quit();
 				fTabSearchWindow = NULL;
 			}
