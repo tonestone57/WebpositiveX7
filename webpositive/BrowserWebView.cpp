@@ -43,18 +43,6 @@ BrowserWebView::MessageReceived(BMessage* message)
 					return;
 				}
 			}
-			// If we didn't handle the zoom (e.g. invalid delta), should we consume?
-			// The original code returned only on success.
-			// But wait, the original code had return inside the innermost if.
-			// My patch intends to NOT call BWebView::MessageReceived if we handled it.
-			// The existing code ALREADY returns!
-			// "return;" is inside "if (message->FindFloat...)".
-			// So if we found the float and zoomed, we return.
-			// BWebView::MessageReceived is skipped.
-			// So... there is NO bug here?
-			// "return;" exits the function.
-			// Ah, I misread the code or the diff.
-			// Let's re-read the file content.
 		}
 	}
 	BWebView::MessageReceived(message);
