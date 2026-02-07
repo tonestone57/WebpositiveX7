@@ -179,7 +179,7 @@ Sync::ImportCookies(const BPath& path,
 				token = tab + 1;
 			} else {
 				// Ensure last token is valid
-				if (token >= lineEnd && partCount < 7) {
+				if (token > lineEnd && partCount < 7) {
 					// Missing fields
 					partCount--;
 				}

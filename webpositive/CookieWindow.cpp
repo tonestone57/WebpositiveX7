@@ -453,6 +453,7 @@ CookieWindow::_BuildDomainList()
 				item->SetOutlineLevel(level);
 				if (!list->AddItem(item)) {
 					delete item;
+					Flatten(child, list, level);
 					continue;
 				}
 				Flatten(child, list, level + 1);
@@ -533,7 +534,7 @@ CookieWindow::_DeleteCookies()
 		// Since fDeleteButton is enabled when domain is selected, we assume intent.
 		while (fCookies->CountRows() > 0) {
 			row = (CookieRow*)fCookies->RowAt(0);
-			BPrivate::Network::BNetworkCookie& cookie = row->Cookie();
+			BPrivate::Network::BNetworkCookie cookie = row->Cookie();
 			cookie.SetExpirationDate(0);
 			fCookieJar.AddCookie(cookie);
 			fCookies->RemoveRow(row);
@@ -543,7 +544,7 @@ CookieWindow::_DeleteCookies()
 		// Delete selected cookies
 		for (size_t i = 0; i < rowsToDelete.size(); i++) {
 			row = rowsToDelete[i];
-			BPrivate::Network::BNetworkCookie& cookie = row->Cookie();
+			BPrivate::Network::BNetworkCookie cookie = row->Cookie();
 			cookie.SetExpirationDate(0);
 			fCookieJar.AddCookie(cookie);
 

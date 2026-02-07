@@ -271,12 +271,12 @@ bool AuthenticationPanel::getAuthentication(const BString& text,
 				break;
 			}
 
-			if (info[0].events & B_EVENT_ACQUIRE_SEMAPHORE) {
+			if (count == 0) {
 				// Exit semaphore
 				break;
 			}
 
-			if (info[1].events & B_EVENT_ACQUIRE_SEMAPHORE) {
+			if (count == 1) {
 				// Update semaphore (we moved/resized)
 				// Consume the semaphore (it was acquired)
 				window->UpdateIfNeeded();
