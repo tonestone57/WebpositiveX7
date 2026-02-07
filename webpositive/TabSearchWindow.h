@@ -22,6 +22,7 @@ public:
 	virtual	bool				QuitRequested();
 
 			void				SetTabManager(TabManager* manager);
+			void				PrepareToQuit();
 
 private:
 			void				_UpdateList();
@@ -32,6 +33,7 @@ private:
 			BMessenger			fTarget;
 			BTextControl*		fSearchControl;
 			BListView*			fTabList;
+			bool				fForceQuit;
 };
 
 #endif // TAB_SEARCH_WINDOW_H

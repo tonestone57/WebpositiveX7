@@ -878,6 +878,7 @@ TabManager::TabManager(const BMessenger& target, BMessage* newTabMessage)
 
 TabManager::~TabManager()
 {
+	fTabContainerView->SetController(NULL);
 }
 
 

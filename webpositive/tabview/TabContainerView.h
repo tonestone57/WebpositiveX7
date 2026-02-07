@@ -74,6 +74,8 @@ public:
 			bool				CanScrollLeft() const;
 			bool				CanScrollRight() const;
 
+			void				SetController(Controller* controller);
+
 private:
 			TabView*			_TabAt(const BPoint& where) const;
 			void				_MouseMoved(BPoint where, uint32 transit,

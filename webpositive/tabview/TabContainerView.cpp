@@ -126,7 +126,8 @@ TabContainerView::MouseDown(BPoint where)
 	else {
 		if ((buttons & B_TERTIARY_MOUSE_BUTTON) != 0) {
 			// Middle click outside tabs should always open a new tab.
-			fController->DoubleClickOutsideTabs();
+			if (fController)
+				fController->DoubleClickOutsideTabs();
 		} else if (clicks > 1)
 			fClickCount++;
 		else
@@ -147,7 +148,8 @@ TabContainerView::MouseUp(BPoint where)
 		// any tab. So even if fLastMouseEventTab has been reset to NULL
 		// because this tab was removed during mouse down, we wouldn't
 		// run the "outside tabs" code below.
-		fController->DoubleClickOutsideTabs();
+		if (fController)
+			fController->DoubleClickOutsideTabs();
 		fClickCount = 0;
 	}
 	// Always check the tab under the mouse again, since we don't update
@@ -428,6 +430,9 @@ TabContainerView::MaxFirstVisibleTabIndex() const
 void
 TabContainerView::_UpdatePreview(BPoint where)
 {
+	if (!fController)
+		return;
+
 	TabView* tab = _TabAt(where);
 	if (tab == NULL) {
 		if (fPreviewWindow && !fPreviewWindow->IsHidden())
@@ -492,6 +497,13 @@ TabContainerView::CanScrollRight() const
 }
 
 
+void
+TabContainerView::SetController(Controller* controller)
+{
+	fController = controller;
+}
+
+
 // #pragma mark -
 
 
@@ -538,7 +550,7 @@ TabContainerView::_MouseMoved(BPoint where, uint32 _transit,
 		fLastMouseEventTab = tab;
 		if (fLastMouseEventTab)
 			fLastMouseEventTab->MouseMoved(where, B_ENTERED_VIEW, dragMessage);
-		else {
+		else if (fController) {
 			fController->SetToolTip(
 				B_TRANSLATE("Double-click or middle-click to open new tab."));
 		}
@@ -583,7 +595,8 @@ TabContainerView::_UpdateTabVisibility()
 				canScrollTabsRight = true;
 		}
 	}
-	fController->UpdateTabScrollability(canScrollTabsLeft, canScrollTabsRight);
+	if (fController)
+		fController->UpdateTabScrollability(canScrollTabsLeft, canScrollTabsRight);
 }
 
 
