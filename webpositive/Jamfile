@@ -38,6 +38,7 @@ local sources =
 	BrowserWebView.cpp
 	BrowserWindow.cpp
 	BrowsingHistory.cpp
+	ConsoleListHelper.cpp
 	ConsoleWindow.cpp
 	CookieWindow.cpp
 	CredentialsStorage.cpp
