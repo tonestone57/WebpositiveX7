@@ -1243,7 +1243,7 @@ BrowserWindow::DispatchMessage(BMessage* message, BHandler* target)
 			return;
 		}
 
-		BPoint where;
+		BPoint where(-1000, -1000);
 		uint32 buttons;
 		webView->GetMouse(&where, &buttons, false);
 		// Only do this when the mouse is over the web view

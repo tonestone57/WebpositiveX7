@@ -169,7 +169,12 @@ NetworkWindow::_AppendRequest(NetworkRequestItem* item)
 {
 	try {
 		fAllRequests.push_back(item);
-		fPendingRequests[item->Url()].push_back(item);
+		try {
+			fPendingRequests[item->Url()].push_back(item);
+		} catch (...) {
+			fAllRequests.pop_back();
+			throw;
+		}
 	} catch (...) {
 		delete item;
 		return;
@@ -194,6 +199,14 @@ NetworkWindow::_AppendRequest(NetworkRequestItem* item)
 
 		if (!IsHidden())
 			fRequestListView->RemoveItem(0);
+		else {
+			// If hidden, the list view might contain a stale pointer to oldItem
+			// if it was added when the window was visible.
+			// To be safe, we clear the list view when hidden to avoid
+			// holding dangling pointers. It will be rebuilt in Show().
+			if (!fRequestListView->IsEmpty())
+				fRequestListView->MakeEmpty();
+		}
 
 		delete oldItem;
 	}
