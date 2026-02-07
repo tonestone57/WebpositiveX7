@@ -1937,7 +1937,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 		}
 
 		case TAB_SEARCH_WINDOW_QUIT:
-			fTabSearchWindow = NULL;
+			if (fTabSearchWindow) {
+				fTabSearchWindow->Lock();
+				fTabSearchWindow->Quit();
+				fTabSearchWindow = NULL;
+			}
 			break;
 
 		case SET_TAB_COLOR:

@@ -104,10 +104,12 @@ public:
     }
 
     ~BOutlineListView() {
+        for (size_t i = 0; i < fullList.size(); ++i) delete fullList[i];
         delete root;
     }
 
     void MakeEmpty() {
+        for (size_t i = 0; i < fullList.size(); ++i) delete fullList[i];
         delete root;
         root = new Node(NULL);
         fullList.clear();

@@ -49,6 +49,7 @@ void TestBlockingLoad(int count) {
 
         // Add to UI (Fast)
         // AddItem(item);
+        delete item;
     }
 
     bigtime_t end = system_time();
@@ -75,6 +76,7 @@ void TestAsyncLoad(int count) {
         BookmarkItem* data = (*items)[i];
         // Add to UI (Fast)
         // AddItem(data->item);
+        delete data->item;
         delete data;
     }
     delete items;
