@@ -238,6 +238,13 @@ public:
 DownloadProgressView::DownloadProgressView(BWebDownload* download)
 	:
 	BGroupView(B_HORIZONTAL, 8),
+	fIconView(NULL),
+	fStatusBar(NULL),
+	fInfoView(NULL),
+	fTopButton(NULL),
+	fBottomButton(NULL),
+	fPauseButton(NULL),
+	fOpenWhenDoneCheckBox(NULL),
 	fDownload(download),
 	fURL(download->URL()),
 	fPath(download->Path()),
@@ -260,6 +267,13 @@ DownloadProgressView::DownloadProgressView(BWebDownload* download)
 DownloadProgressView::DownloadProgressView(const BMessage* archive)
 	:
 	BGroupView(B_HORIZONTAL, 8),
+	fIconView(NULL),
+	fStatusBar(NULL),
+	fInfoView(NULL),
+	fTopButton(NULL),
+	fBottomButton(NULL),
+	fPauseButton(NULL),
+	fOpenWhenDoneCheckBox(NULL),
 	fDownload(NULL),
 	fURL(),
 	fPath(),
@@ -1054,9 +1068,12 @@ DownloadProgressView::_UpdateStatusText()
 				fInfoView->SetText(buffer.String());
 		}
 	} else if (!sShowSpeed && fCurrentSize < fExpectedSize) {
-		double totalBytesPerSecond = (double)(fCurrentSize
-				- fEstimatedFinishReferenceSize)
-			* 1000000LL / (system_time() - fEstimatedFinishReferenceTime);
+		double totalBytesPerSecond = 0.0;
+		if (system_time() > fEstimatedFinishReferenceTime) {
+			totalBytesPerSecond = (double)(fCurrentSize
+					- fEstimatedFinishReferenceSize)
+				* 1000000LL / (system_time() - fEstimatedFinishReferenceTime);
+		}
 		double secondsRemaining = 0;
 		if (totalBytesPerSecond > 0) {
 			secondsRemaining = (fExpectedSize - fCurrentSize)
