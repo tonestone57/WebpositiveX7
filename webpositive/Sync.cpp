@@ -195,8 +195,10 @@ Sync::ImportCookies(const BPath& path,
 			cookie.SetHttpOnly(httpOnly);
 
 			// Expiration is time_t
-			time_t exp = (time_t)strtoll(parts[4], NULL, 10);
-			cookie.SetExpirationDate(exp);
+			if (parts[4][0] != '\0') {
+				time_t exp = (time_t)strtoll(parts[4], NULL, 10);
+				cookie.SetExpirationDate(exp);
+			}
 
 			cookieJar.AddCookie(cookie);
 		}

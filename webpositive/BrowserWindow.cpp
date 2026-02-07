@@ -2611,8 +2611,13 @@ BrowserWindow::QuitRequested()
 		// Iterate over all tabs to delete all BWebViews.
 		// Do this here, so WebKit tear down happens earlier.
 		SetCurrentWebView(NULL);
-		while (fTabManager->CountTabs() > 0)
-			_ShutdownTab(fTabManager->CountTabs() - 1);
+		int32 tabCount = fTabManager->CountTabs();
+		while (tabCount > 0) {
+			_ShutdownTab(tabCount - 1);
+			if (fTabManager->CountTabs() >= tabCount)
+				break;
+			tabCount = fTabManager->CountTabs();
+		}
 
 		message.AddRect("window frame", WindowFrame());
 		be_app->PostMessage(&message);
@@ -3841,8 +3846,12 @@ BrowserWindow::_ShutdownTab(int32 index)
 	view = fTabManager->RemoveTab(index);
 	// webView pointer is still valid here, as RemoveTab only removed it from layout
 
-	if (webView != NULL)
+	if (webView != NULL) {
+		PageUserData* userData = static_cast<PageUserData*>(
+			webView->GetUserData());
 		webView->Shutdown();
+		delete userData;
+	}
 
 	delete view;
 }

@@ -1000,7 +1000,15 @@ TabManager::AddTab(BView* view, const char* label, int32 index)
 		index = CountTabs();
 
 	fTabContainerView->AddTab(label, index);
-	fCardLayout->AddView(index, view);
+	if (!fCardLayout->AddView(index, view)) {
+		TabView* tab = fTabContainerView->RemoveTab(index);
+		delete tab;
+
+		BWebView* webView = dynamic_cast<BWebView*>(view);
+		if (webView != NULL)
+			webView->Shutdown();
+		delete view;
+	}
 }
 
 

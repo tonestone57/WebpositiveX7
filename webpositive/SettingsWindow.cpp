@@ -160,6 +160,11 @@ SettingsWindow::~SettingsWindow()
 	RemoveHandler(fSerifFontView);
 	RemoveHandler(fSansSerifFontView);
 	RemoveHandler(fFixedFontView);
+
+	delete fStandardFontView;
+	delete fSerifFontView;
+	delete fSansSerifFontView;
+	delete fFixedFontView;
 }
 
 
@@ -1171,6 +1176,7 @@ SettingsWindow::_UpdateProxySettings()
 	passwordKey.SetIdentifier("ProxySettings");
 	passwordKey.SetPassword(password);
 	passwordKey.SetPurpose(B_KEY_PURPOSE_WEB);
+	keyStore.RemoveKey("WebPositive", B_KEY_TYPE_PASSWORD, "ProxySettings");
 	status_t status = keyStore.AddKey("WebPositive", passwordKey);
 	if (status != B_OK)
 		fprintf(stderr, "Failed to store proxy password: %s\n", SafeStrerror(status).String());
