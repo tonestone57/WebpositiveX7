@@ -404,7 +404,10 @@ BDefaultChoiceView::ShowChoices(BAutoCompleter::CompletionStyle* completer)
 	BScrollView *scrollView = NULL;
 	if (count > fMaxVisibleChoices) {
 		// BScrollView takes ownership of the target
-		scrollView = new BScrollView("", listView.release(), B_FOLLOW_NONE, 0, false, true, B_NO_BORDER);
+		// Use raw pointer to avoid releasing ownership if new throws
+		ListView* rawListView = listView.get();
+		scrollView = new BScrollView("", rawListView, B_FOLLOW_NONE, 0, false, true, B_NO_BORDER);
+		listView.release();
 	}
 
 	if (fWindow == NULL) {

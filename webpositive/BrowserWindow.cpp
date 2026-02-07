@@ -1158,6 +1158,7 @@ BrowserWindow::~BrowserWindow()
 	if (fTabSearchWindow) {
 		if (fTabSearchWindow->Lock()) {
 			fTabSearchWindow->SetTabManager(NULL);
+			fTabSearchWindow->PrepareToQuit();
 			fTabSearchWindow->Quit();
 			fTabSearchWindow = NULL;
 		}
@@ -2770,8 +2771,8 @@ BrowserWindow::SetCurrentWebView(BWebView* webView)
 
 		// Capture Preview
 		if (CurrentWebView() && !CurrentWebView()->IsHidden()) {
-			BBitmap* tempPreview = new BBitmap(CurrentWebView()->Bounds(), B_RGB32);
-			if (tempPreview->InitCheck() == B_OK) {
+			BBitmap* tempPreview = new(std::nothrow) BBitmap(CurrentWebView()->Bounds(), B_RGB32);
+			if (tempPreview != NULL && tempPreview->InitCheck() == B_OK) {
 				// Use BScreen to read content if visible
 				if (CurrentWebView()->Window()) {
 					BScreen screen(CurrentWebView()->Window());
@@ -2779,21 +2780,23 @@ BrowserWindow::SetCurrentWebView(BWebView* webView)
 					if (screen.ReadBitmap(tempPreview, false, &screenRect) == B_OK) {
 						// Scale down to save memory
 						BRect thumbRect(0, 0, 200, 150);
-						BBitmap* thumbnail = new BBitmap(thumbRect, B_RGB32, true);
-						if (thumbnail->IsValid()) {
-							BView* thumbView = new BView(thumbRect, "thumb", B_FOLLOW_NONE, B_WILL_DRAW);
-							thumbnail->AddChild(thumbView);
-							thumbnail->Lock();
-							thumbView->SetHighColor(B_TRANSPARENT_32_BIT);
-							thumbView->FillRect(thumbRect);
-							thumbView->SetDrawingMode(B_OP_COPY);
-							thumbView->DrawBitmap(tempPreview, tempPreview->Bounds(), thumbRect, B_FILTER_BITMAP_BILINEAR);
-							thumbView->Sync();
-							thumbnail->Unlock();
-							thumbnail->RemoveChild(thumbView);
-							delete thumbView;
+						BBitmap* thumbnail = new(std::nothrow) BBitmap(thumbRect, B_RGB32, true);
+						if (thumbnail != NULL && thumbnail->IsValid()) {
+							BView* thumbView = new(std::nothrow) BView(thumbRect, "thumb", B_FOLLOW_NONE, B_WILL_DRAW);
+							if (thumbView != NULL) {
+								thumbnail->AddChild(thumbView);
+								thumbnail->Lock();
+								thumbView->SetHighColor(B_TRANSPARENT_32_BIT);
+								thumbView->FillRect(thumbRect);
+								thumbView->SetDrawingMode(B_OP_COPY);
+								thumbView->DrawBitmap(tempPreview, tempPreview->Bounds(), thumbRect, B_FILTER_BITMAP_BILINEAR);
+								thumbView->Sync();
+								thumbnail->Unlock();
+								thumbnail->RemoveChild(thumbView);
+								delete thumbView;
 
-							userData->SetPreview(thumbnail);
+								userData->SetPreview(thumbnail);
+							}
 						}
 						delete thumbnail;
 					}

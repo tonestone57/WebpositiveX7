@@ -306,7 +306,9 @@ ConsoleWindow::_AppendMessage(const ConsoleMessage& message)
 				item->SetText(repeatText.String());
 			} else {
 				// Add new repeat message
-				fMessagesListView->AddItem(new BStringItem(repeatText.String()));
+				BStringItem* item = new(std::nothrow) BStringItem(repeatText.String());
+				if (item == NULL || !fMessagesListView->AddItem(item))
+					delete item;
 			}
 		}
 	} else {

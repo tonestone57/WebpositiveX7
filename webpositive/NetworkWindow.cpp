@@ -213,7 +213,8 @@ NetworkWindow::_AppendRequest(NetworkRequestItem* item)
 
 	if (!IsHidden()) {
 		fRequestListView->AddItem(item);
-		fRequestListView->ScrollTo(fRequestListView->CountItems() - 1);
+		BRect frame = fRequestListView->ItemFrame(fRequestListView->CountItems() - 1);
+		fRequestListView->ScrollTo(0, frame.top);
 	}
 }
 
@@ -226,6 +227,9 @@ NetworkWindow::_UpdateList()
 			it != fAllRequests.end(); ++it) {
 		fRequestListView->AddItem(*it);
 	}
-	if (fRequestListView->CountItems() > 0)
-		fRequestListView->ScrollTo(fRequestListView->CountItems() - 1);
+	int32 count = fRequestListView->CountItems();
+	if (count > 0) {
+		BRect frame = fRequestListView->ItemFrame(count - 1);
+		fRequestListView->ScrollTo(0, frame.top);
+	}
 }
