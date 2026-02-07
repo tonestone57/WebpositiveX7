@@ -157,13 +157,9 @@ SettingsWindow::SettingsWindow(BRect frame, SettingsMessage* settings)
 SettingsWindow::~SettingsWindow()
 {
 	RemoveHandler(fStandardFontView);
-	delete fStandardFontView;
 	RemoveHandler(fSerifFontView);
-	delete fSerifFontView;
 	RemoveHandler(fSansSerifFontView);
-	delete fSansSerifFontView;
 	RemoveHandler(fFixedFontView);
-	delete fFixedFontView;
 }
 
 

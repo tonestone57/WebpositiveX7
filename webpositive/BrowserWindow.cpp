@@ -2977,7 +2977,7 @@ BrowserWindow::ToggleFullscreen()
 		_ResizeToScreen();
 
 		SetFlags(Flags() | (B_NOT_RESIZABLE | B_NOT_MOVABLE));
-		SetLook(B_TITLED_WINDOW_LOOK);
+		SetLook(B_NO_BORDER_WINDOW_LOOK);
 	}
 	fIsFullscreen = !fIsFullscreen;
 	fFullscreenItem->SetMarked(fIsFullscreen);
