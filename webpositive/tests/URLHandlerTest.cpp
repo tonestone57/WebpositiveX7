@@ -115,5 +115,6 @@ int main()
 
 
 	printf("All tests passed!\n");
+	delete be_roster;
 	return 0;
 }

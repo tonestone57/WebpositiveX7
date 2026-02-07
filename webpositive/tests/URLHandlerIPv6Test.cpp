@@ -63,5 +63,6 @@ int main()
 		result = 1;
 	}
 
+	delete be_roster;
 	return result;
 }
