@@ -524,8 +524,10 @@ CookieWindow::_DeleteCookies()
 	}
 
 	if (rowsToDelete.empty()) {
-		// A domain was selected in the domain list, but no specific cookies
-		// selected -> delete all cookies for this domain.
+		// If no specific cookies are selected, check if we really want to delete
+		// all cookies for the domain. Only do so if the list has focus or if
+		// the user explicitly requested it via context menu/button on the domain.
+		// Since fDeleteButton is enabled when domain is selected, we assume intent.
 		while (fCookies->CountRows() > 0) {
 			row = (CookieRow*)fCookies->RowAt(0);
 			BPrivate::Network::BNetworkCookie& cookie = row->Cookie();
