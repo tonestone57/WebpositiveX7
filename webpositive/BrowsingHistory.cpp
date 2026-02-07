@@ -44,10 +44,12 @@ BrowsingHistoryItem::BrowsingHistoryItem(const BString& url)
 
 BrowsingHistoryItem::BrowsingHistoryItem(const BrowsingHistoryItem& other)
 	:
+	fURL(other.fURL),
+	fDateTime(other.fDateTime),
+	fInvocationCount(other.fInvocationCount),
 	fHostStart(other.fHostStart),
 	fHostLength(other.fHostLength)
 {
-	*this = other;
 }
 
 
@@ -255,19 +257,17 @@ BrowsingHistory::ExportHistory(const BPath& path)
 	if (status != B_OK)
 		return status;
 
-	BString header = "URL,Date,Count\n";
-	file.Write(header.String(), header.Length());
+	BString buffer = "URL,Date,Count\n";
 
 	for (int32 i = 0; i < DefaultInstance()->CountItems(); i++) {
 		const BrowsingHistoryItem* item = DefaultInstance()->HistoryItemAt(i);
 		if (item) {
-			BString line;
 			BString url = item->URL();
 			if (url.FindFirst(',') >= 0 || url.FindFirst('"') >= 0) {
 				url.ReplaceAll("\"", "\"\"");
-				line << "\"" << url << "\",";
+				buffer << "\"" << url << "\",";
 			} else {
-				line << url << ",";
+				buffer << url << ",";
 			}
 
 			// Format date
@@ -275,12 +275,22 @@ BrowsingHistory::ExportHistory(const BPath& path)
 			time_t t = item->DateTime().Time_t();
 			strftime(dateStr, sizeof(dateStr), "%Y-%m-%d %H:%M:%S", localtime(&t));
 
-			line << dateStr << ",";
-			line << item->InvocationCount() << "\n";
+			buffer << dateStr << ",";
+			buffer << item->InvocationCount() << "\n";
 
-			file.Write(line.String(), line.Length());
+			if (buffer.Length() > kSaveBufferSize) {
+				if (file.Write(buffer.String(), buffer.Length()) != buffer.Length())
+					return B_ERROR;
+				buffer.Truncate(0);
+			}
 		}
 	}
+
+	if (buffer.Length() > 0) {
+		if (file.Write(buffer.String(), buffer.Length()) != buffer.Length())
+			return B_ERROR;
+	}
+
 	return B_OK;
 }
 
@@ -507,7 +517,13 @@ _SaveToDisk(const std::vector<BrowsingHistoryItem>& items, int32 maxAge)
 				BString buffer;
 				for (size_t i = 0; i < items.size(); i++) {
 					const BrowsingHistoryItem& item = items[i];
-					buffer << "hadd " << item.URL() << " " << (int64)item.DateTime().Time_t()
+					BString url = item.URL();
+					url.ReplaceAll(" ", "%20");
+					url.ReplaceAll("\t", "%09");
+					url.ReplaceAll("\n", "%0A");
+					url.ReplaceAll("\r", "%0D");
+
+					buffer << "hadd " << url << " " << (int64)item.DateTime().Time_t()
 						<< " " << item.InvocationCount() << "\n";
 
 					if (buffer.Length() > kSaveBufferSize) {

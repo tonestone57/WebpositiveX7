@@ -26,6 +26,8 @@
 #include "BrowserApp.h"
 #include "WebViewConstants.h"
 
+#include "ConsoleListHelper.h"
+#include "ConsoleMessage.h"
 
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "Console Window"
@@ -36,6 +38,80 @@ enum {
 	CLEAR_CONSOLE_MESSAGES = 'ccms',
 	FILTER_ERRORS_ONLY = 'feon'
 };
+
+
+namespace {
+
+class ListViewAdapter : public IConsoleList {
+public:
+	ListViewAdapter(BListView* view) : fView(view) {}
+
+	virtual int32 CountItems() const {
+		return fView->CountItems();
+	}
+
+	virtual void RemoveItem(int32 index) {
+		delete fView->RemoveItem(index);
+	}
+
+	virtual void RemoveItems(int32 index, int32 count) {
+		if (count <= 0) return;
+		// BListView::RemoveItems removes items from the list but does not delete them.
+		// However, it does not return the items either.
+		// So we must retrieve them, remove them (efficiently via RemoveItems if possible), then delete them.
+		// But iterating ItemAt and then RemoveItems is safe.
+
+		BList items;
+		for (int32 i = 0; i < count; i++) {
+			items.AddItem(fView->ItemAt(index + i));
+		}
+
+		if (fView->RemoveItems(index, count)) {
+			for (int32 i = 0; i < items.CountItems(); i++) {
+				delete (BListItem*)items.ItemAt(i);
+			}
+		}
+	}
+
+	virtual void AddItem(const char* text) {
+		fView->AddItem(new BStringItem(text));
+	}
+
+	virtual void SetItemText(int32 index, const char* text) {
+		BStringItem* item = (BStringItem*)fView->ItemAt(index);
+		if (item)
+			item->SetText(text);
+	}
+
+	virtual const char* GetItemText(int32 index) const {
+		BStringItem* item = (BStringItem*)fView->ItemAt(index);
+		return item ? item->Text() : NULL;
+	}
+
+private:
+	BListView* fView;
+};
+
+BString FormatConsoleMessage(const ConsoleMessage& message)
+{
+	BString finalText;
+	finalText.SetToFormat("%s:%" B_PRIi32 ":%" B_PRIi32 ": %s\n",
+		message.source.String(), message.line, message.column, message.text.String());
+	return finalText;
+}
+
+BString FormatRepeatText(int32 count)
+{
+	static BStringFormat repeatFormat(B_TRANSLATE("{0, plural,"
+		"one{Last line repeated # time.}"
+		"other{Last line repeated # times.}}"));
+	BString repeatText;
+	repeatFormat.Format(repeatText, count);
+	repeatText += "\n";
+	return repeatText;
+}
+
+} // namespace
 
 
 ConsoleWindow::ConsoleWindow(BRect frame)
@@ -198,18 +274,10 @@ ConsoleWindow::_CopyToClipboard()
 void
 ConsoleWindow::_UpdateMessageList()
 {
-	// Clear existing items
-	int32 count = fMessagesListView->CountItems();
-	for (int32 i = count - 1; i >= 0; i--)
-		delete fMessagesListView->RemoveItem(i);
-
-	fPreviousText = "";
-	fRepeatCounter = 0;
-
-	for (std::deque<ConsoleMessage>::iterator it = fAllMessages.begin();
-			it != fAllMessages.end(); ++it) {
-		_AppendMessage(*it);
-	}
+	bool errorsOnly = fErrorsOnlyCheckBox->Value() == B_CONTROL_ON;
+	ListViewAdapter listAdapter(fMessagesListView);
+	UpdateConsoleMessageList(listAdapter, fAllMessages, errorsOnly,
+		fPreviousText, fRepeatCounter, FormatConsoleMessage, FormatRepeatText);
 
 	if (fMessagesListView->CountItems() > 0)
 		fMessagesListView->ScrollTo(fMessagesListView->CountItems() - 1);
@@ -224,19 +292,11 @@ ConsoleWindow::_AppendMessage(const ConsoleMessage& message)
 	if (errorsOnly && !message.isError)
 		return;
 
-	static BStringFormat repeatFormat(B_TRANSLATE("{0, plural,"
-		"one{Last line repeated # time.}"
-		"other{Last line repeated # times.}}"));
-
-	BString finalText;
-	finalText.SetToFormat("%s:%" B_PRIi32 ":%" B_PRIi32 ": %s\n",
-		message.source.String(), message.line, message.column, message.text.String());
+	BString finalText = FormatConsoleMessage(message);
 
 	if (finalText == fPreviousText) {
 		fRepeatCounter++;
-		BString repeatText;
-		repeatFormat.Format(repeatText, fRepeatCounter);
-		repeatText += "\n";
+		BString repeatText = FormatRepeatText(fRepeatCounter);
 
 		int32 lastIdx = fMessagesListView->CountItems() - 1;
 		if (lastIdx >= 0) {

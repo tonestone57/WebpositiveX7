@@ -219,8 +219,8 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 			bool isURL = false;
 
 			// Heuristic 1: Check if it looks like an IPv6 literal (e.g. [::1])
-			if (input.Length() > 0 && input[0] == '['
-				&& input.FindFirst(']') != B_ERROR) {
+			if (input.Length() > 2 && input[0] == '['
+				&& input.FindFirst(']') > 1) {
 				bool validIPv6 = true;
 				for (int32 i = 0; i < input.Length(); i++) {
 					// We use IsValidDomainChar because it allows hex, colon,

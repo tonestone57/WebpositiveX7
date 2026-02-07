@@ -15,6 +15,8 @@
 
 #include <deque>
 
+#include "ConsoleMessage.h"
+
 class BListView;
 class BButton;
 class BCheckBox;
@@ -37,14 +39,6 @@ private:
 			void				_AppendMessage(const ConsoleMessage& message);
 
 private:
-			struct ConsoleMessage {
-				BString text;
-				BString source;
-				int32 line;
-				int32 column;
-				bool isError;
-			};
-
 			bool				fQuitting;
 			BListView*			fMessagesListView;
 			BButton* 			fClearMessagesButton;
