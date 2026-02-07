@@ -700,19 +700,22 @@ BookmarkBar::FrameResized(float width, float height)
 
 		// Add new items (they were removed from end of bar, so reverse iterate to restore order)
 		for (int32 i = (int32)newOverflowItems.size() - 1; i >= 0; i--) {
-			fOverflowMenu->AddItem(newOverflowItems[i]);
+			if (!fOverflowMenu->AddItem(newOverflowItems[i]))
+				delete newOverflowItems[i];
 		}
 
 		// Add old items back (they were removed from end of overflow, so reverse iterate)
 		for (int32 i = (int32)oldOverflowItems.size() - 1; i >= 0; i--) {
-			fOverflowMenu->AddItem(oldOverflowItems[i]);
+			if (!fOverflowMenu->AddItem(oldOverflowItems[i]))
+				delete oldOverflowItems[i];
 		}
 	}
 
 	// Move fitting items from Overflow to Bar
 	while (currentBarCount < fitCount && fOverflowMenu->CountItems() > 0) {
 		BMenuItem* item = fOverflowMenu->RemoveItem((int32)0);
-		AddItem(item); // Add to end
+		if (!AddItem(item)) // Add to end
+			delete item;
 		currentBarCount++;
 	}
 

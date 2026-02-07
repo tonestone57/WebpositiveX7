@@ -3629,7 +3629,7 @@ void
 BrowserWindow::StatusChanged(const BString& statusText, BWebView* view)
 {
 	if (statusText.Compare("WebPositive:FormDirty:", 22) == 0) {
-		fFormSafetyHelper->StatusChanged(statusText, view);
+		fFormSafetyHelper->ConsoleMessage(statusText);
 		// Do not show this status message in the UI
 		return;
 	}

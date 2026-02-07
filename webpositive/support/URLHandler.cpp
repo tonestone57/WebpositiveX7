@@ -248,7 +248,7 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 						hasDot = true;
 					else if (input[i] == '/' || input[i] == '?' || input[i] == '#')
 						break;
-					else if (!IsValidDomainChar(input[i])) {
+					else if (!IsValidDomainChar(input[i]) || input[i] == '[' || input[i] == ']') {
 						validChars = false;
 						break;
 					}
