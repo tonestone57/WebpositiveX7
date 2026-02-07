@@ -44,10 +44,12 @@ BrowsingHistoryItem::BrowsingHistoryItem(const BString& url)
 
 BrowsingHistoryItem::BrowsingHistoryItem(const BrowsingHistoryItem& other)
 	:
+	fURL(other.fURL),
+	fDateTime(other.fDateTime),
+	fInvocationCount(other.fInvocationCount),
 	fHostStart(other.fHostStart),
 	fHostLength(other.fHostLength)
 {
-	*this = other;
 }
 
 
@@ -515,7 +517,13 @@ _SaveToDisk(const std::vector<BrowsingHistoryItem>& items, int32 maxAge)
 				BString buffer;
 				for (size_t i = 0; i < items.size(); i++) {
 					const BrowsingHistoryItem& item = items[i];
-					buffer << "hadd " << item.URL() << " " << (int64)item.DateTime().Time_t()
+					BString url = item.URL();
+					url.ReplaceAll(" ", "%20");
+					url.ReplaceAll("\t", "%09");
+					url.ReplaceAll("\n", "%0A");
+					url.ReplaceAll("\r", "%0D");
+
+					buffer << "hadd " << url << " " << (int64)item.DateTime().Time_t()
 						<< " " << item.InvocationCount() << "\n";
 
 					if (buffer.Length() > kSaveBufferSize) {
