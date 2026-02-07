@@ -1057,8 +1057,11 @@ DownloadProgressView::_UpdateStatusText()
 		double totalBytesPerSecond = (double)(fCurrentSize
 				- fEstimatedFinishReferenceSize)
 			* 1000000LL / (system_time() - fEstimatedFinishReferenceTime);
-		double secondsRemaining = (fExpectedSize - fCurrentSize)
-			/ totalBytesPerSecond;
+		double secondsRemaining = 0;
+		if (totalBytesPerSecond > 0) {
+			secondsRemaining = (fExpectedSize - fCurrentSize)
+				/ totalBytesPerSecond;
+		}
 		time_t now = (time_t)real_time_clock();
 		time_t finishTime = (time_t)(now + secondsRemaining);
 
