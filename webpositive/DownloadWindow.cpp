@@ -345,7 +345,7 @@ DownloadWindow::MessageReceived(BMessage* message)
 				DownloadProgressView* view = static_cast<DownloadProgressView*>(viewPtr);
 				if (view->Download())
 					fDownloadsMap.erase(view->Download());
-				view->RemoveSelf();
+				fDownloadViewsLayout->RemoveView(view);
 				delete view;
 				_ValidateButtonStatus();
 				_SaveSettings();
@@ -447,7 +447,7 @@ DownloadWindow::_DownloadStarted(BWebDownload* download)
 			index = i;
 			if (view->Download())
 				fDownloadsMap.erase(view->Download());
-			view->RemoveSelf();
+			fDownloadViewsLayout->RemoveView(view);
 			delete view;
 			continue;
 		}
@@ -536,7 +536,7 @@ DownloadWindow::_RemoveFinishedDownloads()
 		if (view->IsFinished() || view->IsCanceled()) {
 			if (view->Download())
 				fDownloadsMap.erase(view->Download());
-			view->RemoveSelf();
+			fDownloadViewsLayout->RemoveView(view);
 			delete view;
 		} else if (view->IsMissing())
 			missingCount++;
@@ -560,7 +560,7 @@ DownloadWindow::_RemoveMissingDownloads()
 		if (view->IsMissing()) {
 			if (view->Download())
 				fDownloadsMap.erase(view->Download());
-			view->RemoveSelf();
+			fDownloadViewsLayout->RemoveView(view);
 			delete view;
 		} else if (view->IsFinished() || view->IsCanceled())
 			cleanupCount++;

@@ -1182,7 +1182,7 @@ SettingsWindow::_UpdateProxySettings()
 	fOriginalProxyPassword = password;
 
 	// Clear plaintext password from settings file if present
-	if (fSettings->GetValue(kSettingsKeyProxyPassword, "") != "")
+	if (BString(fSettings->GetValue(kSettingsKeyProxyPassword, "")) != "")
 		fSettings->SetValue(kSettingsKeyProxyPassword, "");
 
 	if (fUseProxyCheckBox->Value() == B_CONTROL_ON) {
