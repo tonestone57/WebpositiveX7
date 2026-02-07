@@ -54,6 +54,25 @@ public:
 		delete fView->RemoveItem(index);
 	}
 
+	virtual void RemoveItems(int32 index, int32 count) {
+		if (count <= 0) return;
+		// BListView::RemoveItems removes items from the list but does not delete them.
+		// However, it does not return the items either.
+		// So we must retrieve them, remove them (efficiently via RemoveItems if possible), then delete them.
+		// But iterating ItemAt and then RemoveItems is safe.
+
+		BList items;
+		for (int32 i = 0; i < count; i++) {
+			items.AddItem(fView->ItemAt(index + i));
+		}
+
+		if (fView->RemoveItems(index, count)) {
+			for (int32 i = 0; i < items.CountItems(); i++) {
+				delete (BListItem*)items.ItemAt(i);
+			}
+		}
+	}
+
 	virtual void AddItem(const char* text) {
 		fView->AddItem(new BStringItem(text));
 	}

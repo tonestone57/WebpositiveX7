@@ -42,14 +42,7 @@ void UpdateConsoleMessageList(
 
 			if (matchIndex > 0) {
 				// Remove garbage at top
-				// RemoveItem shifts elements, so we remove 0 repeatedly?
-				// Or loop backwards? "remove items 0 to matchIndex-1"
-				// BListView::RemoveItem(index) removes item at index.
-				// If we remove 0, 1 becomes 0.
-				// So we should remove item at 0, matchIndex times.
-				for (int32 i = 0; i < matchIndex; i++) {
-					list.RemoveItem(0);
-				}
+				list.RemoveItems(0, matchIndex);
 			} else if (matchIndex == -1) {
 				// No match found near top.
 				// Assuming list is completely different/invalid.
@@ -112,8 +105,7 @@ void UpdateConsoleMessageList(
 	// If messages were processed, remove excess items.
 
 	int32 count = list.CountItems();
-	// Remove from end to avoid index shifting issues with loop variable
-	for (int32 i = count - 1; i >= listIndex; i--) {
-		list.RemoveItem(i);
+	if (count > listIndex) {
+		list.RemoveItems(listIndex, count - listIndex);
 	}
 }

@@ -23,6 +23,12 @@ public:
 		}
 	}
 
+	virtual void RemoveItems(int32 index, int32 count) {
+		if (index >= 0 && count > 0 && index + count <= (int32)items.size()) {
+			items.erase(items.begin() + index, items.begin() + index + count);
+		}
+	}
+
 	virtual void AddItem(const char* text) {
 		items.push_back(text ? text : "");
 	}
@@ -110,6 +116,22 @@ int main() {
 
 	if (list.CountItems() != 1) return 12;
 	if (list.items[0] != "Error") return 13;
+
+	// Test 6: Bulk Removal (Shift)
+	list.items.clear();
+	list.AddItem("Old1");
+	list.AddItem("Old2");
+	list.AddItem("Match");
+
+	messages.clear();
+	messages.push_back({"Match"});
+	messages.push_back({"New"});
+
+	UpdateConsoleMessageList(list, messages, false, previousText, repeatCounter, FormatMessage, FormatRepeat);
+
+	if (list.CountItems() != 2) return 14;
+	if (list.items[0] != "Match") return 15;
+	if (list.items[1] != "New") return 16;
 
 	std::cout << "All tests passed!" << std::endl;
 	return 0;

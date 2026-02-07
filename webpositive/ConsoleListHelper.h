@@ -16,6 +16,7 @@ public:
 	virtual ~IConsoleList() {}
 	virtual int32 CountItems() const = 0;
 	virtual void RemoveItem(int32 index) = 0;
+	virtual void RemoveItems(int32 index, int32 count) = 0;
 	virtual void AddItem(const char* text) = 0;
 	virtual void SetItemText(int32 index, const char* text) = 0;
 	virtual const char* GetItemText(int32 index) const = 0;
