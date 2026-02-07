@@ -1158,6 +1158,7 @@ BrowserWindow::~BrowserWindow()
 
 	if (fTabSearchWindow) {
 		if (fTabSearchWindow->Lock()) {
+			fTabSearchWindow->SetTabManager(NULL);
 			fTabSearchWindow->Quit();
 			fTabSearchWindow = NULL;
 		}
