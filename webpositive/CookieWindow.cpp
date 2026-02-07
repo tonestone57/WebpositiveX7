@@ -387,6 +387,9 @@ CookieWindow::_BuildDomainList()
 	const BPrivate::Network::BNetworkCookie* cookie;
 
 	while ((cookie = it.Next()) != NULL) {
+		if (cookie->ExpirationDate() == 0)
+			continue;
+
 		BString domain = cookie->Domain();
 		fCookieMap[domain].push_back(*cookie);
 	}

@@ -194,6 +194,7 @@ CredentialsStorage::PutCredentials(const HashString& key,
 		passwordKey.SetPassword(credentials.Password());
 		passwordKey.SetSecondaryInfo(credentials.Username());
 		passwordKey.SetPurpose(B_KEY_PURPOSE_WEB);
+		fKeyStore.RemoveKey("WebPositive", B_KEY_TYPE_PASSWORD, key.GetString());
 		return fKeyStore.AddKey("WebPositive", passwordKey);
 	}
 	return B_OK;

@@ -261,6 +261,17 @@ TabContainerView::RemoveTab(int32 index)
 	Invalidate(dirty);
 	_ValidateTabVisibility();
 
+	if (fPreviewWindow != NULL) {
+		if (fPreviewWindow->Lock()) {
+			BView* view = fPreviewWindow->ChildAt(0);
+			if (view != NULL)
+				view->SetViewBitmap(NULL);
+			if (!fPreviewWindow->IsHidden())
+				fPreviewWindow->Hide();
+			fPreviewWindow->Unlock();
+		}
+	}
+
 	return removedTab;
 }
 

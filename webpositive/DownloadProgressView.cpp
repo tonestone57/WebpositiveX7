@@ -1081,7 +1081,7 @@ DownloadProgressView::_UpdateStatusText()
 				* 1000000LL / timeDiff;
 		}
 		double secondsRemaining = 0;
-		if (totalBytesPerSecond > 0) {
+		if (totalBytesPerSecond > 0.001) {
 			secondsRemaining = (fExpectedSize - fCurrentSize)
 				/ totalBytesPerSecond;
 		}

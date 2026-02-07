@@ -870,12 +870,7 @@ BrowserApp::_SaveSession()
 
 		webWindow->Unlock();
 	}
-	// SettingsMessage saves on destruction or we can rely on it being up to date
-	// assuming it behaves like typical Haiku settings.
-	// But usually we need to set values. Here we just added messages.
-	// We might need to force a save if SettingsMessage doesn't do it automatically enough.
-	// Reading the code for SettingsMessage would be ideal but it's not in the file list.
-	// Assuming it works similar to fSession.
+	autoSaveSession.Save();
 }
 
 
