@@ -639,7 +639,6 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings, const BS
 	fLastHistoryGeneration(0),
 	fPermissionsWindow(NULL),
 	fNetworkWindow(NULL),
-	fIsBypassingCache(false),
 	fIsPrivate(privateWindow),
 	fButtonResetRunner(NULL),
 	fExpectingDomInspection(false),
@@ -1321,7 +1320,9 @@ BrowserWindow::MessageReceived(BMessage* message)
 					// If standard is WEB_BROWSER, maybe DOCUMENT_VIEWER is stricter?
 					// I'll stick to what I used but persistent:
 					webView->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
-					fIsBypassingCache = true;
+					PageUserData* userData = _GetOrCreateUserData(webView);
+					if (userData)
+						userData->SetIsBypassingCache(true);
 				}
 				webView->Reload();
 			}
@@ -1334,9 +1335,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 			break;
 
 		case SHOW_HIDE_BOOKMARK_BAR:
-			_ShowBookmarkBar(fBookmarkBar->IsHidden());
-			if (fAutoHideBookmarkBarMenuItem)
-				fAutoHideBookmarkBarMenuItem->SetEnabled(!fBookmarkBar->IsHidden());
+			if (fBookmarkBar) {
+				_ShowBookmarkBar(fBookmarkBar->IsHidden());
+				if (fAutoHideBookmarkBarMenuItem)
+					fAutoHideBookmarkBarMenuItem->SetEnabled(!fBookmarkBar->IsHidden());
+			}
 			break;
 
 		case TOGGLE_AUTO_HIDE_BOOKMARK_BAR:
@@ -3145,7 +3148,11 @@ BrowserWindow::LoadNegotiating(const BString& url, BWebView* view)
 			settings->SetMediaSourceEnabled(enableMSE);
 
 			// Only apply global cache setting if we are NOT currently in a forced reload (bypass cache) state
-			if (!fIsBypassingCache) {
+			bool isBypassingCache = false;
+			if (userData)
+				isBypassingCache = userData->IsBypassingCache();
+
+			if (!isBypassingCache) {
 				if (fAppSettings->GetValue(kSettingsKeyDisableCache, false)) {
 					view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
 				} else {
@@ -3241,15 +3248,14 @@ BrowserWindow::LoadFailed(const BString& url, BWebView* view)
 		fNetworkWindow->PostMessage(&msg);
 	}
 
-	if (fIsBypassingCache && view && view->WebPage()) {
+	PageUserData* userData = _GetOrCreateUserData(view);
+	if (userData && userData->IsBypassingCache() && view && view->WebPage()) {
 		// Restore cache model on failure too
 		if (!fAppSettings->GetValue(kSettingsKeyDisableCache, false)) {
 			view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
 		}
-		fIsBypassingCache = false;
+		userData->SetIsBypassingCache(false);
 	}
-
-	PageUserData* userData = _GetOrCreateUserData(view);
 	if (userData != NULL)
 		userData->SetIsLoading(false);
 
@@ -3294,12 +3300,13 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 		fNetworkWindow->PostMessage(&msg);
 	}
 
-	if (fIsBypassingCache && view && view->WebPage()) {
+	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
+	if (userData && userData->IsBypassingCache() && view && view->WebPage()) {
 		// Restore cache model if we were bypassing, UNLESS disable cache setting is on
 		if (!fAppSettings->GetValue(kSettingsKeyDisableCache, false)) {
 			view->WebPage()->SetCacheModel(B_WEBKIT_CACHE_MODEL_WEB_BROWSER);
 		}
-		fIsBypassingCache = false;
+		userData->SetIsBypassingCache(false);
 	}
 
 	// Check permissions for popups and dark mode injection
@@ -3377,7 +3384,6 @@ BrowserWindow::LoadFinished(const BString& url, BWebView* view)
 		view->WebPage()->EvaluateJavaScript(script);
 	}
 
-	PageUserData* userData = static_cast<PageUserData*>(view->GetUserData());
 	if (userData != NULL) {
 		userData->SetIsLoading(false);
 		if (userData->IsDownloadRestart())

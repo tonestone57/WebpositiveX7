@@ -31,6 +31,7 @@ public:
 		fURLInputSelectionEnd(-1),
 		fIsLoading(false),
 		fIsDownloadRestart(false),
+		fIsBypassingCache(false),
 		fHttpsUpgraded(false),
 		fIsLazy(false),
 		fIsDiscarded(false),
@@ -147,6 +148,16 @@ public:
 		return fIsDownloadRestart;
 	}
 
+	void SetIsBypassingCache(bool bypassing)
+	{
+		fIsBypassingCache = bypassing;
+	}
+
+	bool IsBypassingCache() const
+	{
+		return fIsBypassingCache;
+	}
+
 	void SetExpectedUpgradedUrl(const BString& url)
 	{
 		fExpectedUpgradedUrl = url;
@@ -240,6 +251,7 @@ private:
 	int32		fURLInputSelectionEnd;
 	bool		fIsLoading;
 	bool		fIsDownloadRestart;
+	bool		fIsBypassingCache;
 	BString		fExpectedUpgradedUrl;
 	bool		fHttpsUpgraded;
 	BString		fPendingURL;
