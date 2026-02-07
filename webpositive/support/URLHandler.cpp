@@ -183,6 +183,11 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 
 				if (be_roster->Launch(temp.String(), 1, argv) == B_OK)
 					return LAUNCH_APP;
+
+				// If we have a valid scheme (like ftp or others supported by WebKit
+				// but not by an external app), try to load it in the browser.
+				outURL = input;
+				return LOAD_URL;
 			}
 		}
 	}

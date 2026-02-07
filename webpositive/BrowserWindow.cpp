@@ -424,14 +424,12 @@ _LoadFaviconThread(void* data)
 						}
 						if (success) {
 							BMessage msg(FAVICON_LOADED);
-							msg.AddPointer("icon", icon);
-							msg.AddUInt32("tabId", params->tabId);
-							if (params->target.SendMessage(&msg) != B_OK) {
-								delete icon;
+							if (icon->Archive(&msg) == B_OK) {
+								msg.AddUInt32("tabId", params->tabId);
+								params->target.SendMessage(&msg);
 							}
-						} else {
-							delete icon;
 						}
+						delete icon;
 					} else {
 						delete icon;
 					}
@@ -1884,10 +1882,11 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 		case FAVICON_LOADED:
 		{
-			void* iconPtr = NULL;
-			if (message->FindPointer("icon", &iconPtr) != B_OK)
+			BBitmap* icon = new(std::nothrow) BBitmap(message);
+			if (icon == NULL || icon->InitCheck() != B_OK) {
+				delete icon;
 				break;
-			BBitmap* icon = static_cast<BBitmap*>(iconPtr);
+			}
 
 			uint32 tabId;
 			if (message->FindUInt32("tabId", &tabId) == B_OK) {

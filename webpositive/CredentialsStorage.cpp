@@ -30,9 +30,11 @@ Credentials::Credentials()
 
 Credentials::Credentials(const BString& username, const BString& password)
 	:
-	fUsername(username),
-	fPassword(password)
+	fUsername(username)
 {
+	// Force deep copy to avoid COW, so we can wipe the buffer later without affecting others
+	// or being affected by COW mechanics (which might allocate a new buffer on LockBuffer).
+	fPassword.SetTo(password.String());
 }
 
 
