@@ -95,7 +95,7 @@ PageSourceSaver::_PageSourceThread(void* data)
 			if (ext.Length() > 0 && ext.Length() <= 5) {
 				bool valid = true;
 				for (int32 i = 0; i < ext.Length(); i++) {
-					if (!isalnum(ext[i])) {
+					if (!isalnum((unsigned char)ext[i])) {
 						valid = false;
 						break;
 					}

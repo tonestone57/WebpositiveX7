@@ -50,6 +50,9 @@ Credentials::Credentials(const BMessage* archive)
 		return;
 	archive->FindString("username", &fUsername);
 	archive->FindString("password", &fPassword);
+	// Force deep copy to avoid COW, so we can wipe the buffer later without affecting others
+	// or being affected by COW mechanics (which might allocate a new buffer on LockBuffer).
+	fPassword.SetTo(fPassword.String());
 }
 
 
