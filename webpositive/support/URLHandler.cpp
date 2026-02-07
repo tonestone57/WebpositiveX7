@@ -226,6 +226,10 @@ URLHandler::CheckURL(const BString& input, BString& outURL, const BString& searc
 					// We use IsValidDomainChar because it allows hex, colon,
 					// dot (IPv4-mapped), and brackets, but disallows spaces.
 					if (!IsValidDomainChar(input[i])) {
+						if (input[i] == '/' || input[i] == '?'
+							|| input[i] == '#') {
+							break;
+						}
 						validIPv6 = false;
 						break;
 					}

@@ -208,6 +208,13 @@ BDefaultChoiceView::ListView::ListView(
 }
 
 
+BDefaultChoiceView::ListView::~ListView()
+{
+	for (int32 i = CountItems() - 1; i >= 0; i--)
+		delete ItemAt(i);
+}
+
+
 void
 BDefaultChoiceView::ListView::AttachedToWindow()
 {

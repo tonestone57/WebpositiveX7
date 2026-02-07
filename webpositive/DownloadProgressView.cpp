@@ -240,8 +240,20 @@ DownloadProgressView::DownloadProgressView(BWebDownload* download)
 	BGroupView(B_HORIZONTAL, 8),
 	fDownload(download),
 	fURL(download->URL()),
-	fPath(download->Path())
+	fPath(download->Path()),
+	fFinishTime(0),
+	fCurrentSize(0),
+	fExpectedSize(0),
+	fLastSpeedReferenceSize(0),
+	fEstimatedFinishReferenceSize(0),
+	fLastUpdateTime(0),
+	fLastSpeedReferenceTime(0),
+	fEstimatedFinishReferenceTime(0),
+	fCurrentBytesPerSecondSlot(0),
+	fBytesPerSecond(0.0)
 {
+	for (size_t i = 0; i < kBytesPerSecondSlots; i++)
+		fBytesPerSecondSlot[i] = -1.0;
 }
 
 
@@ -250,8 +262,21 @@ DownloadProgressView::DownloadProgressView(const BMessage* archive)
 	BGroupView(B_HORIZONTAL, 8),
 	fDownload(NULL),
 	fURL(),
-	fPath()
+	fPath(),
+	fFinishTime(0),
+	fCurrentSize(0),
+	fExpectedSize(0),
+	fLastSpeedReferenceSize(0),
+	fEstimatedFinishReferenceSize(0),
+	fLastUpdateTime(0),
+	fLastSpeedReferenceTime(0),
+	fEstimatedFinishReferenceTime(0),
+	fCurrentBytesPerSecondSlot(0),
+	fBytesPerSecond(0.0)
 {
+	for (size_t i = 0; i < kBytesPerSecondSlots; i++)
+		fBytesPerSecondSlot[i] = -1.0;
+
 	const char* string;
 	if (archive->FindString("path", &string) == B_OK)
 		fPath.SetTo(string);

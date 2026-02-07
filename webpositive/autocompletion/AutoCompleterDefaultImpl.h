@@ -57,6 +57,7 @@ protected:
 	public:
 								ListView(
 									BAutoCompleter::CompletionStyle* completer);
+		virtual					~ListView();
 		virtual	void			SelectionChanged();
 		virtual	void			MessageReceived(BMessage* msg);
 		virtual	void			MouseDown(BPoint point);
